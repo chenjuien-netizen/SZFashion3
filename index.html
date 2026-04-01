@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f9fb" />
+    <title>SZFASHION | Inventaire</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body data-page="inventory">
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-main">
+          <div>
+            <div class="brand">SZFASHION</div>
+            <p class="page-label">Inventaire</p>
+          </div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="search-section">
+          <div class="search-card">
+            <label class="search-input-wrap" for="inventorySearchInput">
+              <span class="search-icon" aria-hidden="true">⌕</span>
+              <input
+                id="inventorySearchInput"
+                class="search-input"
+                type="search"
+                autocomplete="off"
+                placeholder="Recherche référence / entrepôt..."
+              />
+            </label>
+          </div>
+        </section>
+
+        <section class="summary-section">
+          <div class="summary-card">
+            <div class="summary-title">Vue stock</div>
+            <div class="summary-metrics">
+              <div class="summary-metric">
+                <span class="summary-metric-label">Réfs</span>
+                <span id="inventorySummaryRefs" class="summary-metric-value">0</span>
+              </div>
+              <div class="summary-metric">
+                <span class="summary-metric-label">En stock</span>
+                <span id="inventorySummaryPositive" class="summary-metric-value">0</span>
+              </div>
+              <div class="summary-metric">
+                <span class="summary-metric-label">Rupture</span>
+                <span id="inventorySummaryZero" class="summary-metric-value">0</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="list-section">
+          <div id="inventoryList" class="card-list" aria-live="polite"></div>
+          <div id="inventoryEmptyState" class="empty-state hidden">
+            <p class="empty-state-title">Aucun résultat</p>
+            <p class="empty-state-text">Ajuste la recherche pour afficher des références.</p>
+          </div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Navigation principale">
+        <a class="bottom-nav-link is-active" href="./index.html" aria-current="page">
+          <span class="bottom-nav-icon" aria-hidden="true">□</span>
+          <span class="bottom-nav-text">Inventaire</span>
+        </a>
+        <a class="bottom-nav-link" href="./history.html">
+          <span class="bottom-nav-icon" aria-hidden="true">◷</span>
+          <span class="bottom-nav-text">Historique</span>
+        </a>
+      </nav>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f9fb" />
+    <title>SZFASHION | Historique</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body data-page="history">
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-main">
+          <div>
+            <div class="brand">SZFASHION</div>
+            <p class="page-label">Historique</p>
+          </div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <section class="search-section">
+          <div class="search-card search-card-stack">
+            <label class="search-input-wrap" for="historySearchInput">
+              <span class="search-icon" aria-hidden="true">⌕</span>
+              <input
+                id="historySearchInput"
+                class="search-input"
+                type="search"
+                autocomplete="off"
+                placeholder="Recherche référence / remarque..."
+              />
+            </label>
+
+            <div class="filter-row">
+              <label class="filter-field" for="historyTypeFilter">
+                <span class="filter-label">Type</span>
+                <select id="historyTypeFilter" class="filter-select">
+                  <option value="all">Tous</option>
+                  <option value="entry">Entrée</option>
+                  <option value="exit">Sortie</option>
+                  <option value="adjustment">Ajustement</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section class="summary-section">
+          <div class="summary-card">
+            <div class="summary-title">Mouvements visibles</div>
+            <div class="summary-inline">
+              <span id="historySummaryCount" class="summary-inline-value">0</span>
+              <span class="summary-inline-label">mouvement(s)</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="list-section">
+          <div id="historyList" class="card-list" aria-live="polite"></div>
+          <div id="historyEmptyState" class="empty-state hidden">
+            <p class="empty-state-title">Aucun mouvement</p>
+            <p class="empty-state-text">Aucun mouvement ne correspond aux filtres actuels.</p>
+          </div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Navigation principale">
+        <a class="bottom-nav-link" href="./index.html">
+          <span class="bottom-nav-icon" aria-hidden="true">□</span>
+          <span class="bottom-nav-text">Inventaire</span>
+        </a>
+        <a class="bottom-nav-link is-active" href="./history.html" aria-current="page">
+          <span class="bottom-nav-icon" aria-hidden="true">◷</span>
+          <span class="bottom-nav-text">Historique</span>
+        </a>
+      </nav>
+    </div>
+  </body>
+</html>
