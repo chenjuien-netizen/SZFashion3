@@ -5,89 +5,101 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f7f9fb" />
     <title>SZFASHION | Détail inventaire</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./style.css" />
     <script src="./app.js" defer></script>
   </head>
   <body data-page="detail">
-    <div class="app-shell">
-      <header class="topbar">
-        <div class="topbar-main topbar-main-detail">
-          <button id="detailBackButton" class="back-button" type="button" aria-label="Retour">
-            ←
-          </button>
-          <div>
-            <div class="brand">SZFASHION</div>
-            <p class="page-label">Détail inventaire</p>
-          </div>
-        </div>
-      </header>
-
-      <main class="page-content">
-        <div id="detailNotFoundState" class="empty-state hidden">
-          <p class="empty-state-title">Référence introuvable</p>
-          <p class="empty-state-text">La fiche demandée n’existe pas dans cette V0.</p>
-        </div>
-
-        <div id="detailContent" class="detail-content">
-          <section class="detail-hero">
-            <div class="detail-hero-head">
-              <div>
-                <p class="detail-hero-label">Référence</p>
-                <h1 id="detailReference" class="detail-reference">-</h1>
+    <div class="app-screen">
+      <div class="app-shell app-shell-detail">
+        <main class="app-main">
+          <div class="app-top-stack">
+            <header class="app-header">
+              <div class="app-header-left app-header-left-detail">
+                <button id="detailBackButton" class="icon-button" type="button" aria-label="Retour">
+                  <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                <div class="detail-header-copy">
+                  <h1 id="detailReference" class="app-title detail-title">-</h1>
+                  <p id="detailSubline" class="detail-subline">Fiche produit</p>
+                </div>
               </div>
-              <span id="detailStockState" class="badge badge-zero">-</span>
-            </div>
+              <div class="detail-header-spacer"></div>
+            </header>
+          </div>
 
-            <div class="detail-stock-block">
-              <p class="detail-hero-label">Stock actuel</p>
-              <div id="detailStockDisplay" class="detail-stock-value">-</div>
+          <section id="detailScroll" class="content-scroll detail-scroll">
+            <div class="detail-inner">
+              <div id="detailNotFoundBanner" class="detail-not-found hidden">
+                Référence introuvable dans le stock courant.
+              </div>
+
+              <div id="detailContent">
+                <section class="detail-card">
+                  <div class="detail-stock-head">
+                    <div class="detail-stock-copy">
+                      <div class="detail-card-label">Stock actuel</div>
+                      <div id="detailStockDisplay" class="detail-stock-display">-</div>
+                    </div>
+                    <div id="detailStockState" class="detail-stock-state">-</div>
+                  </div>
+
+                  <div class="detail-meta-grid">
+                    <div class="detail-meta-block">
+                      <div class="detail-meta-label">Entrepot</div>
+                      <div id="detailWarehouse" class="detail-meta-value">-</div>
+                    </div>
+                    <div class="detail-meta-block">
+                      <div class="detail-meta-label">Création</div>
+                      <div id="detailCreatedAt" class="detail-meta-value">-</div>
+                    </div>
+                    <div class="detail-meta-block">
+                      <div class="detail-meta-label">Dernier mouvement</div>
+                      <div id="detailLastMovement" class="detail-meta-value">-</div>
+                    </div>
+                    <div class="detail-meta-block">
+                      <div class="detail-meta-label">Résumé</div>
+                      <div id="detailSummary" class="detail-meta-value">-</div>
+                    </div>
+                  </div>
+                </section>
+
+                <section id="detailRemarkSection" class="detail-card">
+                  <div class="detail-card-label">Remarque</div>
+                  <div id="detailRemark" class="detail-remark">-</div>
+                </section>
+
+                <section class="detail-card detail-history-card-wrap">
+                  <div class="detail-history-header">
+                    <div class="detail-card-label">Historique récent</div>
+                  </div>
+                  <div id="detailHistoryList" class="history-list"></div>
+                  <div id="detailHistoryEmpty" class="detail-history-empty hidden">
+                    <p class="empty-title">Aucun historique</p>
+                  </div>
+                </section>
+              </div>
             </div>
           </section>
-
-          <section class="detail-grid">
-            <article class="detail-block">
-              <p class="detail-block-label">Entrepôt</p>
-              <p id="detailWarehouse" class="detail-block-value">-</p>
-            </article>
-            <article class="detail-block">
-              <p class="detail-block-label">Création</p>
-              <p id="detailCreatedAt" class="detail-block-value">-</p>
-            </article>
-            <article class="detail-block">
-              <p class="detail-block-label">Dernier mouvement</p>
-              <p id="detailLastMovement" class="detail-block-value">-</p>
-            </article>
-            <article class="detail-block">
-              <p class="detail-block-label">Résumé</p>
-              <p id="detailSummary" class="detail-block-value">-</p>
-            </article>
-          </section>
-
-          <section id="detailRemarkBlock" class="card detail-panel">
-            <p class="section-title">Remarque</p>
-            <p id="detailRemark" class="detail-remark">-</p>
-          </section>
-
-          <section class="card detail-panel">
-            <div class="section-heading">
-              <p class="section-title">Historique récent</p>
-            </div>
-            <div id="detailHistoryList" class="card-list"></div>
-            <div id="detailHistoryEmptyState" class="empty-state empty-state-embedded hidden">
-              <p class="empty-state-title">Aucun historique</p>
-              <p class="empty-state-text">Aucun mouvement lié à cette référence.</p>
-            </div>
-          </section>
-        </div>
-      </main>
+        </main>
+      </div>
 
       <nav class="bottom-nav" aria-label="Navigation principale">
         <a class="bottom-nav-link" href="./index.html">
-          <span class="bottom-nav-icon" aria-hidden="true">□</span>
+          <span class="material-symbols-outlined">inventory_2</span>
           <span class="bottom-nav-text">Inventaire</span>
         </a>
         <a class="bottom-nav-link" href="./history.html">
-          <span class="bottom-nav-icon" aria-hidden="true">◷</span>
+          <span class="material-symbols-outlined">history</span>
           <span class="bottom-nav-text">Historique</span>
         </a>
       </nav>

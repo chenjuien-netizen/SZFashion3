@@ -5,74 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f7f9fb" />
     <title>SZFASHION | Historique</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./style.css" />
     <script src="./app.js" defer></script>
   </head>
   <body data-page="history">
-    <div class="app-shell">
-      <header class="topbar">
-        <div class="topbar-main">
-          <div>
-            <div class="brand">SZFASHION</div>
-            <p class="page-label">Historique</p>
+    <div class="app-screen">
+      <div class="app-shell app-shell-history">
+        <main class="app-main">
+          <div class="app-top-stack">
+            <header class="app-header">
+              <div class="app-header-left">
+                <a class="icon-button" href="./index.html" aria-label="Retour inventaire">
+                  <span class="material-symbols-outlined">arrow_back</span>
+                </a>
+                <div>
+                  <h1 class="app-title">Historique</h1>
+                </div>
+              </div>
+              <div id="historySummary" class="header-status">-</div>
+            </header>
+
+            <section class="history-search-strip">
+              <div class="search-row">
+                <span class="material-symbols-outlined search-symbol">search</span>
+                <input
+                  id="historySearchInput"
+                  class="search-input"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="RECHERCHE RÉFÉRENCE / TYPE / REMARQUE..."
+                />
+              </div>
+
+              <div class="history-filter-row">
+                <label class="history-filter-wrap">
+                  <select id="historyActionTypeFilter" class="history-filter-select">
+                    <option value="">Tous types</option>
+                    <option value="modifier">modifier</option>
+                    <option value="sortie_rapide">sortie_rapide</option>
+                  </select>
+                </label>
+                <div id="historyStatus" class="history-inline-status">Pret</div>
+              </div>
+            </section>
           </div>
-        </div>
-      </header>
 
-      <main class="page-content">
-        <section class="search-section">
-          <div class="search-card search-card-stack">
-            <label class="search-input-wrap" for="historySearchInput">
-              <span class="search-icon" aria-hidden="true">⌕</span>
-              <input
-                id="historySearchInput"
-                class="search-input"
-                type="search"
-                autocomplete="off"
-                placeholder="Recherche référence / remarque..."
-              />
-            </label>
-
-            <div class="filter-row">
-              <label class="filter-field" for="historyTypeFilter">
-                <span class="filter-label">Type</span>
-                <select id="historyTypeFilter" class="filter-select">
-                  <option value="all">Tous</option>
-                  <option value="entry">Entrée</option>
-                  <option value="exit">Sortie</option>
-                  <option value="adjustment">Ajustement</option>
-                </select>
-              </label>
+          <section id="historyScroll" class="content-scroll inventory-scroll">
+            <div id="historyList" class="history-list" aria-live="polite"></div>
+            <div id="historyEmptyState" class="empty-strip hidden">
+              <p id="historyEmptyTitle" class="empty-title">Aucun historique</p>
+              <p id="historyEmptyMessage" class="empty-message">Aucun mouvement à afficher.</p>
             </div>
-          </div>
-        </section>
-
-        <section class="summary-section">
-          <div class="summary-card">
-            <div class="summary-title">Mouvements visibles</div>
-            <div class="summary-inline">
-              <span id="historySummaryCount" class="summary-inline-value">0</span>
-              <span class="summary-inline-label">mouvement(s)</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="list-section">
-          <div id="historyList" class="card-list" aria-live="polite"></div>
-          <div id="historyEmptyState" class="empty-state hidden">
-            <p class="empty-state-title">Aucun mouvement</p>
-            <p class="empty-state-text">Aucun mouvement ne correspond aux filtres actuels.</p>
-          </div>
-        </section>
-      </main>
+          </section>
+        </main>
+      </div>
 
       <nav class="bottom-nav" aria-label="Navigation principale">
         <a class="bottom-nav-link" href="./index.html">
-          <span class="bottom-nav-icon" aria-hidden="true">□</span>
+          <span class="material-symbols-outlined">inventory_2</span>
           <span class="bottom-nav-text">Inventaire</span>
         </a>
         <a class="bottom-nav-link is-active" href="./history.html" aria-current="page">
-          <span class="bottom-nav-icon" aria-hidden="true">◷</span>
+          <span class="material-symbols-outlined">history</span>
           <span class="bottom-nav-text">Historique</span>
         </a>
       </nav>

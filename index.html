@@ -5,72 +5,106 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f7f9fb" />
     <title>SZFASHION | Inventaire</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./style.css" />
     <script src="./app.js" defer></script>
   </head>
   <body data-page="inventory">
-    <div class="app-shell">
-      <header class="topbar">
-        <div class="topbar-main">
-          <div>
-            <div class="brand">SZFASHION</div>
-            <p class="page-label">Inventaire</p>
-          </div>
-        </div>
-      </header>
+    <div class="app-screen">
+      <div class="app-shell app-shell-inventory">
+        <main class="app-main">
+          <div class="app-top-stack">
+            <header class="app-header">
+              <div class="app-header-left">
+                <button class="icon-button" type="button" aria-label="Menu">
+                  <span class="material-symbols-outlined">menu</span>
+                </button>
+                <div>
+                  <h1 class="app-brand">SZFASHION</h1>
+                </div>
+              </div>
+              <div class="app-header-right">
+                <button class="icon-button" id="refreshButton" type="button" aria-label="Rafraîchir">
+                  <span class="material-symbols-outlined">refresh</span>
+                </button>
+              </div>
+            </header>
 
-      <main class="page-content">
-        <section class="search-section">
-          <div class="search-card">
-            <label class="search-input-wrap" for="inventorySearchInput">
-              <span class="search-icon" aria-hidden="true">⌕</span>
-              <input
-                id="inventorySearchInput"
-                class="search-input"
-                type="search"
-                autocomplete="off"
-                placeholder="Recherche référence / entrepôt..."
-              />
-            </label>
-          </div>
-        </section>
+            <section class="search-strip">
+              <div class="search-row">
+                <span class="material-symbols-outlined search-symbol">search</span>
+                <input
+                  id="searchInput"
+                  class="search-input"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="RECHERCHE RÉFÉRENCE / STOCK..."
+                />
+                <span id="sortBadge" class="search-badge">REF ASC</span>
+              </div>
+            </section>
 
-        <section class="summary-section">
-          <div class="summary-card">
-            <div class="summary-title">Vue stock</div>
-            <div class="summary-metrics">
-              <div class="summary-metric">
-                <span class="summary-metric-label">Réfs</span>
-                <span id="inventorySummaryRefs" class="summary-metric-value">0</span>
+            <section class="utility-strip">
+              <div class="utility-actions">
+                <button class="utility-action" id="toggleFilterButton" type="button">
+                  <span class="material-symbols-outlined utility-symbol">filter_list</span>
+                  <span class="utility-label">Filtrer</span>
+                </button>
+                <button class="utility-action" id="toggleSortButton" type="button">
+                  <span class="material-symbols-outlined utility-symbol">sort</span>
+                  <span class="utility-label">Trier</span>
+                </button>
               </div>
-              <div class="summary-metric">
-                <span class="summary-metric-label">En stock</span>
-                <span id="inventorySummaryPositive" class="summary-metric-value">0</span>
+            </section>
+
+            <section class="summary-strip">
+              <div class="summary-row">
+                <div class="summary-left">
+                  <div class="summary-date-pill">
+                    <span class="material-symbols-outlined summary-date-icon">calendar_today</span>
+                    <span id="summaryDate">--/--/----</span>
+                  </div>
+                  <div class="summary-metrics">
+                    <span id="summaryRefs">0 refs</span>
+                    <span class="summary-separator">//</span>
+                    <span id="summaryPositive">0 en stock</span>
+                    <span class="summary-separator">//</span>
+                    <span id="summaryZero">0 en rupture</span>
+                    <span class="summary-separator">//</span>
+                    <span id="summaryTotals">0 cartons 0 pcs</span>
+                  </div>
+                </div>
+                <div id="summaryStatus" class="summary-status">Pret</div>
               </div>
-              <div class="summary-metric">
-                <span class="summary-metric-label">Rupture</span>
-                <span id="inventorySummaryZero" class="summary-metric-value">0</span>
-              </div>
+            </section>
+          </div>
+
+          <section id="inventoryScroll" class="content-scroll inventory-scroll">
+            <div id="inventoryGrid" class="inventory-grid" aria-live="polite"></div>
+            <div id="emptyState" class="empty-strip hidden">
+              <p class="empty-title">Aucun resultat</p>
+              <p class="empty-message">Ajuste la recherche pour afficher des references.</p>
             </div>
-          </div>
-        </section>
-
-        <section class="list-section">
-          <div id="inventoryList" class="card-list" aria-live="polite"></div>
-          <div id="inventoryEmptyState" class="empty-state hidden">
-            <p class="empty-state-title">Aucun résultat</p>
-            <p class="empty-state-text">Ajuste la recherche pour afficher des références.</p>
-          </div>
-        </section>
-      </main>
+          </section>
+        </main>
+      </div>
 
       <nav class="bottom-nav" aria-label="Navigation principale">
         <a class="bottom-nav-link is-active" href="./index.html" aria-current="page">
-          <span class="bottom-nav-icon" aria-hidden="true">□</span>
+          <span class="material-symbols-outlined">inventory_2</span>
           <span class="bottom-nav-text">Inventaire</span>
         </a>
         <a class="bottom-nav-link" href="./history.html">
-          <span class="bottom-nav-icon" aria-hidden="true">◷</span>
+          <span class="material-symbols-outlined">history</span>
           <span class="bottom-nav-text">Historique</span>
         </a>
       </nav>
