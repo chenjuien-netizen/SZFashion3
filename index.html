@@ -136,7 +136,9 @@
                 <h1 class="text-lg font-extrabold uppercase tracking-tight text-slate-900">SZFASHION</h1>
               </div>
             </div>
-            <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Inventaire</div>
+            <button aria-label="Rafraîchir" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="refreshButton" type="button">
+              <span class="material-symbols-outlined">refresh</span>
+            </button>
           </header>
 
           <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-1.5 shadow-ledger">
@@ -163,7 +165,11 @@
                   <span id="summaryTotals">0 pcs</span>
                 </div>
               </div>
-              <div class="text-right text-[8px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="summaryStatus">Pret</div>
+              <div class="flex items-center gap-2 text-right text-[8px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
+                <span id="networkStatus">En ligne</span>
+                <span class="text-outline-variant/40">//</span>
+                <span id="summaryStatus">Pret</span>
+              </div>
             </div>
           </section>
         </div>

@@ -944,6 +944,8 @@ function bindQuickEditEvents() {
 
 function renderInventoryPage() {
   const searchInput = document.getElementById("searchInput");
+  const networkStatus = document.getElementById("networkStatus");
+  const refreshButton = document.getElementById("refreshButton");
   const summaryDate = document.getElementById("summaryDate");
   const summaryRefs = document.getElementById("summaryRefs");
   const summaryPositive = document.getElementById("summaryPositive");
@@ -965,13 +967,20 @@ function renderInventoryPage() {
   summaryPositive.textContent = summary.positiveCount + " en stock";
   summaryZero.textContent = summary.zeroCount + " en rupture";
   summaryTotals.textContent = summary.totalBoxes + " 箱 " + summary.totalPieces + " 件";
+  if (networkStatus) networkStatus.textContent = navigator.onLine ? "En ligne" : "Hors ligne";
   summaryStatus.textContent = state.query ? "Recherche" : "Pret";
+  if (refreshButton && !refreshButton.dataset.bound) {
+    refreshButton.dataset.bound = "true";
+    refreshButton.addEventListener("click", function() {
+      renderInventoryPage();
+    });
+  }
 }
 
 function renderHistoryPage() {
   const searchInput = document.getElementById("historySearchInput");
   const actionTypeFilter = document.getElementById("historyActionTypeFilter");
-  const historySummary = document.getElementById("historySummary");
+  const historyRefreshButton = document.getElementById("historyRefreshButton");
   const historyStatus = document.getElementById("historyStatus");
   const historyList = document.getElementById("historyList");
   const historyEmptyState = document.getElementById("historyEmptyState");
@@ -984,11 +993,16 @@ function renderHistoryPage() {
   const items = filterHistoryItems(state.historyQuery, state.historyActionType);
   const hasFilters = !!(state.historyQuery || state.historyActionType);
   historyList.innerHTML = items.map(renderHistoryCard).join("");
-  historySummary.textContent = items.length > 0 ? items.length + " mouvements" : "-";
   historyStatus.textContent = hasFilters ? "Filtré" : "Pret";
   historyEmptyState.classList.toggle("hidden", items.length > 0);
   historyEmptyTitle.textContent = hasFilters ? "Aucun resultat" : "Aucun historique";
   historyEmptyMessage.textContent = hasFilters ? "Aucun mouvement ne correspond à la recherche." : "Aucun mouvement à afficher.";
+  if (historyRefreshButton && !historyRefreshButton.dataset.bound) {
+    historyRefreshButton.dataset.bound = "true";
+    historyRefreshButton.addEventListener("click", function() {
+      renderHistoryPage();
+    });
+  }
 }
 
 function renderDetailPage() {
@@ -1129,6 +1143,8 @@ function initApp() {
       syncColumnLayout(false);
     }, 100);
   });
+  window.addEventListener("online", renderAll);
+  window.addEventListener("offline", renderAll);
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
