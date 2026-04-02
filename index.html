@@ -251,22 +251,22 @@
                   <div class="overflow-x-auto" id="quickEditExpressionCenterWrap">
                     <div class="min-w-max" id="quickEditExpressionScroll">
                       <div class="flex min-h-[3.25rem] flex-wrap items-center gap-2" id="quickEditExpressionMeasure">
-                        <div class="flex min-w-max items-center gap-2" id="quickEditExpressionLine">
-                          <div class="min-w-max" id="quickEditTailSlot">
+                        <div class="relative flex min-w-max items-end gap-x-2 gap-y-2 whitespace-nowrap pb-1" id="quickEditExpressionLine">
+                          <div class="flex-none" id="quickEditTailSlot">
                             <button class="border border-dashed border-outline-variant/40 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" id="quickEditTailToggle" type="button"><span id="quickEditTailToggleIcon">+</span> 尾箱</button>
                             <div class="hidden items-center gap-2" id="quickEditTailGroup">
                               <div class="border border-outline-variant/20 bg-surface-container-lowest px-2 py-2" id="quickEditTailSegment">
                                 <div class="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">尾箱</div>
-                                <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditTail" inputmode="numeric" min="0" step="1" type="number" />
+                                <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditTail" inputmode="text" placeholder="(85p)" type="text" />
                               </div>
                             </div>
                           </div>
-                          <div class="hidden min-w-max text-[11px] font-black text-on-surface-variant" id="quickEditTailJoinSlot"><span id="quickEditTailJoin">+</span></div>
+                          <div class="pointer-events-none hidden flex-none w-4 self-stretch" id="quickEditTailJoinSlot"><span aria-hidden="true" class="pointer-events-none absolute text-sm font-medium text-on-surface-variant/80" id="quickEditTailJoin">+</span></div>
                           <div class="min-w-max border border-outline-variant/20 bg-surface-container-lowest px-2 py-2" id="quickEditUnitsPerBoxSlot">
                             <div class="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">件/箱</div>
-                            <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditUnitsPerBox" inputmode="numeric" min="0" step="1" type="number" />
+                            <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditUnitsPerBox" inputmode="text" placeholder="144p" type="text" />
                           </div>
-                          <div class="min-w-max text-[11px] font-black text-on-surface-variant" id="quickEditMultiplyJoinSlot"><span id="quickEditMultiplyJoin">×</span></div>
+                          <div class="pointer-events-none flex-none w-4 self-stretch" id="quickEditMultiplyJoinSlot"><span aria-hidden="true" class="pointer-events-none absolute text-sm font-medium text-on-surface-variant/80" id="quickEditMultiplyJoin">×</span></div>
                           <div class="min-w-max border border-outline-variant/20 bg-surface-container-lowest px-2 py-2" id="quickEditItemBoxesSlot">
                             <div class="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">箱数</div>
                             <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditItemBoxes" inputmode="numeric" min="0" step="1" type="number" />

@@ -1,3 +1,8 @@
 .hidden {
   display: none !important;
 }
+
+.quick-edit-body.dropdown-open {
+  overscroll-behavior: none;
+  touch-action: pan-x;
+}
