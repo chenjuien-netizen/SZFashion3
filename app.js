@@ -1327,7 +1327,7 @@ function renderQuickExitSegmentForms_(item) {
       + '<div class="mt-1 text-sm font-semibold text-on-surface">' + escapeHtml(segment.label) + '</div>'
       + '<div class="mt-2 min-h-[4.5rem]">'
       + '<div class="relative min-w-0" data-quick-exit-wrapper="' + escapeHtml(segment.id) + '">'
-      + '<label class="block min-w-0"><span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">valeur</span><input class="w-[9.5rem] border-outline-variant/30 bg-surface-container-low px-2 py-1 text-sm font-semibold text-on-surface opacity-100 caret-on-surface placeholder:text-outline focus:text-on-surface" data-quick-exit-field="entry" data-segment-id="' + escapeHtml(segment.id) + '" inputmode="text" type="text" placeholder="' + escapeHtml(getQuickExitSegmentPlaceholder_(segment)) + '" value="' + escapeHtml(config.entry || "") + '" autocomplete="off" /></label>'
+      + '<label class="block min-w-0"><span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">valeur</span><input class="w-[8.25rem] border-outline-variant/30 bg-surface-container-low px-2 py-1 text-[16px] leading-tight font-semibold text-on-surface opacity-100 caret-on-surface placeholder:text-outline focus:text-on-surface md:text-sm" data-quick-exit-field="entry" data-segment-id="' + escapeHtml(segment.id) + '" inputmode="decimal" type="text" placeholder="' + escapeHtml(getQuickExitSegmentPlaceholder_(segment)) + '" value="' + escapeHtml(config.entry || "") + '" autocomplete="off" /></label>'
       + '<div class="hidden" data-quick-exit-dropdown="' + escapeHtml(segment.id) + '" data-quick-exit-role="suggestions"></div>'
       + '</div>'
       + '<p class="mt-2 hidden max-w-[15rem] text-[11px] font-medium text-error" data-quick-exit-error="' + escapeHtml(segment.id) + '"></p>'
@@ -1790,13 +1790,13 @@ function scheduleQuickEditMeasuredLayout_() {
 
 function syncQuickEditFieldWidths_() {
   const form = state.quickEditForm || {};
-  setFieldWidth_(document.getElementById("quickEditTailSegment"), document.getElementById("quickEditTail"), form.tailInput, document.getElementById("quickEditTail").placeholder, 8, 14, 1);
-  setFieldWidth_(document.getElementById("quickEditUnitsPerBoxField"), document.getElementById("quickEditUnitsPerBox"), form.unitsPerBoxInput, document.getElementById("quickEditUnitsPerBox").placeholder, 8, 14, 1);
-  setFieldWidth_(document.getElementById("quickEditItemBoxesField"), document.getElementById("quickEditItemBoxes"), form.itemBoxes, "1", 6, 8, 1);
-  setFieldWidth_(document.getElementById("quickEditSignField"), document.getElementById("quickEditSignField"), sanitizeSign(form.sign), "+", 7, 8, 0);
-  setFieldWidth_(document.getElementById("quickEditFractionTextField"), document.getElementById("quickEditFractionTextField"), form.fractionText, document.getElementById("quickEditFractionTextField").placeholder, 6, 10, 1);
-  setFieldWidth_(document.getElementById("quickEditPackSignField"), document.getElementById("quickEditPackSignField"), form.packNotationSign, "+", 7, 8, 0);
-  setFieldWidth_(document.getElementById("quickEditPackCountField"), document.getElementById("quickEditPackCountField"), form.packNotationCount, "0", 6, 8, 1);
+  setFieldWidth_(document.getElementById("quickEditTailSegment"), document.getElementById("quickEditTail"), form.tailInput, document.getElementById("quickEditTail").placeholder, 7, 12, 0);
+  setFieldWidth_(document.getElementById("quickEditUnitsPerBoxField"), document.getElementById("quickEditUnitsPerBox"), form.unitsPerBoxInput, document.getElementById("quickEditUnitsPerBox").placeholder, 6, 10, 0);
+  setFieldWidth_(document.getElementById("quickEditItemBoxesField"), document.getElementById("quickEditItemBoxes"), form.itemBoxes, "1", 3, 5, 0);
+  setFieldWidth_(document.getElementById("quickEditSignField"), document.getElementById("quickEditSign"), sanitizeSign(form.sign), "+", 2, 3, 0);
+  setFieldWidth_(document.getElementById("quickEditFractionTextField"), document.getElementById("quickEditFractionText"), form.fractionText, document.getElementById("quickEditFractionText").placeholder, 4, 6, 0);
+  setFieldWidth_(document.getElementById("quickEditPackSignField"), document.getElementById("quickEditPackNotationSign"), form.packNotationSign, "+", 2, 3, 0);
+  setFieldWidth_(document.getElementById("quickEditPackCountField"), document.getElementById("quickEditPackNotationCount"), form.packNotationCount, "0", 2, 4, 0);
   scheduleQuickEditMeasuredLayout_();
 }
 
@@ -1850,11 +1850,7 @@ function renderQuickEdit() {
   els.quickEditTail.value = form.tailInput || "";
   els.quickEditUnitsPerBox.value = form.unitsPerBoxInput || "";
   els.quickEditItemBoxes.value = form.itemBoxes || "";
-  els.quickEditSignField.value = sanitizeSign(form.sign);
-  els.quickEditFractionTextField.value = form.fractionText || "";
-  els.quickEditPackSignField.value = form.packNotationSign || "+";
-  els.quickEditPackCountField.value = form.packNotationCount || "";
-  if (els.quickEditSign) els.quickEditSign.value = sanitizeSign(form.sign);
+  if (els.quickEditSign) els.quickEditSign.value = sanitizeSign(form.sign) || "+";
   if (els.quickEditFractionText) els.quickEditFractionText.value = form.fractionText || "";
   if (els.quickEditPackNotationSign) els.quickEditPackNotationSign.value = form.packNotationSign || "+";
   if (els.quickEditPackNotationCount) els.quickEditPackNotationCount.value = form.packNotationCount || "";
@@ -1874,7 +1870,6 @@ function renderQuickEdit() {
   els.quickEditTailRemoveJoinSlot.classList.toggle("hidden", !tailOpen);
   els.quickEditPartialToggle.classList.toggle("hidden", !showPartialToggle);
   els.quickEditPartialGroup.classList.toggle("hidden", !showPartialGroup);
-  els.quickEditPartialGroup.classList.toggle("flex", showPartialGroup);
   els.quickEditPartialRemoveSlot.classList.toggle("hidden", !showPartialGroup);
   els.quickEditTailToggleIcon.textContent = "add";
   els.quickEditPartialToggleIcon.textContent = "add";

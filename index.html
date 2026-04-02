@@ -2,7 +2,7 @@
 <html class="light" lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
     <meta name="theme-color" content="#f7f9fb" />
     <title>SZFASHION | Inventaire</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -256,7 +256,7 @@
                           <div class="hidden" id="quickEditTailGroup">
                             <label class="block" id="quickEditTailSegment">
                               <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</span>
-                              <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditTail" inputmode="numeric" maxlength="16" placeholder="(85p)" type="text" />
+                              <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditTail" inputmode="numeric" maxlength="16" placeholder="(85p)" type="text" />
                             </label>
                           </div>
                         </div>
@@ -270,7 +270,7 @@
                         <div class="flex-none" id="quickEditUnitsPerBoxSlot">
                           <label class="block" id="quickEditUnitsPerBoxField">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</span>
-                            <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-semibold text-on-surface" id="quickEditUnitsPerBox" inputmode="numeric" maxlength="16" placeholder="144p" type="text" />
+                            <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-semibold text-on-surface md:text-sm" id="quickEditUnitsPerBox" inputmode="numeric" maxlength="16" placeholder="144p" type="text" />
                           </label>
                         </div>
                         <div class="pointer-events-none flex-none w-4 self-stretch" id="quickEditMultiplyJoinSlot">
@@ -283,7 +283,7 @@
                         <div class="flex-none" id="quickEditItemBoxesSlot">
                           <label class="block" id="quickEditItemBoxesField">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</span>
-                            <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-semibold text-on-surface" id="quickEditItemBoxes" inputmode="numeric" min="0" step="1" type="number" />
+                            <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-semibold text-on-surface md:text-sm" id="quickEditItemBoxes" inputmode="numeric" min="0" step="1" type="number" />
                           </label>
                         </div>
                         <div class="flex-none" id="quickEditPartialSlot">
@@ -294,25 +294,25 @@
                             <div class="flex items-end gap-x-2 gap-y-2" id="quickEditPartialSegment">
                               <label class="block" id="quickEditSignField">
                                 <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
-                                <select class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditSign">
+                                <select class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditSign">
                                   <option value="+">+</option>
                                   <option value="×">×</option>
                                 </select>
                               </label>
                               <label class="block" id="quickEditFractionTextField">
                                 <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">分数</span>
-                                <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditFractionText" inputmode="text" maxlength="10" placeholder="1/2" type="text" />
+                                <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditFractionText" inputmode="decimal" maxlength="10" placeholder="1/2" type="text" />
                               </label>
                               <label class="block" id="quickEditPackSignField">
                                 <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
-                                <select class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditPackNotationSign">
+                                <select class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditPackNotationSign">
                                   <option value="+">+</option>
                                   <option value="-">-</option>
                                 </select>
                               </label>
                               <label class="block" id="quickEditPackCountField">
                                 <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">包</span>
-                                <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditPackNotationCount" inputmode="numeric" min="0" step="1" type="number" />
+                                <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditPackNotationCount" inputmode="numeric" min="0" step="1" type="number" />
                               </label>
                             </div>
                           </div>
@@ -358,7 +358,7 @@
 
             <label class="block">
               <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">放位</span>
-              <textarea class="min-h-[7rem] w-full border-outline-variant/30 bg-surface-container-low text-sm text-on-surface" id="quickEditRemark" maxlength="240" placeholder="放位"></textarea>
+              <textarea class="min-h-[7rem] w-full border-outline-variant/30 bg-surface-container-low text-[16px] leading-tight text-on-surface md:text-sm" id="quickEditRemark" maxlength="240" placeholder="放位"></textarea>
             </label>
 
             <p class="hidden rounded border border-error/20 bg-error-container/20 px-3 py-2 text-[11px] font-medium text-on-error-container" id="quickEditMessage"></p>
