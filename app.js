@@ -796,6 +796,7 @@ function getQuickEditElements() {
     quickExitCurrentStockScroll: document.getElementById("quickExitCurrentStockScroll"),
     quickExitCurrentStock: document.getElementById("quickExitCurrentStock"),
     quickExitClearButton: document.getElementById("quickExitClearButton"),
+    quickExitSegmentFormsScroll: document.getElementById("quickExitSegmentFormsScroll"),
     quickExitSegmentForms: document.getElementById("quickExitSegmentForms"),
     quickExitPreviewWrap: document.getElementById("quickExitPreviewWrap"),
     quickExitPreview: document.getElementById("quickExitPreview"),
@@ -814,10 +815,12 @@ function getQuickEditElements() {
     quickEditTailJoinSlot: document.getElementById("quickEditTailJoinSlot"),
     quickEditTailJoin: document.getElementById("quickEditTailJoin"),
     quickEditUnitsPerBoxSlot: document.getElementById("quickEditUnitsPerBoxSlot"),
+    quickEditUnitsPerBoxField: document.getElementById("quickEditUnitsPerBoxField"),
     quickEditUnitsPerBox: document.getElementById("quickEditUnitsPerBox"),
     quickEditMultiplyJoinSlot: document.getElementById("quickEditMultiplyJoinSlot"),
     quickEditMultiplyJoin: document.getElementById("quickEditMultiplyJoin"),
     quickEditItemBoxesSlot: document.getElementById("quickEditItemBoxesSlot"),
+    quickEditItemBoxesField: document.getElementById("quickEditItemBoxesField"),
     quickEditItemBoxes: document.getElementById("quickEditItemBoxes"),
     quickEditPartialSlot: document.getElementById("quickEditPartialSlot"),
     quickEditPartialToggle: document.getElementById("quickEditPartialToggle"),
@@ -1578,18 +1581,19 @@ function renderQuickExitSegmentDropdown_(segmentId) {
     return;
   }
   const panelRect = panelWrap.getBoundingClientRect();
+  const modalRect = els.quickEditModal ? els.quickEditModal.getBoundingClientRect() : panelRect;
   const footerRect = footer.getBoundingClientRect();
   const inputRect = controls.input.getBoundingClientRect();
   const maxVisibleRows = Math.min(suggestions.length, 5);
-  const dropdownWidth = Math.max(0, Math.round(inputRect.width));
-  const left = Math.max(0, Math.min(inputRect.left - panelRect.left, panelRect.width - dropdownWidth));
+  const dropdownWidth = Math.max(160, Math.min(Math.round(inputRect.width), Math.round(panelRect.width)));
+  const left = Math.max(0, Math.min(Math.round(inputRect.left - panelRect.left), Math.max(0, Math.round(panelRect.width - dropdownWidth))));
   const rowHeight = 40;
   const desiredHeight = Math.max(44, maxVisibleRows * rowHeight);
   const gap = 4;
-  const safeBottom = Math.max(inputRect.bottom + gap + 32, footerRect.top - gap);
-  const spaceBelow = Math.max(0, safeBottom - inputRect.bottom - gap);
+  const maxBottom = Math.min(footerRect.top - panelRect.top - gap, modalRect.bottom - panelRect.top - 12);
+  const top = Math.max(0, Math.round(inputRect.bottom - panelRect.top + gap));
+  const spaceBelow = Math.max(0, maxBottom - top);
   const maxHeight = Math.max(32, Math.min(desiredHeight, spaceBelow));
-  const top = Math.max(0, inputRect.bottom - panelRect.top + gap);
   const highlightedIndex = Math.max(-1, Math.min(Number(config.highlightedIndex || -1), suggestions.length - 1));
   layer.innerHTML = '<div class="pointer-events-auto absolute overflow-y-auto rounded border border-outline-variant/40 bg-surface-container-lowest shadow-[0_16px_32px_rgba(11,15,16,0.24)]" style="left:' + left + 'px;top:' + top + 'px;width:' + dropdownWidth + 'px;max-height:' + maxHeight + 'px;">'
     + suggestions.map(function(suggestion, index) {
@@ -1623,8 +1627,8 @@ function renderQuickExitSegmentUi_(segmentId) {
   const els = getQuickEditElements();
   renderQuickExitSegmentDropdown_(segmentId);
   renderQuickExitSegmentError_(segmentId);
-  if (els.quickExitSegmentForms && els.quickExitSegmentForms.scrollWidth <= els.quickExitSegmentForms.clientWidth + 1) {
-    els.quickExitSegmentForms.scrollLeft = 0;
+  if (els.quickExitSegmentFormsScroll && els.quickExitSegmentFormsScroll.scrollWidth <= els.quickExitSegmentFormsScroll.clientWidth + 1) {
+    els.quickExitSegmentFormsScroll.scrollLeft = 0;
   }
 }
 
@@ -1787,8 +1791,8 @@ function scheduleQuickEditMeasuredLayout_() {
 function syncQuickEditFieldWidths_() {
   const form = state.quickEditForm || {};
   setFieldWidth_(document.getElementById("quickEditTailSegment"), document.getElementById("quickEditTail"), form.tailInput, document.getElementById("quickEditTail").placeholder, 8, 14, 1);
-  setFieldWidth_(document.getElementById("quickEditUnitsPerBoxSlot"), document.getElementById("quickEditUnitsPerBox"), form.unitsPerBoxInput, document.getElementById("quickEditUnitsPerBox").placeholder, 8, 14, 1);
-  setFieldWidth_(document.getElementById("quickEditItemBoxesSlot"), document.getElementById("quickEditItemBoxes"), form.itemBoxes, "1", 6, 8, 1);
+  setFieldWidth_(document.getElementById("quickEditUnitsPerBoxField"), document.getElementById("quickEditUnitsPerBox"), form.unitsPerBoxInput, document.getElementById("quickEditUnitsPerBox").placeholder, 8, 14, 1);
+  setFieldWidth_(document.getElementById("quickEditItemBoxesField"), document.getElementById("quickEditItemBoxes"), form.itemBoxes, "1", 6, 8, 1);
   setFieldWidth_(document.getElementById("quickEditSignField"), document.getElementById("quickEditSignField"), sanitizeSign(form.sign), "+", 7, 8, 0);
   setFieldWidth_(document.getElementById("quickEditFractionTextField"), document.getElementById("quickEditFractionTextField"), form.fractionText, document.getElementById("quickEditFractionTextField").placeholder, 6, 10, 1);
   setFieldWidth_(document.getElementById("quickEditPackSignField"), document.getElementById("quickEditPackSignField"), form.packNotationSign, "+", 7, 8, 0);
@@ -1802,10 +1806,16 @@ function syncQuickExitScrollableRow_(scrollEl, contentEl) {
 }
 
 function buildQuickExitPacksHintMarkup(colisage, packsPerBox) {
-  return '<div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Packs</div>'
-    + '<div class="mt-1 text-[11px] text-primary"><span class="font-semibold text-on-surface">' + escapeHtml(colisage) + '</span> 件 / 包'
-    + ' <span class="text-on-surface-variant">•</span> '
-    + '<span class="font-semibold text-on-surface">' + escapeHtml(packsPerBox) + '</span> 包 / 箱</div>';
+  const safeColisage = Math.max(0, Math.trunc(Number(colisage) || 0));
+  const safePacksPerBox = Math.max(0, Math.trunc(Number(packsPerBox) || 0));
+  if (!(safeColisage > 0) || !(safePacksPerBox > 0)) return "";
+  return ''
+    + '<span class="font-semibold text-on-surface">' + escapeHtml(safeColisage) + '</span>'
+    + '<span class="text-on-surface-variant">件/包</span>'
+    + '<span class="text-on-surface-variant"> · </span>'
+    + '<span class="text-on-surface-variant">1箱=</span>'
+    + '<span class="font-semibold text-on-surface">' + escapeHtml(safePacksPerBox) + '</span>'
+    + '<span class="text-on-surface-variant">包</span>';
 }
 
 function renderQuickEdit() {

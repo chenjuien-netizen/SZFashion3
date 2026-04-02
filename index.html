@@ -214,110 +214,146 @@
             <button class="border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="quickEditTabEdit" type="button">Modifier</button>
           </div>
         </div>
-        <div class="quick-edit-body relative max-h-[calc(100dvh-12.5rem)] overflow-y-auto px-4 py-3" id="quickEditBody">
+        <div class="quick-edit-body max-h-[calc(100dvh-12.5rem)] overflow-y-auto px-4 py-3" id="quickEditBody">
           <div class="space-y-4">
-            <section class="space-y-3" id="quickExitPanel">
-              <div class="flex items-center justify-between gap-3 rounded border border-outline-variant/20 bg-surface-container-low px-3 py-2" id="quickExitPanelWrap">
-                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Stock actuel</div>
-                <button class="hidden border border-outline-variant/30 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" id="quickExitClearButton" type="button">清空库存</button>
-              </div>
-              <div class="hidden border border-outline-variant/20 bg-surface-container-low px-3 py-2" id="quickExitPacksHint">
-                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Packs</div>
-                <div class="mt-1 text-[11px] text-primary" id="quickExitPacksHintText">-</div>
-              </div>
-              <div class="rounded border border-outline-variant/20 bg-surface-container-low">
-                <div class="max-h-28 overflow-y-auto px-3 py-3" id="quickExitCurrentStockScroll">
-                  <div class="flex flex-wrap gap-2" id="quickExitCurrentStock"></div>
+            <p class="hidden overflow-hidden whitespace-nowrap text-[10px] text-on-surface-variant" id="quickExitPacksHint"></p>
+            <div class="relative overflow-visible" id="quickExitPanelWrap">
+              <section id="quickExitPanel">
+                <div class="rounded border border-outline-variant/20 bg-surface-container-low px-3 py-2">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Stock actuel</div>
+                    <button class="shrink-0 rounded border border-outline-variant/30 px-2 py-1 text-[10px] font-bold tracking-[0.12em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickExitClearButton" type="button">清空库存</button>
+                  </div>
+                  <div class="mt-2 w-full overflow-x-auto" id="quickExitCurrentStockScroll">
+                    <div class="flex justify-center">
+                      <div class="inline-flex min-w-fit flex-nowrap gap-2 text-sm font-semibold text-primary" id="quickExitCurrentStock">-</div>
+                    </div>
+                  </div>
+                  <div class="mt-2 hidden text-[11px] text-on-surface-variant" id="quickExitPreviewWrap">
+                    <span class="font-bold uppercase tracking-[0.16em] text-on-surface-variant">Apres sortie</span>
+                    <span class="ml-2 font-semibold text-on-surface" id="quickExitPreview">-</span>
+                  </div>
                 </div>
-              </div>
-              <div class="space-y-3" id="quickExitSegmentFormsWrap">
-                <div class="max-h-56 overflow-y-auto pr-1" id="quickExitSegmentFormsScroll">
-                  <div class="space-y-3" id="quickExitSegmentForms"></div>
+                <div class="mt-3 w-full overflow-visible" id="quickExitSegmentFormsScroll">
+                  <div class="flex justify-center">
+                    <div class="inline-flex min-w-fit flex-nowrap items-start gap-6" id="quickExitSegmentForms"></div>
+                  </div>
                 </div>
-              </div>
-              <div class="hidden rounded border border-primary/20 bg-primary-container/35 px-3 py-2" id="quickExitPreviewWrap">
-                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Après sortie</div>
-                <div class="mt-1 text-[11px] font-semibold text-primary" id="quickExitPreview">-</div>
-              </div>
-              <div class="pointer-events-none absolute inset-x-4 top-[13.8rem] z-10 hidden" id="quickExitDropdownLayer"></div>
-            </section>
+              </section>
+              <div class="pointer-events-none absolute inset-0 z-[90] hidden overflow-visible" id="quickExitDropdownLayer"></div>
+            </div>
 
             <form class="hidden space-y-3" id="quickEditForm" novalidate>
-              <div class="overflow-hidden rounded border border-outline-variant/20 bg-surface-container-low">
-                <div class="border-b border-outline-variant/20 px-3 py-2">
-                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Expression stock</div>
-                </div>
-                <div class="px-3 py-3">
-                  <div class="overflow-x-auto" id="quickEditExpressionCenterWrap">
-                    <div class="min-w-max" id="quickEditExpressionScroll">
-                      <div class="flex min-h-[3.25rem] flex-wrap items-center gap-2" id="quickEditExpressionMeasure">
-                        <div class="relative flex min-w-max items-end gap-x-2 gap-y-2 whitespace-nowrap pb-1" id="quickEditExpressionLine">
-                          <div class="flex-none" id="quickEditTailSlot">
-                            <button class="border border-dashed border-outline-variant/40 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" id="quickEditTailToggle" type="button"><span id="quickEditTailToggleIcon">+</span> 尾箱</button>
-                            <div class="hidden items-center gap-2" id="quickEditTailGroup">
-                              <div class="border border-outline-variant/20 bg-surface-container-lowest px-2 py-2" id="quickEditTailSegment">
-                                <div class="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">尾箱</div>
-                                <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditTail" inputmode="text" placeholder="(85p)" type="text" />
-                              </div>
-                            </div>
+              <div class="space-y-2">
+                <div class="w-full" id="quickEditExpressionCenterWrap">
+                  <div class="overflow-x-auto" id="quickEditExpressionScroll">
+                    <div class="w-max min-w-0" id="quickEditExpressionMeasure">
+                      <div class="relative flex items-end gap-x-2 gap-y-2 whitespace-nowrap pb-1" id="quickEditExpressionLine">
+                        <div class="flex-none" id="quickEditTailSlot">
+                          <button aria-label="Ajouter 尾箱" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditTailToggle" type="button">
+                            <span class="material-symbols-outlined !text-[15px]" id="quickEditTailToggleIcon">add</span>
+                          </button>
+                          <div class="hidden" id="quickEditTailGroup">
+                            <label class="block" id="quickEditTailSegment">
+                              <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</span>
+                              <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditTail" inputmode="numeric" maxlength="16" placeholder="(85p)" type="text" />
+                            </label>
                           </div>
-                          <div class="pointer-events-none hidden flex-none w-4 self-stretch" id="quickEditTailJoinSlot"><span aria-hidden="true" class="pointer-events-none absolute text-sm font-medium text-on-surface-variant/80" id="quickEditTailJoin">+</span></div>
-                          <div class="min-w-max border border-outline-variant/20 bg-surface-container-lowest px-2 py-2" id="quickEditUnitsPerBoxSlot">
-                            <div class="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">件/箱</div>
-                            <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditUnitsPerBox" inputmode="text" placeholder="144p" type="text" />
+                        </div>
+                        <div class="pointer-events-none hidden flex-none w-4 self-stretch" id="quickEditTailJoinSlot">
+                          <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
+                            <span aria-hidden="true" class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
+                            <span aria-hidden="true" class="block text-sm font-medium opacity-0">+</span>
                           </div>
-                          <div class="pointer-events-none flex-none w-4 self-stretch" id="quickEditMultiplyJoinSlot"><span aria-hidden="true" class="pointer-events-none absolute text-sm font-medium text-on-surface-variant/80" id="quickEditMultiplyJoin">×</span></div>
-                          <div class="min-w-max border border-outline-variant/20 bg-surface-container-lowest px-2 py-2" id="quickEditItemBoxesSlot">
-                            <div class="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">箱数</div>
-                            <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditItemBoxes" inputmode="numeric" min="0" step="1" type="number" />
+                          <span aria-hidden="true" class="pointer-events-none absolute text-sm font-medium text-on-surface-variant/80" id="quickEditTailJoin">+</span>
+                        </div>
+                        <div class="flex-none" id="quickEditUnitsPerBoxSlot">
+                          <label class="block" id="quickEditUnitsPerBoxField">
+                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</span>
+                            <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-semibold text-on-surface" id="quickEditUnitsPerBox" inputmode="numeric" maxlength="16" placeholder="144p" type="text" />
+                          </label>
+                        </div>
+                        <div class="pointer-events-none flex-none w-4 self-stretch" id="quickEditMultiplyJoinSlot">
+                          <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
+                            <span aria-hidden="true" class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
+                            <span aria-hidden="true" class="block text-sm font-medium opacity-0">×</span>
                           </div>
-                          <div class="min-w-max" id="quickEditPartialSlot">
-                            <button class="border border-dashed border-outline-variant/40 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" id="quickEditPartialToggle" type="button"><span id="quickEditPartialToggleIcon">+</span> Partiel</button>
-                            <div class="hidden items-end gap-2" id="quickEditPartialGroup">
-                              <div class="border border-outline-variant/20 bg-surface-container-lowest px-2 py-2" id="quickEditPartialSegment">
-                                <div class="mb-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Partiel</div>
-                                <div class="flex items-center gap-2">
-                                  <select class="w-16 border-none bg-transparent p-0 text-[12px] font-bold text-on-surface focus:ring-0" id="quickEditSignField">
-                                    <option value="">vide</option>
-                                    <option value="+">+</option>
-                                    <option value="×">×</option>
-                                  </select>
-                                  <input class="w-20 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditFractionTextField" maxlength="10" placeholder="1/2" type="text" />
-                                  <select class="w-16 border-none bg-transparent p-0 text-[12px] font-bold text-on-surface focus:ring-0" id="quickEditPackSignField">
-                                    <option value="">包</option>
-                                    <option value="+">+</option>
-                                    <option value="-">-</option>
-                                  </select>
-                                  <input class="w-16 border-none bg-transparent p-0 text-[13px] font-bold text-on-surface focus:ring-0" id="quickEditPackCountField" inputmode="numeric" min="0" step="1" type="number" placeholder="0" />
-                                </div>
-                              </div>
+                          <span aria-hidden="true" class="pointer-events-none absolute text-sm font-medium text-on-surface-variant/80" id="quickEditMultiplyJoin">×</span>
+                        </div>
+                        <div class="flex-none" id="quickEditItemBoxesSlot">
+                          <label class="block" id="quickEditItemBoxesField">
+                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</span>
+                            <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-semibold text-on-surface" id="quickEditItemBoxes" inputmode="numeric" min="0" step="1" type="number" />
+                          </label>
+                        </div>
+                        <div class="flex-none" id="quickEditPartialSlot">
+                          <button aria-label="Ajouter bloc partiel" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditPartialToggle" type="button">
+                            <span class="material-symbols-outlined !text-[15px]" id="quickEditPartialToggleIcon">add</span>
+                          </button>
+                          <div class="hidden" id="quickEditPartialGroup">
+                            <div class="flex items-end gap-x-2 gap-y-2" id="quickEditPartialSegment">
+                              <label class="block" id="quickEditSignField">
+                                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
+                                <select class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditSign">
+                                  <option value="+">+</option>
+                                  <option value="×">×</option>
+                                </select>
+                              </label>
+                              <label class="block" id="quickEditFractionTextField">
+                                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">分数</span>
+                                <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditFractionText" inputmode="text" maxlength="10" placeholder="1/2" type="text" />
+                              </label>
+                              <label class="block" id="quickEditPackSignField">
+                                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
+                                <select class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditPackNotationSign">
+                                  <option value="+">+</option>
+                                  <option value="-">-</option>
+                                </select>
+                              </label>
+                              <label class="block" id="quickEditPackCountField">
+                                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">包</span>
+                                <input class="border-outline-variant/30 bg-surface-container-low px-2 text-sm font-medium text-on-surface" id="quickEditPackNotationCount" inputmode="numeric" min="0" step="1" type="number" />
+                              </label>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div class="mt-3 overflow-x-auto" id="quickEditRemoveCenterWrap">
-                    <div class="min-w-max" id="quickEditRemoveScroll">
-                      <div class="flex items-center gap-2" id="quickEditRemoveMeasure">
-                        <div class="flex items-center gap-2" id="quickEditRemoveLine">
-                          <div class="min-w-[5.5rem]" id="quickEditTailRemoveSlot"><button class="hidden border border-error/20 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-on-error-container" id="quickEditTailRemove" type="button">Retirer 尾箱</button></div>
-                          <div class="hidden min-w-[1rem]" id="quickEditTailRemoveJoinSlot"><span id="quickEditTailRemoveJoin"></span></div>
-                          <div class="min-w-[5.5rem]" id="quickEditUnitsPerBoxRemoveSpacer"></div>
-                          <div class="min-w-[1rem]" id="quickEditMultiplyRemoveSpacerSlot"><span class="invisible" id="quickEditMultiplyRemoveSpacer">×</span></div>
-                          <div class="min-w-[5.5rem]" id="quickEditItemBoxesRemoveSpacer"></div>
-                          <div class="min-w-[8rem]" id="quickEditPartialRemoveSlot"><button class="hidden border border-error/20 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-on-error-container" id="quickEditPartialRemove" type="button">Retirer partiel</button></div>
+                </div>
+                <div class="hidden w-full" id="quickEditRemoveCenterWrap">
+                  <div class="overflow-x-auto" id="quickEditRemoveScroll">
+                    <div class="w-max min-w-0" id="quickEditRemoveMeasure">
+                      <div class="flex items-start gap-x-2 gap-y-1 whitespace-nowrap" id="quickEditRemoveLine">
+                        <div class="flex-none" id="quickEditTailRemoveSlot">
+                          <button aria-label="Retirer 尾箱" class="hidden inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditTailRemove" type="button">
+                            <span class="material-symbols-outlined !text-[15px]">remove</span>
+                          </button>
+                        </div>
+                        <div aria-hidden="true" class="hidden flex-none w-4" id="quickEditTailRemoveJoinSlot">
+                          <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
+                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
+                            <span class="flex items-center justify-center text-sm font-medium opacity-0" id="quickEditTailRemoveJoin">+</span>
+                          </div>
+                        </div>
+                        <span aria-hidden="true" class="flex-none opacity-0" id="quickEditUnitsPerBoxRemoveSpacer"></span>
+                        <div aria-hidden="true" class="flex-none w-4" id="quickEditMultiplyRemoveSpacerSlot">
+                          <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
+                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
+                            <span class="flex items-center justify-center text-sm font-medium opacity-0" id="quickEditMultiplyRemoveSpacer">×</span>
+                          </div>
+                        </div>
+                        <span aria-hidden="true" class="flex-none opacity-0" id="quickEditItemBoxesRemoveSpacer"></span>
+                        <div class="flex-none hidden" id="quickEditPartialRemoveSlot">
+                          <button aria-label="Retirer bloc partiel" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditPartialRemove" type="button">
+                            <span class="material-symbols-outlined !text-[15px]">remove</span>
+                          </button>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-
-              <input class="hidden" id="quickEditSign" type="hidden" />
-              <input class="hidden" id="quickEditFractionText" type="hidden" />
-              <input class="hidden" id="quickEditPackNotationCount" type="hidden" />
-              <input class="hidden" id="quickEditPackNotationSign" type="hidden" />
             </form>
 
             <label class="block">
@@ -330,7 +366,7 @@
         </div>
         <div class="grid grid-cols-2 gap-3 border-t border-outline-variant/20 bg-surface-container-low px-4 py-4" id="quickEditFooter">
           <button class="border border-outline-variant/30 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditCancel" type="button">ANNULER</button>
-          <button class="bg-surface-tint py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="quickEditSave" type="button">APPLIQUER</button>
+          <button class="bg-surface-tint py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="quickEditSave" type="button">APPLIQUER LA SORTIE</button>
         </div>
       </div>
     </div>
