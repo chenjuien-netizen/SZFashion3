@@ -40,6 +40,13 @@ const state = {
   quickEditOpen: false,
   quickEditTab: "quick-exit",
   quickEditItemId: "",
+  quickEditItem: null,
+  quickEditTailOpen: false,
+  quickEditPartialOpen: false,
+  quickExitClearSelected: false,
+  quickExitSegmentErrors: {},
+  quickEditError: "",
+  quickEditSaving: false,
   quickEditForm: null,
   quickExitForm: null
 };
@@ -707,17 +714,29 @@ function renderDetailHistoryCard(entry) {
 function getQuickEditElements() {
   return {
     overlay: document.getElementById("quickEditOverlay"),
+    modal: document.getElementById("quickEditModal"),
     reference: document.getElementById("quickEditReference"),
     stockDisplay: document.getElementById("quickEditStockDisplay"),
     tabQuickExit: document.getElementById("quickEditTabQuickExit"),
     tabEdit: document.getElementById("quickEditTabEdit"),
     quickExitPanel: document.getElementById("quickExitPanel"),
+    quickExitPacksHint: document.getElementById("quickExitPacksHint"),
+    quickExitPacksHintText: document.getElementById("quickExitPacksHintText"),
     quickExitCurrentStock: document.getElementById("quickExitCurrentStock"),
-    quickExitMode: document.getElementById("quickExitMode"),
-    quickExitValue: document.getElementById("quickExitValue"),
-    quickExitFractionText: document.getElementById("quickExitFractionText"),
-    quickExitFractionWrap: document.getElementById("quickExitFractionWrap"),
+    quickExitClearButton: document.getElementById("quickExitClearButton"),
+    quickExitSegmentForms: document.getElementById("quickExitSegmentForms"),
+    quickExitPreviewWrap: document.getElementById("quickExitPreviewWrap"),
+    quickExitPreview: document.getElementById("quickExitPreview"),
     form: document.getElementById("quickEditForm"),
+    tailToggle: document.getElementById("quickEditTailToggle"),
+    tailToggleIcon: document.getElementById("quickEditTailToggleIcon"),
+    tailGroup: document.getElementById("quickEditTailGroup"),
+    tailJoinSlot: document.getElementById("quickEditTailJoinSlot"),
+    tailRemove: document.getElementById("quickEditTailRemove"),
+    partialToggle: document.getElementById("quickEditPartialToggle"),
+    partialToggleIcon: document.getElementById("quickEditPartialToggleIcon"),
+    partialGroup: document.getElementById("quickEditPartialGroup"),
+    partialRemove: document.getElementById("quickEditPartialRemove"),
     tail: document.getElementById("quickEditTail"),
     unitsPerBox: document.getElementById("quickEditUnitsPerBox"),
     itemBoxes: document.getElementById("quickEditItemBoxes"),
@@ -725,11 +744,23 @@ function getQuickEditElements() {
     fractionText: document.getElementById("quickEditFractionText"),
     packNotationSign: document.getElementById("quickEditPackNotationSign"),
     packNotationCount: document.getElementById("quickEditPackNotationCount"),
+    signField: document.getElementById("quickEditSignField"),
+    fractionTextField: document.getElementById("quickEditFractionTextField"),
+    packSignField: document.getElementById("quickEditPackSignField"),
+    packCountField: document.getElementById("quickEditPackCountField"),
     remark: document.getElementById("quickEditRemark"),
     message: document.getElementById("quickEditMessage"),
     cancel: document.getElementById("quickEditCancel"),
     save: document.getElementById("quickEditSave")
   };
+}
+
+function setQuickEditError(message) {
+  state.quickEditError = String(message || "").trim();
+}
+
+function resetQuickExitErrors_() {
+  state.quickExitSegmentErrors = {};
 }
 
 function syncQuickEditTabs(els) {
@@ -738,28 +769,301 @@ function syncQuickEditTabs(els) {
   els.form.classList.toggle("hidden", isQuickExit);
   els.tabQuickExit.className = "border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] " + (isQuickExit ? "bg-surface-tint text-on-primary" : "text-on-surface-variant");
   els.tabEdit.className = "border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] " + (!isQuickExit ? "bg-surface-tint text-on-primary" : "text-on-surface-variant");
-  els.quickExitFractionWrap.classList.toggle("hidden", els.quickExitMode.value !== "fraction");
+  els.save.textContent = isQuickExit ? "APPLIQUER LA SORTIE" : "ENREGISTRER";
+}
+
+function getDefaultQuickExitConfig_(item, segmentKey) {
+  return segmentKey === "tail"
+    ? { selected: false, mode: "pieces", entry: "" }
+    : { selected: false, mode: item && item.colisage > 0 ? "packs" : "boxes", entry: "" };
+}
+
+function ensureQuickExitForm_(item) {
+  if (!state.quickExitForm || typeof state.quickExitForm !== "object") {
+    state.quickExitForm = { segments: {}, remark: item && item.remark ? item.remark : "" };
+  }
+  if (!state.quickExitForm.segments || typeof state.quickExitForm.segments !== "object") {
+    state.quickExitForm.segments = {};
+  }
+  ["tail", "main"].forEach(function(segmentKey) {
+    if (!state.quickExitForm.segments[segmentKey]) {
+      state.quickExitForm.segments[segmentKey] = getDefaultQuickExitConfig_(item, segmentKey);
+    }
+  });
+  return state.quickExitForm;
+}
+
+function getQuickExitSegments_(item) {
+  const totalPieces = stateModelToPieces(item);
+  const tailPieces = getTailActualPieces(item);
+  const mainPieces = Math.max(0, totalPieces - tailPieces);
+  const segments = [];
+  if (tailPieces > 0) {
+    segments.push({
+      key: "tail",
+      label: buildTailDisplay(item) || ("(" + tailPieces + "p)"),
+      pieces: tailPieces,
+      modes: ["pieces"]
+    });
+  }
+  if (mainPieces > 0) {
+    const modes = ["boxes", "fraction"];
+    if (item.colisage > 0) modes.unshift("packs");
+    segments.push({
+      key: "main",
+      label: buildRawStockDisplay(Object.assign({}, item, { tail: 0, packNotation: getMainPackNotationFromState(item) })),
+      pieces: mainPieces,
+      modes: modes
+    });
+  }
+  return segments;
+}
+
+function getQuickExitSegmentMap_(item) {
+  return getQuickExitSegments_(item).reduce(function(map, segment) {
+    map[segment.key] = segment;
+    return map;
+  }, {});
+}
+
+function getAllowedQuickExitFractions_(item) {
+  const list = ["1/2", "1/3", "1/4", "2/3"];
+  (item.dynamicFractions || []).forEach(function(value) {
+    if (list.indexOf(value) === -1) list.push(value);
+  });
+  return list;
+}
+
+function buildQuickExitSuggestions_(item, segmentKey) {
+  const form = ensureQuickExitForm_(item);
+  const config = form.segments[segmentKey];
+  if (segmentKey === "tail") {
+    const pieces = getTailActualPieces(item);
+    return [String(pieces), String(Math.max(1, Math.floor(pieces / 2)))];
+  }
+  if (config.mode === "packs" && item.colisage > 0) return ["1包", "2包", "3包"];
+  if (config.mode === "boxes") return ["1箱", "2箱", "3箱"];
+  return getAllowedQuickExitFractions_(item).slice(0, 5);
+}
+
+function parseQuickExitSegmentEntry_(item, segmentKey, config) {
+  const raw = String(config && config.entry || "").trim();
+  if (!raw) return { pieces: 0, valid: true };
+  if (segmentKey === "tail") {
+    const pieces = Math.max(0, toInt(raw));
+    return pieces > 0 ? { pieces: pieces, valid: true } : { pieces: 0, valid: false, error: "Saisis un nombre de pièces valide." };
+  }
+  if (config.mode === "boxes") {
+    const boxes = Math.max(0, toInt(raw));
+    return boxes > 0 ? { pieces: boxes * item.unitsPerBox, valid: true } : { pieces: 0, valid: false, error: "Indique un nombre de cartons positif." };
+  }
+  if (config.mode === "packs") {
+    const packs = Math.max(0, toInt(raw));
+    return packs > 0 && item.colisage > 0 ? { pieces: packs * item.colisage, valid: true } : { pieces: 0, valid: false, error: "Indique un nombre de paquets positif." };
+  }
+  const fractionText = normalizeFractionText(raw.replace(/[^\d/]/g, ""));
+  const fractionValue = parseFractionValue(fractionText);
+  return fractionValue > 0 ? { pieces: item.unitsPerBox * fractionValue, valid: true } : { pieces: 0, valid: false, error: "Sélectionne une fraction valide." };
+}
+
+function syncQuickEditBuilderUi(els) {
+  const tailOpen = !!state.quickEditTailOpen;
+  const partialOpen = !!state.quickEditPartialOpen;
+  els.tailGroup.classList.toggle("hidden", !tailOpen);
+  els.tailGroup.classList.toggle("flex", tailOpen);
+  els.tailToggle.classList.toggle("hidden", tailOpen);
+  els.tailJoinSlot.classList.toggle("hidden", !tailOpen);
+  els.tailRemove.classList.toggle("hidden", !tailOpen);
+  els.partialGroup.classList.toggle("hidden", !partialOpen);
+  els.partialGroup.classList.toggle("flex", partialOpen);
+  els.partialToggle.classList.toggle("hidden", partialOpen);
+  els.partialRemove.classList.toggle("hidden", !partialOpen);
+  els.tailToggleIcon.textContent = tailOpen ? "−" : "+";
+  els.partialToggleIcon.textContent = partialOpen ? "−" : "+";
+}
+
+function buildCurrentEditStateModel() {
+  const form = state.quickEditForm || {};
+  const nextState = normalizeStateModel({
+    tail: state.quickEditTailOpen ? Math.max(0, toInt(form.tail)) : 0,
+    unitsPerBox: Math.max(0, toInt(form.unitsPerBox)),
+    itemBoxes: Math.max(0, toInt(form.itemBoxes)),
+    sign: state.quickEditPartialOpen ? normalizeSign(form.sign) : "",
+    fractionText: state.quickEditPartialOpen ? normalizeFractionText(form.fractionText) : "",
+    fractionValue: state.quickEditPartialOpen ? parseFractionValue(form.fractionText) : 0,
+    colisage: state.quickEditItem ? state.quickEditItem.colisage : 0,
+    packNotation: state.quickEditPartialOpen ? buildPackNotationFromParts(form.packNotationSign, form.packNotationCount, "") : "",
+    remark: String(form.remark || "").trim()
+  });
+  return nextState;
+}
+
+function validateEditPayload() {
+  const nextState = buildCurrentEditStateModel();
+  if (!(nextState.unitsPerBox > 0)) throw new Error("件/箱 requis.");
+  if (!(nextState.tail > 0) && !(nextState.itemBoxes > 0) && !(nextState.fractionValue > 0)) {
+    throw new Error("Le stock doit contenir au moins un segment.");
+  }
+  return nextState;
+}
+
+function computeQuickExitPreviewState_(item) {
+  const form = ensureQuickExitForm_(item);
+  const segmentMap = getQuickExitSegmentMap_(item);
+  resetQuickExitErrors_();
+  if (state.quickExitClearSelected) {
+    return normalizeStateModel({
+      tail: 0,
+      unitsPerBox: item.unitsPerBox,
+      itemBoxes: 0,
+      sign: "",
+      fractionText: "",
+      fractionValue: 0,
+      colisage: item.colisage,
+      packNotation: "",
+      remark: String(form.remark || "").trim()
+    });
+  }
+
+  let tailRemaining = getTailActualPieces(item);
+  let mainRemaining = Math.max(0, stateModelToPieces(item) - tailRemaining);
+
+  ["tail", "main"].forEach(function(segmentKey) {
+    const segment = segmentMap[segmentKey];
+    const config = form.segments[segmentKey];
+    if (!segment || !config || !config.selected) return;
+    const parsed = parseQuickExitSegmentEntry_(item, segmentKey, config);
+    if (!parsed.valid) {
+      state.quickExitSegmentErrors[segmentKey] = parsed.error || "Valeur invalide.";
+      return;
+    }
+    if (segmentKey === "tail") {
+      if (parsed.pieces > tailRemaining) {
+        state.quickExitSegmentErrors.tail = "La sortie dépasse le tail disponible.";
+        return;
+      }
+      tailRemaining -= parsed.pieces;
+      return;
+    }
+    if (parsed.pieces > mainRemaining) {
+      state.quickExitSegmentErrors.main = "La sortie dépasse le stock principal disponible.";
+      return;
+    }
+    mainRemaining -= parsed.pieces;
+  });
+
+  if (Object.keys(state.quickExitSegmentErrors).length) return null;
+
+  const mainState = buildStateFromPieces(mainRemaining, {
+    unitsPerBox: item.unitsPerBox,
+    colisage: item.colisage,
+    remark: String(form.remark || "").trim(),
+    reconstructionMode: form.segments.main && form.segments.main.mode === "packs" ? "packs" : "boxes"
+  });
+
+  return normalizeStateModel(Object.assign({}, mainState, {
+    tail: tailRemaining,
+    remark: String(form.remark || "").trim()
+  }));
+}
+
+function computeQuickExitPreview(item) {
+  const previewState = computeQuickExitPreviewState_(item);
+  return previewState ? hydrateItem(Object.assign({}, item, previewState)) : null;
+}
+
+function validateQuickExitPayload(item) {
+  const previewItem = computeQuickExitPreview(item);
+  if (!previewItem) {
+    const firstError = Object.keys(state.quickExitSegmentErrors)[0];
+    throw new Error(state.quickExitSegmentErrors[firstError] || "Sortie rapide invalide.");
+  }
+  return previewItem;
+}
+
+function renderQuickExitSegmentsMarkup_(item) {
+  const form = ensureQuickExitForm_(item);
+  return getQuickExitSegments_(item).map(function(segment) {
+    const config = form.segments[segment.key];
+    return '<button class="border px-2 py-2 text-left text-[11px] font-semibold transition-colors duration-150 '
+      + (config.selected ? 'border-primary bg-primary-container/35 text-primary' : 'border-outline-variant/25 bg-surface-container-lowest text-on-surface')
+      + '" type="button" data-action="toggle-quick-exit-segment" data-segment="' + escapeHtml(segment.key) + '">'
+      + '<span class="block text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">' + escapeHtml(segment.key === "tail" ? "Tail" : "Main") + '</span>'
+      + '<span class="mt-1 block">' + escapeHtml(segment.label || "-") + '</span>'
+      + '</button>';
+  }).join("");
+}
+
+function renderQuickExitSegmentForms_(item) {
+  const els = getQuickEditElements();
+  const form = ensureQuickExitForm_(item);
+  els.quickExitSegmentForms.innerHTML = getQuickExitSegments_(item).map(function(segment) {
+    const config = form.segments[segment.key];
+    if (!config.selected) return "";
+    return '<section class="rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3" data-segment-form="' + escapeHtml(segment.key) + '">'
+      + '<div class="flex items-center justify-between gap-3">'
+      + '<div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">' + escapeHtml(segment.key === "tail" ? "Sortie tail" : "Sortie main") + '</div>'
+      + '<div class="flex flex-wrap gap-2">' + segment.modes.map(function(mode) {
+        return '<button class="border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] '
+          + (config.mode === mode ? 'border-primary bg-primary-container/35 text-primary' : 'border-outline-variant/25 text-on-surface-variant')
+          + '" data-action="quick-exit-mode" data-segment="' + escapeHtml(segment.key) + '" data-mode="' + escapeHtml(mode) + '" type="button">' + escapeHtml(mode) + '</button>';
+      }).join("") + '</div>'
+      + '</div>'
+      + '<input class="mt-3 w-full border-outline-variant/30 bg-surface-container-lowest px-2 text-sm font-medium text-on-surface" data-action="quick-exit-entry" data-segment="' + escapeHtml(segment.key) + '" value="' + escapeHtml(config.entry || "") + '" placeholder="' + escapeHtml(segment.key === "tail" ? "12" : (config.mode === "fraction" ? "1/2" : config.mode === "packs" ? "2包" : "2箱")) + '" type="text" />'
+      + '<div class="mt-2 flex flex-wrap gap-2">' + buildQuickExitSuggestions_(item, segment.key).map(function(suggestion) {
+        return '<button class="border border-outline-variant/25 bg-surface-container-lowest px-2 py-1 text-[10px] font-bold text-on-surface-variant" data-action="quick-exit-suggestion" data-segment="' + escapeHtml(segment.key) + '" data-value="' + escapeHtml(suggestion) + '" type="button">' + escapeHtml(suggestion) + '</button>';
+      }).join("") + '</div>'
+      + (state.quickExitSegmentErrors[segment.key] ? '<div class="mt-2 text-[11px] font-medium text-on-error-container">' + escapeHtml(state.quickExitSegmentErrors[segment.key]) + '</div>' : '')
+      + '</section>';
+  }).join("");
+}
+
+function refreshQuickEditInlineFeedback() {
+  const els = getQuickEditElements();
+  const item = getItemById(state.quickEditItemId);
+  if (!els.overlay || !item) return;
+  if (state.quickEditTab === "quick-exit") {
+    const previewItem = computeQuickExitPreview(item);
+    els.quickExitPreviewWrap.classList.toggle("hidden", !previewItem);
+    els.quickExitPreview.textContent = previewItem ? previewItem.stockDisplay : "-";
+  }
+  if (state.quickEditError) {
+    els.message.textContent = state.quickEditError;
+    els.message.classList.remove("hidden");
+  } else {
+    els.message.textContent = "";
+    els.message.classList.add("hidden");
+  }
 }
 
 function openQuickEdit(item) {
   if (!item) return;
+  const mainPack = parsePackNotation(getMainPackNotationFromState(item));
   state.quickEditOpen = true;
   state.quickEditItemId = item.id;
+  state.quickEditItem = item;
   state.quickEditTab = "quick-exit";
+  state.quickEditTailOpen = toInt(item.tail) > 0;
+  state.quickEditPartialOpen = !!(item.sign || item.fractionText || mainPack.count > 0);
+  state.quickExitClearSelected = false;
+  state.quickEditSaving = false;
+  setQuickEditError("");
+  resetQuickExitErrors_();
   state.quickEditForm = {
     tail: item.tail,
     unitsPerBox: item.unitsPerBox,
     itemBoxes: item.itemBoxes,
     sign: item.sign,
     fractionText: item.fractionText,
-    packNotationSign: parsePackNotation(getMainPackNotationFromState(item)).sign,
-    packNotationCount: parsePackNotation(getMainPackNotationFromState(item)).count,
+    packNotationSign: mainPack.sign,
+    packNotationCount: mainPack.count,
     remark: item.remark
   };
   state.quickExitForm = {
-    exitMode: item.colisage > 0 ? "packs" : "boxes",
-    exitValue: "",
-    exitFractionText: "",
+    segments: {
+      tail: getDefaultQuickExitConfig_(item, "tail"),
+      main: getDefaultQuickExitConfig_(item, "main")
+    },
     remark: item.remark
   };
   renderQuickEdit();
@@ -768,6 +1072,15 @@ function openQuickEdit(item) {
 function closeQuickEdit() {
   state.quickEditOpen = false;
   state.quickEditItemId = "";
+  state.quickEditItem = null;
+  state.quickEditTailOpen = false;
+  state.quickEditPartialOpen = false;
+  state.quickExitClearSelected = false;
+  state.quickEditSaving = false;
+  state.quickEditForm = null;
+  state.quickExitForm = null;
+  resetQuickExitErrors_();
+  setQuickEditError("");
   const els = getQuickEditElements();
   if (els.overlay) {
     els.overlay.classList.add("hidden");
@@ -789,88 +1102,50 @@ function renderQuickEdit() {
     return;
   }
 
+  state.quickEditItem = item;
+  ensureQuickExitForm_(item);
   els.overlay.classList.remove("hidden");
   els.overlay.classList.add("flex");
   els.reference.textContent = item.reference;
   els.stockDisplay.textContent = item.stockDisplay;
-  els.quickExitCurrentStock.textContent = item.stockDisplay;
-  els.quickExitMode.value = state.quickExitForm.exitMode;
-  els.quickExitValue.value = state.quickExitForm.exitValue;
-  els.quickExitFractionText.value = state.quickExitForm.exitFractionText;
   els.tail.value = state.quickEditForm.tail;
   els.unitsPerBox.value = state.quickEditForm.unitsPerBox;
   els.itemBoxes.value = state.quickEditForm.itemBoxes;
+  els.signField.value = state.quickEditForm.sign;
+  els.fractionTextField.value = state.quickEditForm.fractionText;
+  els.packSignField.value = state.quickEditForm.packNotationSign;
+  els.packCountField.value = state.quickEditForm.packNotationCount;
   els.sign.value = state.quickEditForm.sign;
   els.fractionText.value = state.quickEditForm.fractionText;
   els.packNotationSign.value = state.quickEditForm.packNotationSign;
   els.packNotationCount.value = state.quickEditForm.packNotationCount;
   els.remark.value = state.quickEditTab === "quick-exit" ? state.quickExitForm.remark : state.quickEditForm.remark;
-  els.message.classList.add("hidden");
-  els.message.textContent = "";
-
-  if (state.quickExitForm.exitMode === "packs" && !(item.colisage > 0)) {
-    state.quickExitForm.exitMode = "boxes";
-    els.quickExitMode.value = "boxes";
-  }
 
   syncQuickEditTabs(els);
+  syncQuickEditBuilderUi(els);
+  els.quickExitCurrentStock.innerHTML = renderQuickExitSegmentsMarkup_(item);
+  renderQuickExitSegmentForms_(item);
+  els.quickExitPacksHint.classList.toggle("hidden", !(item.packsPerBox > 0));
+  els.quickExitPacksHintText.textContent = item.packsPerBox > 0 ? (item.colisage + " 件 par paquet • " + item.packsPerBox + " paquets / 箱") : "-";
+  els.quickExitClearButton.classList.toggle("hidden", !getQuickExitSegments_(item).length);
+  els.quickExitClearButton.textContent = state.quickExitClearSelected ? "RESTAURER" : "清空库存";
+
+  const previewItem = state.quickEditTab === "quick-exit" ? computeQuickExitPreview(item) : null;
+  els.quickExitPreviewWrap.classList.toggle("hidden", !(state.quickEditTab === "quick-exit" && previewItem));
+  els.quickExitPreview.textContent = previewItem ? previewItem.stockDisplay : "-";
+
+  if (state.quickEditError) {
+    els.message.textContent = state.quickEditError;
+    els.message.classList.remove("hidden");
+  } else {
+    els.message.textContent = "";
+    els.message.classList.add("hidden");
+  }
 }
 
 function replaceItem(nextItem) {
   state.items = state.items.map(function(item) {
     return item.id === nextItem.id ? nextItem : item;
-  });
-}
-
-function buildEditStateFromInput(payload, currentItem) {
-  const nextState = normalizeStateModel({
-    tail: Math.max(0, toInt(payload.tail)),
-    unitsPerBox: Math.max(0, toInt(payload.unitsPerBox)),
-    itemBoxes: Math.max(0, toInt(payload.itemBoxes)),
-    sign: normalizeSign(payload.sign),
-    fractionText: normalizeFractionText(payload.fractionText),
-    fractionValue: parseFractionValue(payload.fractionText),
-    colisage: currentItem.colisage,
-    packNotation: buildPackNotationFromParts(payload.packNotationSign, payload.packNotationCount, currentItem.packNotation),
-    remark: String(payload.remark || "").trim()
-  });
-  return nextState;
-}
-
-function buildQuickExitStateFromInput(payload, currentItem) {
-  const currentState = normalizeStateModel(currentItem);
-  const unitsPerBox = currentState.unitsPerBox;
-  const totalPieces = stateModelToPieces(currentState);
-  const exitMode = String(payload.exitMode || "").trim();
-  const exitValue = Math.max(0, toInt(payload.exitValue));
-  const exitFractionText = normalizeFractionText(payload.exitFractionText);
-  let exitPieces = 0;
-
-  if (unitsPerBox <= 0) throw new Error("Sortie rapide impossible sans 件/箱.");
-  if (exitMode === "boxes") {
-    if (!(exitValue > 0)) throw new Error("Indique un nombre de cartons positif.");
-    exitPieces = unitsPerBox * exitValue;
-  } else if (exitMode === "fraction") {
-    const fractionValue = parseFractionValue(exitFractionText);
-    if (!(fractionValue > 0) || !exitFractionText) throw new Error("Selectionne une fraction valide.");
-    exitPieces = unitsPerBox * fractionValue;
-  } else if (exitMode === "packs") {
-    const colisage = parsePositiveNumber(currentItem.colisage);
-    if (!(colisage > 0)) throw new Error("Mode paquets indisponible pour cette reference.");
-    if (!(exitValue > 0)) throw new Error("Indique un nombre de paquets positif.");
-    exitPieces = colisage * exitValue;
-  } else {
-    throw new Error("Mode de sortie invalide.");
-  }
-
-  const newTotal = totalPieces - exitPieces;
-  if (newTotal < 0) throw new Error("La sortie depasse le stock disponible.");
-
-  return buildStateFromPieces(newTotal, {
-    unitsPerBox: unitsPerBox,
-    colisage: currentItem.colisage,
-    remark: String(payload.remark || "").trim(),
-    reconstructionMode: exitMode
   });
 }
 
@@ -880,40 +1155,31 @@ function saveQuickEdit() {
   if (!currentItem) return;
 
   try {
-    const nextState = state.quickEditTab === "edit"
-      ? buildEditStateFromInput({
-          tail: els.tail.value,
-          unitsPerBox: els.unitsPerBox.value,
-          itemBoxes: els.itemBoxes.value,
-          sign: els.sign.value,
-          fractionText: els.fractionText.value,
-          packNotationSign: els.packNotationSign.value,
-          packNotationCount: els.packNotationCount.value,
-          remark: els.remark.value
-        }, currentItem)
-      : buildQuickExitStateFromInput({
-          exitMode: els.quickExitMode.value,
-          exitValue: els.quickExitValue.value,
-          exitFractionText: els.quickExitFractionText.value,
-          remark: els.remark.value
-        }, currentItem);
-
-    const nextItem = hydrateItem(Object.assign({}, currentItem, nextState));
+    state.quickEditSaving = true;
+    setQuickEditError("");
+    if (state.quickEditTab === "quick-exit") state.quickExitForm.remark = els.remark.value;
+    if (state.quickEditForm) state.quickEditForm.remark = els.remark.value;
+    const nextItem = state.quickEditTab === "edit"
+      ? hydrateItem(Object.assign({}, currentItem, validateEditPayload(), { remark: String(els.remark.value || "").trim() }))
+      : validateQuickExitPayload(currentItem);
+    nextItem.remark = String(els.remark.value || "").trim();
+    const hydratedNextItem = hydrateItem(nextItem);
     const historyEntry = buildHistoryEntryFromLocalChange(
       state.quickEditTab === "edit" ? "adjustment" : "exit",
       currentItem,
-      nextItem,
-      nextState.remark
+      hydratedNextItem,
+      hydratedNextItem.remark
     );
-
-    replaceItem(nextItem);
+    replaceItem(hydratedNextItem);
     state.historyItems = [historyEntry].concat(state.historyItems);
     saveState();
     closeQuickEdit();
     renderAll();
   } catch (error) {
-    els.message.textContent = error && error.message ? error.message : "Erreur quick edit";
-    els.message.classList.remove("hidden");
+    setQuickEditError(error && error.message ? error.message : "Erreur quick edit");
+    renderQuickEdit();
+  } finally {
+    state.quickEditSaving = false;
   }
 }
 
@@ -928,8 +1194,96 @@ function bindQuickEditEvents() {
     state.quickEditTab = "edit";
     renderQuickEdit();
   });
-  els.quickExitMode.addEventListener("change", function() {
-    state.quickExitForm.exitMode = els.quickExitMode.value;
+  els.tailToggle.addEventListener("click", function() {
+    state.quickEditTailOpen = true;
+    renderQuickEdit();
+  });
+  els.partialToggle.addEventListener("click", function() {
+    state.quickEditPartialOpen = true;
+    renderQuickEdit();
+  });
+  els.tailRemove.addEventListener("click", function() {
+    state.quickEditTailOpen = false;
+    state.quickEditForm.tail = 0;
+    renderQuickEdit();
+  });
+  els.partialRemove.addEventListener("click", function() {
+    state.quickEditPartialOpen = false;
+    state.quickEditForm.sign = "";
+    state.quickEditForm.fractionText = "";
+    state.quickEditForm.packNotationSign = "";
+    state.quickEditForm.packNotationCount = 0;
+    renderQuickEdit();
+  });
+  [
+    ["tail", "tail"],
+    ["unitsPerBox", "unitsPerBox"],
+    ["itemBoxes", "itemBoxes"],
+    ["signField", "sign"],
+    ["fractionTextField", "fractionText"],
+    ["packSignField", "packNotationSign"],
+    ["packCountField", "packNotationCount"]
+  ].forEach(function(pair) {
+    const el = els[pair[0]];
+    if (!el) return;
+    el.addEventListener("input", function(event) {
+      state.quickEditForm[pair[1]] = event.target.value;
+      setQuickEditError("");
+      refreshQuickEditInlineFeedback();
+    });
+    el.addEventListener("change", function(event) {
+      state.quickEditForm[pair[1]] = event.target.value;
+      renderQuickEdit();
+    });
+  });
+  els.remark.addEventListener("input", function(event) {
+    if (state.quickEditTab === "quick-exit" && state.quickExitForm) {
+      state.quickExitForm.remark = event.target.value;
+    }
+    if (state.quickEditForm) state.quickEditForm.remark = event.target.value;
+  });
+  els.quickExitClearButton.addEventListener("click", function() {
+    state.quickExitClearSelected = !state.quickExitClearSelected;
+    renderQuickEdit();
+  });
+  els.quickExitCurrentStock.addEventListener("click", function(event) {
+    const trigger = event.target.closest('[data-action="toggle-quick-exit-segment"]');
+    if (!trigger || !state.quickEditItem) return;
+    const segment = trigger.getAttribute("data-segment");
+    const form = ensureQuickExitForm_(state.quickEditItem);
+    form.segments[segment].selected = !form.segments[segment].selected;
+    if (!form.segments[segment].selected) form.segments[segment].entry = "";
+    renderQuickEdit();
+  });
+  els.quickExitSegmentForms.addEventListener("click", function(event) {
+    const modeTrigger = event.target.closest('[data-action="quick-exit-mode"]');
+    if (modeTrigger && state.quickEditItem) {
+      const segment = modeTrigger.getAttribute("data-segment");
+      ensureQuickExitForm_(state.quickEditItem).segments[segment].mode = modeTrigger.getAttribute("data-mode");
+      ensureQuickExitForm_(state.quickEditItem).segments[segment].entry = "";
+      renderQuickEdit();
+      return;
+    }
+    const suggestionTrigger = event.target.closest('[data-action="quick-exit-suggestion"]');
+    if (suggestionTrigger && state.quickEditItem) {
+      const segment = suggestionTrigger.getAttribute("data-segment");
+      ensureQuickExitForm_(state.quickEditItem).segments[segment].entry = suggestionTrigger.getAttribute("data-value") || "";
+      renderQuickEdit();
+    }
+  });
+  els.quickExitSegmentForms.addEventListener("input", function(event) {
+    const input = event.target.closest('[data-action="quick-exit-entry"]');
+    if (!input || !state.quickEditItem) return;
+    const segment = input.getAttribute("data-segment");
+    ensureQuickExitForm_(state.quickEditItem).segments[segment].entry = input.value;
+    setQuickEditError("");
+    refreshQuickEditInlineFeedback();
+  });
+  els.quickExitSegmentForms.addEventListener("change", function(event) {
+    const input = event.target.closest('[data-action="quick-exit-entry"]');
+    if (!input || !state.quickEditItem) return;
+    const segment = input.getAttribute("data-segment");
+    ensureQuickExitForm_(state.quickEditItem).segments[segment].entry = input.value;
     renderQuickEdit();
   });
   els.cancel.addEventListener("click", closeQuickEdit);
