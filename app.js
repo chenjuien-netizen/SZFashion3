@@ -16,14 +16,14 @@ const seedItems = [
 ];
 
 const seedHistory = [
-  { timestampRaw: "2026-03-28T09:10:00.000Z", actionType: "modifier", reference: "SZ-TS-001", rowId: "row_3", beforeDisplay: "120p×4", afterDisplay: "120p×4+1/3", remark: "Ajustement comptage", source: "stock_mobile_quick_edit", beforeTotalPieces: 480, afterTotalPieces: 520 },
-  { timestampRaw: "2026-03-27T16:30:00.000Z", actionType: "sortie_rapide", reference: "SZ-DR-014", rowId: "row_2", beforeDisplay: "(85p)+144p×3+2/3+2包", afterDisplay: "(85p)+144p×3+1/2+2包", remark: "Sortie showroom", source: "stock_mobile_quick_edit", beforeTotalPieces: 649, afterTotalPieces: 643 },
-  { timestampRaw: "2026-03-27T11:45:00.000Z", actionType: "modifier", reference: "SZ-BL-032", rowId: "row_5", beforeDisplay: "72p×5+1/2", afterDisplay: "72p×5+2/3", remark: "Correction fraction", source: "stock_mobile_quick_edit", beforeTotalPieces: 396, afterTotalPieces: 408 },
-  { timestampRaw: "2026-03-26T18:05:00.000Z", actionType: "sortie_rapide", reference: "SZ-JK-203", rowId: "row_4", beforeDisplay: "96p×3", afterDisplay: "96p×2", remark: "Client export", source: "stock_mobile_quick_edit", beforeTotalPieces: 288, afterTotalPieces: 192 },
-  { timestampRaw: "2026-03-26T10:20:00.000Z", actionType: "modifier", reference: "SZ-SH-021", rowId: "row_8", beforeDisplay: "84p×2", afterDisplay: "84p×3", remark: "Réception repassage", source: "stock_mobile_quick_edit", beforeTotalPieces: 168, afterTotalPieces: 252 },
-  { timestampRaw: "2026-03-25T17:15:00.000Z", actionType: "sortie_rapide", reference: "SZ-TS-008", rowId: "row_13", beforeDisplay: "120p×1", afterDisplay: "-", remark: "Fin de lot", source: "stock_mobile_quick_edit", beforeTotalPieces: 120, afterTotalPieces: 0 },
-  { timestampRaw: "2026-03-25T09:40:00.000Z", actionType: "modifier", reference: "SZ-KN-087", rowId: "row_6", beforeDisplay: "(24p)+48p×2+1/4", afterDisplay: "(24p)+48p×2+1/4+1包", remark: "Ajout paquets", source: "stock_mobile_quick_edit", beforeTotalPieces: 132, afterTotalPieces: 144 },
-  { timestampRaw: "2026-03-24T15:50:00.000Z", actionType: "modifier", reference: "SZ-AC-410", rowId: "row_9", beforeDisplay: "144p×1", afterDisplay: "144p×1+1/6", remark: "", source: "stock_mobile_quick_edit", beforeTotalPieces: 144, afterTotalPieces: 168 }
+  { timestampRaw: "2026-03-28T09:10:00.000Z", actionType: "adjustment", reference: "SZ-TS-001", rowId: "row_3", beforeDisplay: "120p×4", afterDisplay: "120p×4+1/3", remark: "Ajustement comptage", source: "stock_mobile_quick_edit", beforeTotalPieces: 480, afterTotalPieces: 520 },
+  { timestampRaw: "2026-03-27T16:30:00.000Z", actionType: "exit", reference: "SZ-DR-014", rowId: "row_2", beforeDisplay: "(85p)+144p×3+2/3+2包", afterDisplay: "(85p)+144p×3+1/2+2包", remark: "Sortie showroom", source: "stock_mobile_quick_edit", beforeTotalPieces: 649, afterTotalPieces: 643 },
+  { timestampRaw: "2026-03-27T11:45:00.000Z", actionType: "adjustment", reference: "SZ-BL-032", rowId: "row_5", beforeDisplay: "72p×5+1/2", afterDisplay: "72p×5+2/3", remark: "Correction fraction", source: "stock_mobile_quick_edit", beforeTotalPieces: 396, afterTotalPieces: 408 },
+  { timestampRaw: "2026-03-26T18:05:00.000Z", actionType: "exit", reference: "SZ-JK-203", rowId: "row_4", beforeDisplay: "96p×3", afterDisplay: "96p×2", remark: "Client export", source: "stock_mobile_quick_edit", beforeTotalPieces: 288, afterTotalPieces: 192 },
+  { timestampRaw: "2026-03-26T10:20:00.000Z", actionType: "entry", reference: "SZ-SH-021", rowId: "row_8", beforeDisplay: "84p×2", afterDisplay: "84p×3", remark: "Réception repassage", source: "stock_mobile_quick_edit", beforeTotalPieces: 168, afterTotalPieces: 252 },
+  { timestampRaw: "2026-03-25T17:15:00.000Z", actionType: "exit", reference: "SZ-TS-008", rowId: "row_13", beforeDisplay: "120p×1", afterDisplay: "-", remark: "Fin de lot", source: "stock_mobile_quick_edit", beforeTotalPieces: 120, afterTotalPieces: 0 },
+  { timestampRaw: "2026-03-25T09:40:00.000Z", actionType: "entry", reference: "SZ-KN-087", rowId: "row_6", beforeDisplay: "(24p)+48p×2+1/4", afterDisplay: "(24p)+48p×2+1/4+1包", remark: "Ajout paquets", source: "stock_mobile_quick_edit", beforeTotalPieces: 132, afterTotalPieces: 144 },
+  { timestampRaw: "2026-03-24T15:50:00.000Z", actionType: "adjustment", reference: "SZ-AC-410", rowId: "row_9", beforeDisplay: "144p×1", afterDisplay: "144p×1+1/6", remark: "", source: "stock_mobile_quick_edit", beforeTotalPieces: 144, afterTotalPieces: 168 }
 ].map(function(entry, index) {
   return Object.assign({ id: "seed-his-" + String(index + 1), timestampLabel: formatHistoryTimestamp(entry.timestampRaw) }, entry);
 });
@@ -460,14 +460,16 @@ function formatHistoryTimestamp(value) {
 }
 
 function getActionBadgeClass(actionType) {
-  if (actionType === "sortie_rapide") return "bg-error-container/25 text-on-error-container";
-  if (actionType === "modifier") return "bg-primary-container text-on-primary-container";
+  if (actionType === "exit") return "bg-error-container/25 text-on-error-container";
+  if (actionType === "entry") return "bg-primary-container text-on-primary-container";
+  if (actionType === "adjustment") return "bg-surface-container-high text-on-surface-variant";
   return "bg-surface-container-high text-on-surface-variant";
 }
 
 function getActionLabel(actionType) {
-  if (actionType === "sortie_rapide") return "sortie_rapide";
-  if (actionType === "modifier") return "modifier";
+  if (actionType === "entry") return "entrée";
+  if (actionType === "exit") return "sortie";
+  if (actionType === "adjustment") return "ajustement";
   return actionType || "-";
 }
 
@@ -898,7 +900,7 @@ function saveQuickEdit() {
 
     const nextItem = hydrateItem(Object.assign({}, currentItem, nextState));
     const historyEntry = buildHistoryEntryFromLocalChange(
-      state.quickEditTab === "edit" ? "modifier" : "sortie_rapide",
+      state.quickEditTab === "edit" ? "adjustment" : "exit",
       currentItem,
       nextItem,
       nextState.remark
