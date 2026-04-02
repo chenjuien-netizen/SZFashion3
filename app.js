@@ -7,9 +7,7 @@ const inventoryItems = [
     warehouse: "A1",
     createdAt: "2026-01-12T09:20:00",
     remark: "Best seller noir, rotation rapide.",
-    summary: "T-shirt col rond noir",
-    cartons: 12,
-    pieces: 24
+    summary: "T-shirt col rond noir"
   },
   {
     id: "inv-002",
@@ -19,9 +17,7 @@ const inventoryItems = [
     warehouse: "A1",
     createdAt: "2026-01-18T10:15:00",
     remark: "Réassort attendu semaine prochaine.",
-    summary: "T-shirt oversize beige",
-    cartons: 0,
-    pieces: 0
+    summary: "T-shirt oversize beige"
   },
   {
     id: "inv-003",
@@ -31,9 +27,7 @@ const inventoryItems = [
     warehouse: "B2",
     createdAt: "2026-01-22T14:30:00",
     remark: "Série robe fluide printemps.",
-    summary: "Robe fluide imprimée",
-    cartons: 8,
-    pieces: 16
+    summary: "Robe fluide imprimée"
   },
   {
     id: "inv-004",
@@ -43,9 +37,7 @@ const inventoryItems = [
     warehouse: "B1",
     createdAt: "2026-02-02T11:00:00",
     remark: "",
-    summary: "Veste courte denim",
-    cartons: 3,
-    pieces: 6
+    summary: "Veste courte denim"
   },
   {
     id: "inv-005",
@@ -55,9 +47,7 @@ const inventoryItems = [
     warehouse: "C3",
     createdAt: "2026-02-06T16:45:00",
     remark: "Tailles mixtes restant en fin de lot.",
-    summary: "Pantalon droit gris",
-    cartons: 1,
-    pieces: 4
+    summary: "Pantalon droit gris"
   },
   {
     id: "inv-006",
@@ -67,9 +57,7 @@ const inventoryItems = [
     warehouse: "B2",
     createdAt: "2026-02-11T08:35:00",
     remark: "Reste seulement des unités ouvertes.",
-    summary: "Jupe plissée marine",
-    cartons: 0,
-    pieces: 2
+    summary: "Jupe plissée marine"
   },
   {
     id: "inv-007",
@@ -79,9 +67,7 @@ const inventoryItems = [
     warehouse: "A2",
     createdAt: "2026-02-14T13:10:00",
     remark: "",
-    summary: "Blouse satin ivoire",
-    cartons: 15,
-    pieces: 30
+    summary: "Blouse satin ivoire"
   },
   {
     id: "inv-008",
@@ -91,9 +77,7 @@ const inventoryItems = [
     warehouse: "C1",
     createdAt: "2026-02-20T10:05:00",
     remark: "Collection maille légère.",
-    summary: "Pull maille fine taupe",
-    cartons: 5,
-    pieces: 10
+    summary: "Pull maille fine taupe"
   },
   {
     id: "inv-009",
@@ -103,9 +87,7 @@ const inventoryItems = [
     warehouse: "C2",
     createdAt: "2026-02-27T15:25:00",
     remark: "",
-    summary: "Manteau long sable",
-    cartons: 0,
-    pieces: 0
+    summary: "Manteau long sable"
   },
   {
     id: "inv-010",
@@ -115,9 +97,7 @@ const inventoryItems = [
     warehouse: "A2",
     createdAt: "2026-03-03T09:50:00",
     remark: "Sort bien sur les tailles standard.",
-    summary: "Chemise rayée bleue",
-    cartons: 9,
-    pieces: 18
+    summary: "Chemise rayée bleue"
   },
   {
     id: "inv-011",
@@ -127,9 +107,7 @@ const inventoryItems = [
     warehouse: "C3",
     createdAt: "2026-03-07T12:40:00",
     remark: "Accessoire plié en box mix.",
-    summary: "Ceinture boucle dorée",
-    cartons: 2,
-    pieces: 12
+    summary: "Ceinture boucle dorée"
   },
   {
     id: "inv-012",
@@ -139,33 +117,31 @@ const inventoryItems = [
     warehouse: "B1",
     createdAt: "2026-03-11T17:00:00",
     remark: "Dernière pièce showroom.",
-    summary: "Robe courte rouge",
-    cartons: 0,
-    pieces: 1
+    summary: "Robe courte rouge"
   }
 ];
 
 const historyItems = [
-  { id: "his-001", reference: "SZ-TS-001", actionType: "modifier", beforeDisplay: "8 cartons / 16 pcs", afterDisplay: "12 cartons / 24 pcs", remark: "Réception container mars.", timestamp: "2026-03-28T09:10:00" },
-  { id: "his-002", reference: "SZ-DR-014", actionType: "sortie_rapide", beforeDisplay: "9 cartons / 18 pcs", afterDisplay: "8 cartons / 16 pcs", remark: "Préparation client wholesale.", timestamp: "2026-03-27T16:30:00" },
-  { id: "his-003", reference: "SZ-BL-032", actionType: "modifier", beforeDisplay: "10 cartons / 20 pcs", afterDisplay: "15 cartons / 30 pcs", remark: "Réassort atelier.", timestamp: "2026-03-27T11:45:00" },
-  { id: "his-004", reference: "SZ-JK-203", actionType: "modifier", beforeDisplay: "4 cartons / 8 pcs", afterDisplay: "3 cartons / 6 pcs", remark: "Correction comptage cabine.", timestamp: "2026-03-26T18:05:00" },
-  { id: "his-005", reference: "SZ-SH-021", actionType: "sortie_rapide", beforeDisplay: "11 cartons / 22 pcs", afterDisplay: "9 cartons / 18 pcs", remark: "Sortie salon export.", timestamp: "2026-03-26T10:20:00" },
-  { id: "his-006", reference: "SZ-TS-008", actionType: "sortie_rapide", beforeDisplay: "1 carton / 4 pcs", afterDisplay: "0 carton / 0 pc", remark: "Fin de lot client local.", timestamp: "2026-03-25T17:15:00" },
-  { id: "his-007", reference: "SZ-KN-087", actionType: "modifier", beforeDisplay: "3 cartons / 6 pcs", afterDisplay: "5 cartons / 10 pcs", remark: "Retour finition maille.", timestamp: "2026-03-25T09:40:00" },
-  { id: "his-008", reference: "SZ-AC-410", actionType: "modifier", beforeDisplay: "1 carton / 6 pcs", afterDisplay: "2 cartons / 12 pcs", remark: "", timestamp: "2026-03-24T15:50:00" },
-  { id: "his-009", reference: "SZ-SK-055", actionType: "modifier", beforeDisplay: "0 carton / 0 pc", afterDisplay: "0 carton / 2 pcs", remark: "Deux pièces retrouvées au picking.", timestamp: "2026-03-24T08:25:00" },
-  { id: "his-010", reference: "SZ-PT-119", actionType: "sortie_rapide", beforeDisplay: "2 cartons / 8 pcs", afterDisplay: "1 carton / 4 pcs", remark: "Commande boutique partenaire.", timestamp: "2026-03-23T13:15:00" },
-  { id: "his-011", reference: "SZ-CT-301", actionType: "sortie_rapide", beforeDisplay: "1 carton / 2 pcs", afterDisplay: "0 carton / 0 pc", remark: "Échantillons showroom sortis.", timestamp: "2026-03-22T16:40:00" },
-  { id: "his-012", reference: "SZ-DR-028", actionType: "modifier", beforeDisplay: "0 carton / 0 pc", afterDisplay: "0 carton / 1 pc", remark: "Pièce de présentation reclassée.", timestamp: "2026-03-22T11:10:00" },
-  { id: "his-013", reference: "SZ-TS-001", actionType: "sortie_rapide", beforeDisplay: "13 cartons / 26 pcs", afterDisplay: "8 cartons / 16 pcs", remark: "Sortie gros compte France.", timestamp: "2026-03-21T14:20:00" },
-  { id: "his-014", reference: "SZ-DR-014", actionType: "modifier", beforeDisplay: "6 cartons / 12 pcs", afterDisplay: "9 cartons / 18 pcs", remark: "Nouveau lot réceptionné.", timestamp: "2026-03-20T10:30:00" },
-  { id: "his-015", reference: "SZ-JK-203", actionType: "modifier", beforeDisplay: "2 cartons / 4 pcs", afterDisplay: "4 cartons / 8 pcs", remark: "", timestamp: "2026-03-19T09:05:00" },
-  { id: "his-016", reference: "SZ-BL-032", actionType: "sortie_rapide", beforeDisplay: "12 cartons / 24 pcs", afterDisplay: "10 cartons / 20 pcs", remark: "Transfert vers corner retail.", timestamp: "2026-03-18T12:55:00" },
-  { id: "his-017", reference: "SZ-SH-021", actionType: "modifier", beforeDisplay: "7 cartons / 14 pcs", afterDisplay: "11 cartons / 22 pcs", remark: "Réception chemises repassées.", timestamp: "2026-03-18T09:15:00" },
-  { id: "his-018", reference: "SZ-AC-410", actionType: "modifier", beforeDisplay: "2 cartons / 10 pcs", afterDisplay: "1 carton / 6 pcs", remark: "Erreur de conditionnement corrigée.", timestamp: "2026-03-17T17:30:00" },
-  { id: "his-019", reference: "SZ-KN-087", actionType: "sortie_rapide", beforeDisplay: "4 cartons / 8 pcs", afterDisplay: "3 cartons / 6 pcs", remark: "Sortie commande capsule.", timestamp: "2026-03-17T10:45:00" },
-  { id: "his-020", reference: "SZ-PT-119", actionType: "modifier", beforeDisplay: "0 carton / 0 pc", afterDisplay: "2 cartons / 8 pcs", remark: "Ouverture nouvelle série.", timestamp: "2026-03-16T11:25:00" }
+  { id: "his-001", reference: "SZ-TS-001", actionType: "entry", beforeDisplay: "8 cartons / 16 pcs", afterDisplay: "12 cartons / 24 pcs", remark: "Réception container mars.", timestamp: "2026-03-28T09:10:00" },
+  { id: "his-002", reference: "SZ-DR-014", actionType: "exit", beforeDisplay: "9 cartons / 18 pcs", afterDisplay: "8 cartons / 16 pcs", remark: "Préparation client wholesale.", timestamp: "2026-03-27T16:30:00" },
+  { id: "his-003", reference: "SZ-BL-032", actionType: "entry", beforeDisplay: "10 cartons / 20 pcs", afterDisplay: "15 cartons / 30 pcs", remark: "Réassort atelier.", timestamp: "2026-03-27T11:45:00" },
+  { id: "his-004", reference: "SZ-JK-203", actionType: "adjustment", beforeDisplay: "4 cartons / 8 pcs", afterDisplay: "3 cartons / 6 pcs", remark: "Correction comptage cabine.", timestamp: "2026-03-26T18:05:00" },
+  { id: "his-005", reference: "SZ-SH-021", actionType: "exit", beforeDisplay: "11 cartons / 22 pcs", afterDisplay: "9 cartons / 18 pcs", remark: "Sortie salon export.", timestamp: "2026-03-26T10:20:00" },
+  { id: "his-006", reference: "SZ-TS-008", actionType: "exit", beforeDisplay: "1 carton / 4 pcs", afterDisplay: "0 carton / 0 pc", remark: "Fin de lot client local.", timestamp: "2026-03-25T17:15:00" },
+  { id: "his-007", reference: "SZ-KN-087", actionType: "entry", beforeDisplay: "3 cartons / 6 pcs", afterDisplay: "5 cartons / 10 pcs", remark: "Retour finition maille.", timestamp: "2026-03-25T09:40:00" },
+  { id: "his-008", reference: "SZ-AC-410", actionType: "entry", beforeDisplay: "1 carton / 6 pcs", afterDisplay: "2 cartons / 12 pcs", remark: "", timestamp: "2026-03-24T15:50:00" },
+  { id: "his-009", reference: "SZ-SK-055", actionType: "adjustment", beforeDisplay: "0 carton / 0 pc", afterDisplay: "0 carton / 2 pcs", remark: "Deux pièces retrouvées au picking.", timestamp: "2026-03-24T08:25:00" },
+  { id: "his-010", reference: "SZ-PT-119", actionType: "exit", beforeDisplay: "2 cartons / 8 pcs", afterDisplay: "1 carton / 4 pcs", remark: "Commande boutique partenaire.", timestamp: "2026-03-23T13:15:00" },
+  { id: "his-011", reference: "SZ-CT-301", actionType: "exit", beforeDisplay: "1 carton / 2 pcs", afterDisplay: "0 carton / 0 pc", remark: "Échantillons showroom sortis.", timestamp: "2026-03-22T16:40:00" },
+  { id: "his-012", reference: "SZ-DR-028", actionType: "adjustment", beforeDisplay: "0 carton / 0 pc", afterDisplay: "0 carton / 1 pc", remark: "Pièce de présentation reclassée.", timestamp: "2026-03-22T11:10:00" },
+  { id: "his-013", reference: "SZ-TS-001", actionType: "exit", beforeDisplay: "13 cartons / 26 pcs", afterDisplay: "8 cartons / 16 pcs", remark: "Sortie gros compte France.", timestamp: "2026-03-21T14:20:00" },
+  { id: "his-014", reference: "SZ-DR-014", actionType: "entry", beforeDisplay: "6 cartons / 12 pcs", afterDisplay: "9 cartons / 18 pcs", remark: "Nouveau lot réceptionné.", timestamp: "2026-03-20T10:30:00" },
+  { id: "his-015", reference: "SZ-JK-203", actionType: "entry", beforeDisplay: "2 cartons / 4 pcs", afterDisplay: "4 cartons / 8 pcs", remark: "", timestamp: "2026-03-19T09:05:00" },
+  { id: "his-016", reference: "SZ-BL-032", actionType: "exit", beforeDisplay: "12 cartons / 24 pcs", afterDisplay: "10 cartons / 20 pcs", remark: "Transfert vers corner retail.", timestamp: "2026-03-18T12:55:00" },
+  { id: "his-017", reference: "SZ-SH-021", actionType: "entry", beforeDisplay: "7 cartons / 14 pcs", afterDisplay: "11 cartons / 22 pcs", remark: "Réception chemises repassées.", timestamp: "2026-03-18T09:15:00" },
+  { id: "his-018", reference: "SZ-AC-410", actionType: "adjustment", beforeDisplay: "2 cartons / 10 pcs", afterDisplay: "1 carton / 6 pcs", remark: "Erreur de conditionnement corrigée.", timestamp: "2026-03-17T17:30:00" },
+  { id: "his-019", reference: "SZ-KN-087", actionType: "exit", beforeDisplay: "4 cartons / 8 pcs", afterDisplay: "3 cartons / 6 pcs", remark: "Sortie commande capsule.", timestamp: "2026-03-17T10:45:00" },
+  { id: "his-020", reference: "SZ-PT-119", actionType: "entry", beforeDisplay: "0 carton / 0 pc", afterDisplay: "2 cartons / 8 pcs", remark: "Ouverture nouvelle série.", timestamp: "2026-03-16T11:25:00" }
 ];
 
 function getCurrentPage() {
@@ -186,6 +162,28 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
+}
+
+function formatDateTime(dateString) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date).replace(",", " ·");
+}
+
 function normalizeText(value) {
   return String(value || "")
     .normalize("NFD")
@@ -194,27 +192,22 @@ function normalizeText(value) {
     .trim();
 }
 
-function formatDateLabel(isoText) {
-  if (!isoText) return "--/--/----";
-  const date = new Date(isoText);
-  if (Number.isNaN(date.getTime())) return "--/--/----";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  }).format(date);
+function getStockLabel(stockState) {
+  return stockState === "positive" ? "En stock" : "Rupture";
 }
 
-function formatDateTimeCompact(isoText) {
-  if (!isoText) return "-";
-  const date = new Date(isoText);
-  if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date).replace(",", "");
+function getActionLabel(actionType) {
+  if (actionType === "entry") return "Entrée";
+  if (actionType === "exit") return "Sortie";
+  if (actionType === "adjustment") return "Ajustement";
+  return "Mouvement";
+}
+
+function getActionBadgeClass(actionType) {
+  if (actionType === "entry") return "badge-entry";
+  if (actionType === "exit") return "badge-exit";
+  if (actionType === "adjustment") return "badge-adjustment";
+  return "";
 }
 
 function getInventoryByReference(reference) {
@@ -241,205 +234,172 @@ function filterInventoryItems(query) {
   }
 
   return inventoryItems.filter(function(item) {
-    const haystack = normalizeText(item.reference + " " + item.stockDisplay + " " + item.warehouse);
+    const haystack = normalizeText(item.reference + " " + item.warehouse);
     return haystack.includes(normalizedQuery);
   });
 }
 
 function filterHistoryItems(query, actionType) {
   const normalizedQuery = normalizeText(query);
-  const normalizedType = String(actionType || "").trim();
+  const normalizedType = actionType || "all";
 
   return historyItems
     .filter(function(entry) {
-      const haystack = normalizeText(entry.reference + " " + entry.actionType + " " + entry.remark);
+      const matchesType = normalizedType === "all" || entry.actionType === normalizedType;
+      const haystack = normalizeText(entry.reference + " " + entry.remark);
       const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery);
-      const matchesType = !normalizedType || entry.actionType === normalizedType;
-      return matchesQuery && matchesType;
+      return matchesType && matchesQuery;
     })
     .sort(function(a, b) {
       return new Date(b.timestamp) - new Date(a.timestamp);
     });
 }
 
-function summarizeInventory(items) {
-  return items.reduce(function(accumulator, item) {
-    accumulator.refs += 1;
-    accumulator.cartons += Number(item.cartons || 0);
-    accumulator.pieces += Number(item.pieces || 0);
-    if (item.stockState === "positive") {
-      accumulator.positive += 1;
-    } else {
-      accumulator.zero += 1;
-    }
-    return accumulator;
-  }, {
-    refs: 0,
-    positive: 0,
-    zero: 0,
-    cartons: 0,
-    pieces: 0
-  });
+function getInventorySummary(items) {
+  const total = items.length;
+  const positive = items.filter(function(item) {
+    return item.stockState === "positive";
+  }).length;
+
+  return {
+    total: total,
+    positive: positive,
+    zero: total - positive
+  };
 }
 
-function renderItemMarkup(item) {
-  const stockClass = item.stockState === "positive" ? "" : " is-zero";
-  const stateLabel = item.stockState === "positive" ? "En stock" : "En rupture";
-  const itemClass = item.stockState === "positive" ? "inventory-card is-positive" : "inventory-card";
+function renderInventoryCard(item) {
+  const detailUrl = "./detail.html?ref=" + encodeURIComponent(item.reference);
 
-  return ""
-    + '<article class="' + itemClass + '" data-reference="' + escapeHtml(item.reference) + '">'
-    + '<div class="inventory-card-main">'
-    + '<div class="inventory-card-head">'
-    + '<span class="inventory-reference">' + escapeHtml(item.reference) + "</span>"
-    + '<span class="inventory-state">' + escapeHtml(stateLabel) + "</span>"
-    + "</div>"
-    + '<span class="inventory-stock' + stockClass + '">' + escapeHtml(item.stockDisplay) + "</span>"
-    + '<div class="inventory-meta">Entrepot ' + escapeHtml(item.warehouse) + "</div>"
-    + "</div>"
-    + '<a class="reference-detail-trigger" href="./detail.html?ref=' + encodeURIComponent(item.reference) + '" aria-label="Ouvrir la fiche de ' + escapeHtml(item.reference) + '">'
-    + '<span class="material-symbols-outlined">chevron_right</span>'
-    + "</a>"
-    + "</article>";
+  return (
+    '<article class="inventory-card is-' + escapeHtml(item.stockState) + '">' +
+      '<div class="inventory-card-main">' +
+        '<div class="inventory-card-top">' +
+          '<h2 class="inventory-reference">' + escapeHtml(item.reference) + '</h2>' +
+          '<span class="badge ' + (item.stockState === "positive" ? "badge-positive" : "badge-zero") + '">' +
+            escapeHtml(getStockLabel(item.stockState)) +
+          "</span>" +
+        "</div>" +
+        '<div class="inventory-card-bottom">' +
+          "<div>" +
+            '<p class="inventory-stock">' + escapeHtml(item.stockDisplay) + "</p>" +
+            '<p class="inventory-meta">Entrepôt ' + escapeHtml(item.warehouse) + "</p>" +
+          "</div>" +
+        "</div>" +
+      "</div>" +
+      '<a class="link-arrow" href="' + detailUrl + '" aria-label="Voir le détail de ' + escapeHtml(item.reference) + '">→</a>' +
+    "</article>"
+  );
 }
 
-function getHistoryBadgeClass(actionType) {
-  return actionType === "sortie_rapide" ? "history-badge is-sortie_rapide" : "history-badge is-modifier";
+function renderHistoryCard(entry) {
+  const detailUrl = "./detail.html?ref=" + encodeURIComponent(entry.reference);
+
+  return (
+    '<article class="history-card">' +
+      '<div class="history-card-top">' +
+        "<div>" +
+          '<a class="history-reference-link" href="' + detailUrl + '">' + escapeHtml(entry.reference) + "</a>" +
+          '<span class="history-timestamp">' + escapeHtml(formatDateTime(entry.timestamp)) + "</span>" +
+        "</div>" +
+        '<span class="badge ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + "</span>" +
+      "</div>" +
+      '<div class="history-card-body">' +
+        '<p class="history-copy"><strong>Avant</strong> ' + escapeHtml(entry.beforeDisplay) + "</p>" +
+        '<p class="history-copy"><strong>Après</strong> ' + escapeHtml(entry.afterDisplay) + "</p>" +
+        (entry.remark ? '<p class="history-meta">' + escapeHtml(entry.remark) + "</p>" : "") +
+      "</div>" +
+    "</article>"
+  );
 }
 
-function renderHistoryRow(entry) {
-  const beforeMarkup = entry.beforeDisplay
-    ? '<div class="history-copy"><strong>AVANT</strong><span> ' + escapeHtml(entry.beforeDisplay) + "</span></div>"
-    : "";
-  const afterMarkup = entry.afterDisplay
-    ? '<div class="history-copy"><strong>APRÈS</strong><span> ' + escapeHtml(entry.afterDisplay) + "</span></div>"
-    : "";
-  const remarkMarkup = entry.remark
-    ? '<div class="history-remark">' + escapeHtml(entry.remark) + "</div>"
-    : "";
-
-  return ""
-    + '<article class="history-row">'
-    + '<div class="history-row-head">'
-    + '<div>'
-    + '<a class="history-reference-link" href="./detail.html?ref=' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference) + "</a>"
-    + '<div class="history-timestamp">' + escapeHtml(formatDateTimeCompact(entry.timestamp)) + "</div>"
-    + "</div>"
-    + '<span class="' + getHistoryBadgeClass(entry.actionType) + '">' + escapeHtml(entry.actionType) + "</span>"
-    + "</div>"
-    + '<div class="history-row-body">' + beforeMarkup + afterMarkup + remarkMarkup + "</div>"
-    + "</article>";
-}
-
-function renderDetailHistoryRow(entry) {
-  const beforeMarkup = entry.beforeDisplay
-    ? '<div class="history-copy"><strong>AVANT</strong><span> ' + escapeHtml(entry.beforeDisplay) + "</span></div>"
-    : "";
-  const afterMarkup = entry.afterDisplay
-    ? '<div class="history-copy"><strong>APRÈS</strong><span> ' + escapeHtml(entry.afterDisplay) + "</span></div>"
-    : "";
-  const remarkMarkup = entry.remark
-    ? '<div class="history-remark">' + escapeHtml(entry.remark) + "</div>"
-    : "";
-
-  return ""
-    + '<article class="detail-history-row">'
-    + '<div class="detail-history-row-head">'
-    + '<div class="detail-history-timestamp">' + escapeHtml(formatDateTimeCompact(entry.timestamp)) + "</div>"
-    + '<span class="' + getHistoryBadgeClass(entry.actionType) + '">' + escapeHtml(entry.actionType) + "</span>"
-    + "</div>"
-    + '<div class="detail-history-row-body">' + beforeMarkup + afterMarkup + remarkMarkup + "</div>"
-    + "</article>";
+function renderDetailHistoryCard(entry) {
+  return (
+    '<article class="detail-history-card">' +
+      '<div class="detail-history-top">' +
+        '<span class="detail-history-timestamp">' + escapeHtml(formatDateTime(entry.timestamp)) + "</span>" +
+        '<span class="badge ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + "</span>" +
+      "</div>" +
+      '<div class="detail-history-body">' +
+        '<p class="history-copy detail-history-copy"><strong>Avant</strong> ' + escapeHtml(entry.beforeDisplay) + "</p>" +
+        '<p class="history-copy detail-history-copy"><strong>Après</strong> ' + escapeHtml(entry.afterDisplay) + "</p>" +
+        (entry.remark ? '<p class="history-meta">' + escapeHtml(entry.remark) + "</p>" : "") +
+      "</div>" +
+    "</article>"
+  );
 }
 
 function bootInventoryPage() {
-  const searchInput = document.getElementById("searchInput");
-  const summaryDate = document.getElementById("summaryDate");
-  const summaryRefs = document.getElementById("summaryRefs");
-  const summaryPositive = document.getElementById("summaryPositive");
-  const summaryZero = document.getElementById("summaryZero");
-  const summaryTotals = document.getElementById("summaryTotals");
-  const summaryStatus = document.getElementById("summaryStatus");
-  const inventoryGrid = document.getElementById("inventoryGrid");
-  const emptyState = document.getElementById("emptyState");
+  const searchInput = document.getElementById("inventorySearchInput");
+  const summaryRefs = document.getElementById("inventorySummaryRefs");
+  const summaryPositive = document.getElementById("inventorySummaryPositive");
+  const summaryZero = document.getElementById("inventorySummaryZero");
+  const list = document.getElementById("inventoryList");
+  const emptyState = document.getElementById("inventoryEmptyState");
 
-  if (!searchInput || !summaryDate || !summaryRefs || !summaryPositive || !summaryZero || !summaryTotals || !summaryStatus || !inventoryGrid || !emptyState) {
+  if (!searchInput || !summaryRefs || !summaryPositive || !summaryZero || !list || !emptyState) {
     return;
   }
 
-  function renderInventory() {
-    const visibleItems = filterInventoryItems(searchInput.value);
-    const summary = summarizeInventory(visibleItems);
-    const referenceDate = inventoryItems.length > 0 ? inventoryItems[inventoryItems.length - 1].createdAt : "";
+  function render() {
+    const items = filterInventoryItems(searchInput.value);
+    const summary = getInventorySummary(items);
 
-    inventoryGrid.innerHTML = visibleItems.map(renderItemMarkup).join("");
-    emptyState.classList.toggle("hidden", visibleItems.length > 0);
-    summaryDate.textContent = formatDateLabel(referenceDate);
-    summaryRefs.textContent = summary.refs + " refs";
-    summaryPositive.textContent = summary.positive + " en stock";
-    summaryZero.textContent = summary.zero + " en rupture";
-    summaryTotals.textContent = summary.cartons + " cartons " + summary.pieces + " pcs";
-    summaryStatus.textContent = searchInput.value.trim() ? "Recherche" : "Pret";
+    list.innerHTML = items.map(renderInventoryCard).join("");
+    emptyState.classList.toggle("hidden", items.length > 0);
+    summaryRefs.textContent = String(summary.total);
+    summaryPositive.textContent = String(summary.positive);
+    summaryZero.textContent = String(summary.zero);
   }
 
-  renderInventory();
-  searchInput.addEventListener("input", renderInventory);
+  searchInput.addEventListener("input", render);
+  render();
 }
 
 function bootHistoryPage() {
   const searchInput = document.getElementById("historySearchInput");
-  const typeFilter = document.getElementById("historyActionTypeFilter");
-  const historySummary = document.getElementById("historySummary");
-  const historyStatus = document.getElementById("historyStatus");
-  const historyList = document.getElementById("historyList");
+  const typeFilter = document.getElementById("historyTypeFilter");
+  const summaryCount = document.getElementById("historySummaryCount");
+  const list = document.getElementById("historyList");
   const emptyState = document.getElementById("historyEmptyState");
-  const emptyTitle = document.getElementById("historyEmptyTitle");
-  const emptyMessage = document.getElementById("historyEmptyMessage");
 
-  if (!searchInput || !typeFilter || !historySummary || !historyStatus || !historyList || !emptyState || !emptyTitle || !emptyMessage) {
+  if (!searchInput || !typeFilter || !summaryCount || !list || !emptyState) {
     return;
   }
 
-  function renderHistory() {
-    const visibleItems = filterHistoryItems(searchInput.value, typeFilter.value);
-    const hasFilters = !!(searchInput.value.trim() || typeFilter.value);
+  function render() {
+    const items = filterHistoryItems(searchInput.value, typeFilter.value);
 
-    historyList.innerHTML = visibleItems.map(renderHistoryRow).join("");
-    emptyState.classList.toggle("hidden", visibleItems.length > 0);
-    emptyTitle.textContent = hasFilters ? "Aucun resultat" : "Aucun historique";
-    emptyMessage.textContent = hasFilters
-      ? "Aucun mouvement ne correspond à la recherche."
-      : "Aucun mouvement à afficher.";
-    historySummary.textContent = visibleItems.length > 0 ? visibleItems.length + " mouvements" : "-";
-    historyStatus.textContent = hasFilters ? "Filtres" : "Pret";
+    list.innerHTML = items.map(renderHistoryCard).join("");
+    summaryCount.textContent = String(items.length);
+    emptyState.classList.toggle("hidden", items.length > 0);
   }
 
-  renderHistory();
-  searchInput.addEventListener("input", renderHistory);
-  typeFilter.addEventListener("change", renderHistory);
+  searchInput.addEventListener("input", render);
+  typeFilter.addEventListener("change", render);
+  render();
 }
 
 function bootDetailPage() {
   const backButton = document.getElementById("detailBackButton");
-  const referenceEl = document.getElementById("detailReference");
-  const sublineEl = document.getElementById("detailSubline");
-  const notFoundBanner = document.getElementById("detailNotFoundBanner");
+  const notFoundState = document.getElementById("detailNotFoundState");
   const detailContent = document.getElementById("detailContent");
+  const referenceEl = document.getElementById("detailReference");
   const stockDisplayEl = document.getElementById("detailStockDisplay");
   const stockStateEl = document.getElementById("detailStockState");
   const warehouseEl = document.getElementById("detailWarehouse");
   const createdAtEl = document.getElementById("detailCreatedAt");
   const lastMovementEl = document.getElementById("detailLastMovement");
   const summaryEl = document.getElementById("detailSummary");
-  const remarkSection = document.getElementById("detailRemarkSection");
+  const remarkBlock = document.getElementById("detailRemarkBlock");
   const remarkEl = document.getElementById("detailRemark");
-  const detailHistoryList = document.getElementById("detailHistoryList");
-  const detailHistoryEmpty = document.getElementById("detailHistoryEmpty");
+  const historyList = document.getElementById("detailHistoryList");
+  const historyEmptyState = document.getElementById("detailHistoryEmptyState");
 
   if (
-    !backButton || !referenceEl || !sublineEl || !notFoundBanner || !detailContent ||
-    !stockDisplayEl || !stockStateEl || !warehouseEl || !createdAtEl || !lastMovementEl ||
-    !summaryEl || !remarkSection || !remarkEl || !detailHistoryList || !detailHistoryEmpty
+    !backButton || !notFoundState || !detailContent || !referenceEl || !stockDisplayEl ||
+    !stockStateEl || !warehouseEl || !createdAtEl || !lastMovementEl || !summaryEl ||
+    !remarkBlock || !remarkEl || !historyList || !historyEmptyState
   ) {
     return;
   }
@@ -447,53 +407,52 @@ function bootDetailPage() {
   backButton.addEventListener("click", function() {
     if (window.history.length > 1) {
       window.history.back();
-    } else {
-      window.location.href = "./index.html";
+      return;
     }
+
+    window.location.href = "./index.html";
   });
 
   const reference = getParam("ref");
   const item = getInventoryByReference(reference);
 
   if (!item) {
-    notFoundBanner.classList.remove("hidden");
+    notFoundState.classList.remove("hidden");
     detailContent.classList.add("hidden");
-    referenceEl.textContent = reference || "-";
-    sublineEl.textContent = "Fiche produit";
     return;
   }
 
-  const relatedHistory = getHistoryForReference(reference);
-  const latestHistory = relatedHistory.length > 0 ? relatedHistory[0] : null;
+  const itemHistory = getHistoryForReference(item.reference);
+  const latestMovement = itemHistory.length > 0 ? itemHistory[0].timestamp : "";
 
   referenceEl.textContent = item.reference;
-  sublineEl.textContent = "Fiche produit";
   stockDisplayEl.textContent = item.stockDisplay;
-  stockStateEl.textContent = item.stockState === "positive" ? "En stock" : "En rupture";
-  warehouseEl.textContent = item.warehouse || "-";
-  createdAtEl.textContent = formatDateLabel(item.createdAt);
-  lastMovementEl.textContent = latestHistory ? formatDateTimeCompact(latestHistory.timestamp) : "-";
+  stockStateEl.textContent = getStockLabel(item.stockState);
+  stockStateEl.className = "badge " + (item.stockState === "positive" ? "badge-positive" : "badge-zero");
+  warehouseEl.textContent = item.warehouse;
+  createdAtEl.textContent = formatDate(item.createdAt);
+  lastMovementEl.textContent = latestMovement ? formatDateTime(latestMovement) : "-";
   summaryEl.textContent = item.summary || "-";
 
   if (item.remark) {
-    remarkSection.classList.remove("hidden");
     remarkEl.textContent = item.remark;
+    remarkBlock.classList.remove("hidden");
   } else {
-    remarkSection.classList.add("hidden");
+    remarkBlock.classList.add("hidden");
   }
 
-  detailHistoryList.innerHTML = relatedHistory.map(renderDetailHistoryRow).join("");
-  detailHistoryEmpty.classList.toggle("hidden", relatedHistory.length > 0);
+  historyList.innerHTML = itemHistory.map(renderDetailHistoryCard).join("");
+  historyEmptyState.classList.toggle("hidden", itemHistory.length > 0);
 }
 
 function initApp() {
-  const page = getCurrentPage();
+  const currentPage = getCurrentPage();
 
-  if (page === "inventory") {
+  if (currentPage === "inventory") {
     bootInventoryPage();
-  } else if (page === "history") {
+  } else if (currentPage === "history") {
     bootHistoryPage();
-  } else if (page === "detail") {
+  } else if (currentPage === "detail") {
     bootDetailPage();
   }
 }
