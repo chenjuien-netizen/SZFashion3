@@ -1,124 +1,16 @@
 const inventoryItems = [
-  {
-    id: "inv-001",
-    reference: "SZ-TS-001",
-    stockDisplay: "12 cartons / 24 pcs",
-    stockState: "positive",
-    warehouse: "A1",
-    createdAt: "2026-01-12T09:20:00",
-    remark: "Best seller noir, rotation rapide.",
-    summary: "T-shirt col rond noir"
-  },
-  {
-    id: "inv-002",
-    reference: "SZ-TS-008",
-    stockDisplay: "0 carton / 0 pc",
-    stockState: "zero",
-    warehouse: "A1",
-    createdAt: "2026-01-18T10:15:00",
-    remark: "Réassort attendu semaine prochaine.",
-    summary: "T-shirt oversize beige"
-  },
-  {
-    id: "inv-003",
-    reference: "SZ-DR-014",
-    stockDisplay: "8 cartons / 16 pcs",
-    stockState: "positive",
-    warehouse: "B2",
-    createdAt: "2026-01-22T14:30:00",
-    remark: "Série robe fluide printemps.",
-    summary: "Robe fluide imprimée"
-  },
-  {
-    id: "inv-004",
-    reference: "SZ-JK-203",
-    stockDisplay: "3 cartons / 6 pcs",
-    stockState: "positive",
-    warehouse: "B1",
-    createdAt: "2026-02-02T11:00:00",
-    remark: "",
-    summary: "Veste courte denim"
-  },
-  {
-    id: "inv-005",
-    reference: "SZ-PT-119",
-    stockDisplay: "1 carton / 4 pcs",
-    stockState: "positive",
-    warehouse: "C3",
-    createdAt: "2026-02-06T16:45:00",
-    remark: "Tailles mixtes restant en fin de lot.",
-    summary: "Pantalon droit gris"
-  },
-  {
-    id: "inv-006",
-    reference: "SZ-SK-055",
-    stockDisplay: "0 carton / 2 pcs",
-    stockState: "zero",
-    warehouse: "B2",
-    createdAt: "2026-02-11T08:35:00",
-    remark: "Reste seulement des unités ouvertes.",
-    summary: "Jupe plissée marine"
-  },
-  {
-    id: "inv-007",
-    reference: "SZ-BL-032",
-    stockDisplay: "15 cartons / 30 pcs",
-    stockState: "positive",
-    warehouse: "A2",
-    createdAt: "2026-02-14T13:10:00",
-    remark: "",
-    summary: "Blouse satin ivoire"
-  },
-  {
-    id: "inv-008",
-    reference: "SZ-KN-087",
-    stockDisplay: "5 cartons / 10 pcs",
-    stockState: "positive",
-    warehouse: "C1",
-    createdAt: "2026-02-20T10:05:00",
-    remark: "Collection maille légère.",
-    summary: "Pull maille fine taupe"
-  },
-  {
-    id: "inv-009",
-    reference: "SZ-CT-301",
-    stockDisplay: "0 carton / 0 pc",
-    stockState: "zero",
-    warehouse: "C2",
-    createdAt: "2026-02-27T15:25:00",
-    remark: "",
-    summary: "Manteau long sable"
-  },
-  {
-    id: "inv-010",
-    reference: "SZ-SH-021",
-    stockDisplay: "9 cartons / 18 pcs",
-    stockState: "positive",
-    warehouse: "A2",
-    createdAt: "2026-03-03T09:50:00",
-    remark: "Sort bien sur les tailles standard.",
-    summary: "Chemise rayée bleue"
-  },
-  {
-    id: "inv-011",
-    reference: "SZ-AC-410",
-    stockDisplay: "2 cartons / 12 pcs",
-    stockState: "positive",
-    warehouse: "C3",
-    createdAt: "2026-03-07T12:40:00",
-    remark: "Accessoire plié en box mix.",
-    summary: "Ceinture boucle dorée"
-  },
-  {
-    id: "inv-012",
-    reference: "SZ-DR-028",
-    stockDisplay: "0 carton / 1 pc",
-    stockState: "zero",
-    warehouse: "B1",
-    createdAt: "2026-03-11T17:00:00",
-    remark: "Dernière pièce showroom.",
-    summary: "Robe courte rouge"
-  }
+  { id: "inv-001", reference: "SZ-TS-001", stockDisplay: "12 cartons / 24 pcs", stockState: "positive", warehouse: "A1", createdAt: "2026-01-12T09:20:00", remark: "Best seller noir, rotation rapide.", summary: "T-shirt col rond noir", totalPieces: 24 },
+  { id: "inv-002", reference: "SZ-TS-008", stockDisplay: "0 carton / 0 pc", stockState: "zero", warehouse: "A1", createdAt: "2026-01-18T10:15:00", remark: "Réassort attendu semaine prochaine.", summary: "T-shirt oversize beige", totalPieces: 0 },
+  { id: "inv-003", reference: "SZ-DR-014", stockDisplay: "8 cartons / 16 pcs", stockState: "positive", warehouse: "B2", createdAt: "2026-01-22T14:30:00", remark: "Série robe fluide printemps.", summary: "Robe fluide imprimée", totalPieces: 16 },
+  { id: "inv-004", reference: "SZ-JK-203", stockDisplay: "3 cartons / 6 pcs", stockState: "positive", warehouse: "B1", createdAt: "2026-02-02T11:00:00", remark: "", summary: "Veste courte denim", totalPieces: 6 },
+  { id: "inv-005", reference: "SZ-PT-119", stockDisplay: "1 carton / 4 pcs", stockState: "positive", warehouse: "C3", createdAt: "2026-02-06T16:45:00", remark: "Tailles mixtes restant en fin de lot.", summary: "Pantalon droit gris", totalPieces: 4 },
+  { id: "inv-006", reference: "SZ-SK-055", stockDisplay: "0 carton / 2 pcs", stockState: "zero", warehouse: "B2", createdAt: "2026-02-11T08:35:00", remark: "Reste seulement des unités ouvertes.", summary: "Jupe plissée marine", totalPieces: 2 },
+  { id: "inv-007", reference: "SZ-BL-032", stockDisplay: "15 cartons / 30 pcs", stockState: "positive", warehouse: "A2", createdAt: "2026-02-14T13:10:00", remark: "", summary: "Blouse satin ivoire", totalPieces: 30 },
+  { id: "inv-008", reference: "SZ-KN-087", stockDisplay: "5 cartons / 10 pcs", stockState: "positive", warehouse: "C1", createdAt: "2026-02-20T10:05:00", remark: "Collection maille légère.", summary: "Pull maille fine taupe", totalPieces: 10 },
+  { id: "inv-009", reference: "SZ-CT-301", stockDisplay: "0 carton / 0 pc", stockState: "zero", warehouse: "C2", createdAt: "2026-02-27T15:25:00", remark: "", summary: "Manteau long sable", totalPieces: 0 },
+  { id: "inv-010", reference: "SZ-SH-021", stockDisplay: "9 cartons / 18 pcs", stockState: "positive", warehouse: "A2", createdAt: "2026-03-03T09:50:00", remark: "Sort bien sur les tailles standard.", summary: "Chemise rayée bleue", totalPieces: 18 },
+  { id: "inv-011", reference: "SZ-AC-410", stockDisplay: "2 cartons / 12 pcs", stockState: "positive", warehouse: "C3", createdAt: "2026-03-07T12:40:00", remark: "Accessoire plié en box mix.", summary: "Ceinture boucle dorée", totalPieces: 12 },
+  { id: "inv-012", reference: "SZ-DR-028", stockDisplay: "0 carton / 1 pc", stockState: "zero", warehouse: "B1", createdAt: "2026-03-11T17:00:00", remark: "Dernière pièce showroom.", summary: "Robe courte rouge", totalPieces: 1 }
 ];
 
 const historyItems = [
@@ -149,8 +41,7 @@ function getCurrentPage() {
 }
 
 function getParam(name) {
-  const params = new URLSearchParams(window.location.search);
-  return params.get(name) || "";
+  return new URLSearchParams(window.location.search).get(name) || "";
 }
 
 function escapeHtml(value) {
@@ -162,28 +53,6 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-function formatDate(dateString) {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  }).format(date);
-}
-
-function formatDateTime(dateString) {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(date).replace(",", " ·");
-}
-
 function normalizeText(value) {
   return String(value || "")
     .normalize("NFD")
@@ -192,22 +61,41 @@ function normalizeText(value) {
     .trim();
 }
 
-function getStockLabel(stockState) {
-  return stockState === "positive" ? "En stock" : "Rupture";
+function formatDateLabel(isoText) {
+  if (!isoText) return "--/--/----";
+  const date = new Date(isoText);
+  if (Number.isNaN(date.getTime())) return "--/--/----";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
 }
 
-function getActionLabel(actionType) {
-  if (actionType === "entry") return "Entrée";
-  if (actionType === "exit") return "Sortie";
-  if (actionType === "adjustment") return "Ajustement";
-  return "Mouvement";
+function formatDateTimeCompact(isoText) {
+  if (!isoText) return "-";
+  const date = new Date(isoText);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date).replace(",", "");
 }
 
 function getActionBadgeClass(actionType) {
-  if (actionType === "entry") return "badge-entry";
-  if (actionType === "exit") return "badge-exit";
-  if (actionType === "adjustment") return "badge-adjustment";
-  return "";
+  if (actionType === "entry") return "bg-primary-container text-on-primary-container";
+  if (actionType === "exit") return "bg-error-container/25 text-on-error-container";
+  if (actionType === "adjustment") return "bg-surface-container-high text-on-surface-variant";
+  return "bg-surface-container-high text-on-surface-variant";
+}
+
+function getActionLabel(actionType) {
+  if (actionType === "entry") return "entrée";
+  if (actionType === "exit") return "sortie";
+  if (actionType === "adjustment") return "ajustement";
+  return "-";
 }
 
 function getInventoryByReference(reference) {
@@ -228,27 +116,21 @@ function getHistoryForReference(reference) {
 
 function filterInventoryItems(query) {
   const normalizedQuery = normalizeText(query);
-
-  if (!normalizedQuery) {
-    return inventoryItems.slice();
-  }
+  if (!normalizedQuery) return inventoryItems.slice();
 
   return inventoryItems.filter(function(item) {
-    const haystack = normalizeText(item.reference + " " + item.warehouse);
-    return haystack.includes(normalizedQuery);
+    return normalizeText(item.reference + " " + item.warehouse + " " + item.stockDisplay).includes(normalizedQuery);
   });
 }
 
 function filterHistoryItems(query, actionType) {
   const normalizedQuery = normalizeText(query);
-  const normalizedType = actionType || "all";
 
   return historyItems
     .filter(function(entry) {
-      const matchesType = normalizedType === "all" || entry.actionType === normalizedType;
-      const haystack = normalizeText(entry.reference + " " + entry.remark);
-      const matchesQuery = !normalizedQuery || haystack.includes(normalizedQuery);
-      return matchesType && matchesQuery;
+      const matchesType = !actionType || entry.actionType === actionType;
+      const haystack = normalizeText(entry.reference + " " + entry.remark + " " + entry.actionType);
+      return matchesType && (!normalizedQuery || haystack.includes(normalizedQuery));
     })
     .sort(function(a, b) {
       return new Date(b.timestamp) - new Date(a.timestamp);
@@ -256,100 +138,101 @@ function filterHistoryItems(query, actionType) {
 }
 
 function getInventorySummary(items) {
-  const total = items.length;
-  const positive = items.filter(function(item) {
+  const totalPieces = items.reduce(function(sum, item) {
+    return sum + (Number(item.totalPieces) || 0);
+  }, 0);
+  const positiveCount = items.filter(function(item) {
     return item.stockState === "positive";
   }).length;
 
   return {
-    total: total,
-    positive: positive,
-    zero: total - positive
+    refs: items.length,
+    positive: positiveCount,
+    zero: Math.max(0, items.length - positiveCount),
+    totalPieces: totalPieces
   };
 }
 
 function renderInventoryCard(item) {
-  const detailUrl = "./detail.html?ref=" + encodeURIComponent(item.reference);
+  const reference = item.reference || "-";
+  const stockDisplay = item.stockDisplay || "-";
+  const accentClass = item.stockState === "positive" ? "border-emerald-400/50" : "border-rose-400/50";
 
-  return (
-    '<article class="inventory-card is-' + escapeHtml(item.stockState) + '">' +
-      '<div class="inventory-card-main">' +
-        '<div class="inventory-card-top">' +
-          '<h2 class="inventory-reference">' + escapeHtml(item.reference) + '</h2>' +
-          '<span class="badge ' + (item.stockState === "positive" ? "badge-positive" : "badge-zero") + '">' +
-            escapeHtml(getStockLabel(item.stockState)) +
-          "</span>" +
-        "</div>" +
-        '<div class="inventory-card-bottom">' +
-          "<div>" +
-            '<p class="inventory-stock">' + escapeHtml(item.stockDisplay) + "</p>" +
-            '<p class="inventory-meta">Entrepôt ' + escapeHtml(item.warehouse) + "</p>" +
-          "</div>" +
-        "</div>" +
-      "</div>" +
-      '<a class="link-arrow" href="' + detailUrl + '" aria-label="Voir le détail de ' + escapeHtml(item.reference) + '">→</a>' +
-    "</article>"
-  );
+  return ''
+    + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[4.1rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-reference="' + escapeHtml(reference) + '">'
+    + '<div class="flex min-w-0 flex-1 flex-col justify-between px-2.5 py-2 text-left">'
+    + '<div class="flex items-start gap-2">'
+    + '<span class="truncate pr-2 text-[12px] font-bold tracking-tight text-on-surface">' + escapeHtml(reference) + '</span>'
+    + '</div>'
+    + '<div class="mt-1.5 flex items-end justify-between gap-2">'
+    + '<div class="min-w-0">'
+    + '<span class="block truncate text-[13px] font-medium ' + (item.stockState === "positive" ? 'text-primary' : 'text-on-surface-variant') + '">' + escapeHtml(stockDisplay) + '</span>'
+    + '<span class="mt-0.5 block truncate text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Entrepot ' + escapeHtml(item.warehouse || "-") + '</span>'
+    + '</div>'
+    + '<span class="shrink-0 rounded px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] ' + (item.stockState === "positive" ? 'bg-primary-container text-on-primary-container' : 'bg-error-container/25 text-on-error-container') + '">' + escapeHtml(item.stockState === "positive" ? "En stock" : "En rupture") + '</span>'
+    + '</div>'
+    + '</div>'
+    + '<a class="reference-detail-trigger flex w-10 shrink-0 touch-manipulation select-none items-center justify-center border-l border-outline-variant/20 text-outline-variant transition-colors duration-150 hover:bg-surface-container-highest hover:text-on-surface-variant active:bg-surface-container-high" href="./detail.html?ref=' + encodeURIComponent(reference) + '" aria-label="Ouvrir la fiche de ' + escapeHtml(reference) + '">'
+    + '<span class="material-symbols-outlined !text-[16px]">chevron_right</span>'
+    + '</a>'
+    + '</article>';
 }
 
 function renderHistoryCard(entry) {
-  const detailUrl = "./detail.html?ref=" + encodeURIComponent(entry.reference);
-
-  return (
-    '<article class="history-card">' +
-      '<div class="history-card-top">' +
-        "<div>" +
-          '<a class="history-reference-link" href="' + detailUrl + '">' + escapeHtml(entry.reference) + "</a>" +
-          '<span class="history-timestamp">' + escapeHtml(formatDateTime(entry.timestamp)) + "</span>" +
-        "</div>" +
-        '<span class="badge ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + "</span>" +
-      "</div>" +
-      '<div class="history-card-body">' +
-        '<p class="history-copy"><strong>Avant</strong> ' + escapeHtml(entry.beforeDisplay) + "</p>" +
-        '<p class="history-copy"><strong>Après</strong> ' + escapeHtml(entry.afterDisplay) + "</p>" +
-        (entry.remark ? '<p class="history-meta">' + escapeHtml(entry.remark) + "</p>" : "") +
-      "</div>" +
-    "</article>"
-  );
+  return ''
+    + '<article class="bg-surface-container-lowest px-4 py-3 shadow-ledger" data-history-reference="' + escapeHtml(entry.reference) + '">'
+    + '<div class="flex items-start justify-between gap-3">'
+    + '<div class="min-w-0">'
+    + '<a class="truncate text-left text-[12px] font-bold tracking-tight text-primary" href="./detail.html?ref=' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
+    + '<div class="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">' + escapeHtml(formatDateTimeCompact(entry.timestamp)) + '</div>'
+    + '</div>'
+    + '<span class="shrink-0 rounded px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
+    + '</div>'
+    + '<div class="mt-3 space-y-1">'
+    + '<div class="text-[11px] text-on-surface"><span class="font-bold uppercase tracking-[0.14em] text-on-surface-variant">AVANT</span><span class="ml-2">' + escapeHtml(entry.beforeDisplay || "-") + '</span></div>'
+    + '<div class="text-[11px] text-on-surface"><span class="font-bold uppercase tracking-[0.14em] text-on-surface-variant">APRÈS</span><span class="ml-2">' + escapeHtml(entry.afterDisplay || "-") + '</span></div>'
+    + (entry.remark ? '<div class="text-[11px] text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
+    + '</div>'
+    + '</article>';
 }
 
 function renderDetailHistoryCard(entry) {
-  return (
-    '<article class="detail-history-card">' +
-      '<div class="detail-history-top">' +
-        '<span class="detail-history-timestamp">' + escapeHtml(formatDateTime(entry.timestamp)) + "</span>" +
-        '<span class="badge ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + "</span>" +
-      "</div>" +
-      '<div class="detail-history-body">' +
-        '<p class="history-copy detail-history-copy"><strong>Avant</strong> ' + escapeHtml(entry.beforeDisplay) + "</p>" +
-        '<p class="history-copy detail-history-copy"><strong>Après</strong> ' + escapeHtml(entry.afterDisplay) + "</p>" +
-        (entry.remark ? '<p class="history-meta">' + escapeHtml(entry.remark) + "</p>" : "") +
-      "</div>" +
-    "</article>"
-  );
+  return ''
+    + '<article class="bg-surface-container-lowest px-4 py-3 shadow-ledger">'
+    + '<div class="flex items-start justify-between gap-3">'
+    + '<div class="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">' + escapeHtml(formatDateTimeCompact(entry.timestamp)) + '</div>'
+    + '<span class="shrink-0 rounded px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
+    + '</div>'
+    + '<div class="mt-2 space-y-1">'
+    + '<div class="text-[11px] text-on-surface"><span class="font-bold uppercase tracking-[0.14em] text-on-surface-variant">AVANT</span><span class="ml-2">' + escapeHtml(entry.beforeDisplay || "-") + '</span></div>'
+    + '<div class="text-[11px] text-on-surface"><span class="font-bold uppercase tracking-[0.14em] text-on-surface-variant">APRÈS</span><span class="ml-2">' + escapeHtml(entry.afterDisplay || "-") + '</span></div>'
+    + (entry.remark ? '<div class="text-[11px] text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
+    + '</div>'
+    + '</article>';
 }
 
 function bootInventoryPage() {
-  const searchInput = document.getElementById("inventorySearchInput");
-  const summaryRefs = document.getElementById("inventorySummaryRefs");
-  const summaryPositive = document.getElementById("inventorySummaryPositive");
-  const summaryZero = document.getElementById("inventorySummaryZero");
-  const list = document.getElementById("inventoryList");
-  const emptyState = document.getElementById("inventoryEmptyState");
-
-  if (!searchInput || !summaryRefs || !summaryPositive || !summaryZero || !list || !emptyState) {
-    return;
-  }
+  const searchInput = document.getElementById("searchInput");
+  const summaryDate = document.getElementById("summaryDate");
+  const summaryRefs = document.getElementById("summaryRefs");
+  const summaryPositive = document.getElementById("summaryPositive");
+  const summaryZero = document.getElementById("summaryZero");
+  const summaryTotals = document.getElementById("summaryTotals");
+  const summaryStatus = document.getElementById("summaryStatus");
+  const inventoryGrid = document.getElementById("inventoryGrid");
+  const emptyState = document.getElementById("emptyState");
 
   function render() {
     const items = filterInventoryItems(searchInput.value);
     const summary = getInventorySummary(items);
-
-    list.innerHTML = items.map(renderInventoryCard).join("");
+    inventoryGrid.innerHTML = items.join ? items.map(renderInventoryCard).join("") : "";
     emptyState.classList.toggle("hidden", items.length > 0);
-    summaryRefs.textContent = String(summary.total);
-    summaryPositive.textContent = String(summary.positive);
-    summaryZero.textContent = String(summary.zero);
+    summaryDate.textContent = formatDateLabel(new Date().toISOString());
+    summaryRefs.textContent = summary.refs + " refs";
+    summaryPositive.textContent = summary.positive + " en stock";
+    summaryZero.textContent = summary.zero + " en rupture";
+    summaryTotals.textContent = summary.totalPieces + " pcs";
+    summaryStatus.textContent = searchInput.value.trim() ? "Recherche" : "Pret";
   }
 
   searchInput.addEventListener("input", render);
@@ -358,103 +241,103 @@ function bootInventoryPage() {
 
 function bootHistoryPage() {
   const searchInput = document.getElementById("historySearchInput");
-  const typeFilter = document.getElementById("historyTypeFilter");
-  const summaryCount = document.getElementById("historySummaryCount");
-  const list = document.getElementById("historyList");
-  const emptyState = document.getElementById("historyEmptyState");
-
-  if (!searchInput || !typeFilter || !summaryCount || !list || !emptyState) {
-    return;
-  }
+  const actionTypeFilter = document.getElementById("historyActionTypeFilter");
+  const historySummary = document.getElementById("historySummary");
+  const historyStatus = document.getElementById("historyStatus");
+  const historyList = document.getElementById("historyList");
+  const historyEmptyState = document.getElementById("historyEmptyState");
+  const historyEmptyTitle = document.getElementById("historyEmptyTitle");
+  const historyEmptyMessage = document.getElementById("historyEmptyMessage");
 
   function render() {
-    const items = filterHistoryItems(searchInput.value, typeFilter.value);
+    const actionType = actionTypeFilter.value || "";
+    const items = filterHistoryItems(searchInput.value, actionType);
+    const hasFilters = !!(searchInput.value.trim() || actionType);
 
-    list.innerHTML = items.map(renderHistoryCard).join("");
-    summaryCount.textContent = String(items.length);
-    emptyState.classList.toggle("hidden", items.length > 0);
+    historyList.innerHTML = items.map(renderHistoryCard).join("");
+    historySummary.textContent = items.length > 0 ? items.length + " mouvements" : "-";
+    historyStatus.textContent = hasFilters ? "Filtré" : "Pret";
+    historyEmptyState.classList.toggle("hidden", items.length > 0);
+    historyEmptyTitle.textContent = hasFilters ? "Aucun resultat" : "Aucun historique";
+    historyEmptyMessage.textContent = hasFilters
+      ? "Aucun mouvement ne correspond à la recherche."
+      : "Aucun mouvement à afficher.";
   }
 
   searchInput.addEventListener("input", render);
-  typeFilter.addEventListener("change", render);
+  actionTypeFilter.addEventListener("change", render);
   render();
 }
 
 function bootDetailPage() {
-  const backButton = document.getElementById("detailBackButton");
-  const notFoundState = document.getElementById("detailNotFoundState");
-  const detailContent = document.getElementById("detailContent");
-  const referenceEl = document.getElementById("detailReference");
-  const stockDisplayEl = document.getElementById("detailStockDisplay");
-  const stockStateEl = document.getElementById("detailStockState");
-  const warehouseEl = document.getElementById("detailWarehouse");
-  const createdAtEl = document.getElementById("detailCreatedAt");
-  const lastMovementEl = document.getElementById("detailLastMovement");
-  const summaryEl = document.getElementById("detailSummary");
-  const remarkBlock = document.getElementById("detailRemarkBlock");
-  const remarkEl = document.getElementById("detailRemark");
-  const historyList = document.getElementById("detailHistoryList");
-  const historyEmptyState = document.getElementById("detailHistoryEmptyState");
+  const detailBackButton = document.getElementById("detailBackButton");
+  const detailReference = document.getElementById("detailReference");
+  const detailSubline = document.getElementById("detailSubline");
+  const detailNotFoundBanner = document.getElementById("detailNotFoundBanner");
+  const detailMainSection = document.getElementById("detailMainSection");
+  const detailStockDisplay = document.getElementById("detailStockDisplay");
+  const detailStockState = document.getElementById("detailStockState");
+  const detailWarehouse = document.getElementById("detailWarehouse");
+  const detailCreatedAt = document.getElementById("detailCreatedAt");
+  const detailLastMovement = document.getElementById("detailLastMovement");
+  const detailSummary = document.getElementById("detailSummary");
+  const detailRemarkSection = document.getElementById("detailRemarkSection");
+  const detailRemark = document.getElementById("detailRemark");
+  const detailHistoryList = document.getElementById("detailHistoryList");
+  const detailHistoryEmpty = document.getElementById("detailHistoryEmpty");
 
-  if (
-    !backButton || !notFoundState || !detailContent || !referenceEl || !stockDisplayEl ||
-    !stockStateEl || !warehouseEl || !createdAtEl || !lastMovementEl || !summaryEl ||
-    !remarkBlock || !remarkEl || !historyList || !historyEmptyState
-  ) {
-    return;
-  }
-
-  backButton.addEventListener("click", function() {
+  detailBackButton.addEventListener("click", function() {
     if (window.history.length > 1) {
       window.history.back();
-      return;
+    } else {
+      window.location.href = "./index.html";
     }
-
-    window.location.href = "./index.html";
   });
 
   const reference = getParam("ref");
   const item = getInventoryByReference(reference);
 
   if (!item) {
-    notFoundState.classList.remove("hidden");
-    detailContent.classList.add("hidden");
+    detailReference.textContent = reference || "-";
+    detailSubline.textContent = "Fiche produit";
+    detailNotFoundBanner.classList.remove("hidden");
+    detailMainSection.classList.add("hidden");
+    detailRemarkSection.classList.add("hidden");
+    detailHistoryList.innerHTML = "";
+    detailHistoryEmpty.classList.remove("hidden");
     return;
   }
 
   const itemHistory = getHistoryForReference(item.reference);
-  const latestMovement = itemHistory.length > 0 ? itemHistory[0].timestamp : "";
+  const latestMovement = itemHistory.length ? itemHistory[0].timestamp : "";
 
-  referenceEl.textContent = item.reference;
-  stockDisplayEl.textContent = item.stockDisplay;
-  stockStateEl.textContent = getStockLabel(item.stockState);
-  stockStateEl.className = "badge " + (item.stockState === "positive" ? "badge-positive" : "badge-zero");
-  warehouseEl.textContent = item.warehouse;
-  createdAtEl.textContent = formatDate(item.createdAt);
-  lastMovementEl.textContent = latestMovement ? formatDateTime(latestMovement) : "-";
-  summaryEl.textContent = item.summary || "-";
+  detailReference.textContent = item.reference;
+  detailSubline.textContent = "Fiche produit";
+  detailStockDisplay.textContent = item.stockDisplay || "-";
+  detailStockState.textContent = item.stockState === "positive" ? "En stock" : "En rupture";
+  detailWarehouse.textContent = item.warehouse || "-";
+  detailCreatedAt.textContent = formatDateLabel(item.createdAt);
+  detailLastMovement.textContent = latestMovement ? formatDateTimeCompact(latestMovement) : "-";
+  detailSummary.textContent = item.summary || "-";
+  detailNotFoundBanner.classList.add("hidden");
+  detailMainSection.classList.remove("hidden");
 
   if (item.remark) {
-    remarkEl.textContent = item.remark;
-    remarkBlock.classList.remove("hidden");
+    detailRemarkSection.classList.remove("hidden");
+    detailRemark.textContent = item.remark;
   } else {
-    remarkBlock.classList.add("hidden");
+    detailRemarkSection.classList.add("hidden");
   }
 
-  historyList.innerHTML = itemHistory.map(renderDetailHistoryCard).join("");
-  historyEmptyState.classList.toggle("hidden", itemHistory.length > 0);
+  detailHistoryList.innerHTML = itemHistory.map(renderDetailHistoryCard).join("");
+  detailHistoryEmpty.classList.toggle("hidden", itemHistory.length > 0);
 }
 
 function initApp() {
   const currentPage = getCurrentPage();
-
-  if (currentPage === "inventory") {
-    bootInventoryPage();
-  } else if (currentPage === "history") {
-    bootHistoryPage();
-  } else if (currentPage === "detail") {
-    bootDetailPage();
-  }
+  if (currentPage === "inventory") bootInventoryPage();
+  if (currentPage === "history") bootHistoryPage();
+  if (currentPage === "detail") bootDetailPage();
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
