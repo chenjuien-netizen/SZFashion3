@@ -16,13 +16,13 @@
 
   #quickEditExpressionLine,
   #quickEditRemoveLine {
-    gap: 0.375rem !important;
+    gap: 0.5rem !important;
   }
 
   #quickEditTailJoinSlot,
   #quickEditMultiplyJoinSlot,
   #quickEditTailRemoveJoinSlot,
   #quickEditMultiplyRemoveSpacerSlot {
-    width: 0.75rem !important;
+    width: 1rem !important;
   }
 }
