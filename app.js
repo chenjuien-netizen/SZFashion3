@@ -243,12 +243,12 @@ function hasQuickEditTailValue(form) {
 
 function hasQuickEditPartialValue(form) {
   if (!form) return false;
-  return !!(sanitizeSign(form.sign) || sanitizeFractionText(form.fractionText) || sanitizeIntegerInput(form.packNotationCount));
+  return !!(sanitizeFractionText(form.fractionText) || sanitizeIntegerInput(form.packNotationCount));
 }
 
 function splitPackNotation(value) {
   const parsed = parsePackNotation(getMainPackNotationFromState({ packNotation: value }));
-  return { sign: parsed.sign || "+", count: parsed.count || 0 };
+  return { sign: parsed.sign || "", count: parsed.count ? String(parsed.count) : "" };
 }
 
 function buildRawLocalStockDisplay(stateModel) {
@@ -1850,9 +1850,9 @@ function renderQuickEdit() {
   els.quickEditTail.value = form.tailInput || "";
   els.quickEditUnitsPerBox.value = form.unitsPerBoxInput || "";
   els.quickEditItemBoxes.value = form.itemBoxes || "";
-  if (els.quickEditSign) els.quickEditSign.value = sanitizeSign(form.sign);
+  if (els.quickEditSign) els.quickEditSign.value = showPartialGroup ? (sanitizeSign(form.sign) || "+") : "+";
   if (els.quickEditFractionText) els.quickEditFractionText.value = form.fractionText || "";
-  if (els.quickEditPackNotationSign) els.quickEditPackNotationSign.value = form.packNotationSign || "+";
+  if (els.quickEditPackNotationSign) els.quickEditPackNotationSign.value = showPartialGroup ? (form.packNotationSign || "+") : "+";
   if (els.quickEditPackNotationCount) els.quickEditPackNotationCount.value = form.packNotationCount || "";
   els.quickEditRemark.value = form.remark || "";
   els.quickEditTabQuickExit.className = "border px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] " + (isQuickExit ? "border-primary bg-primary text-on-primary" : "border-outline-variant/30 text-on-surface-variant");
@@ -1960,7 +1960,14 @@ function closeQuickEdit() {
 function toggleQuickEditSegment(segment) {
   if (!state.quickEditForm) return;
   if (segment === "tail") state.quickEditTailOpen = !state.quickEditTailOpen;
-  if (segment === "partial") state.quickEditPartialOpen = !state.quickEditPartialOpen;
+  if (segment === "partial") {
+    const nextOpen = !state.quickEditPartialOpen;
+    state.quickEditPartialOpen = nextOpen;
+    if (nextOpen) {
+      if (!sanitizeSign(state.quickEditForm.sign)) state.quickEditForm.sign = "+";
+      if (!String(state.quickEditForm.packNotationSign || "").trim()) state.quickEditForm.packNotationSign = "+";
+    }
+  }
   renderQuickEdit();
 }
 
