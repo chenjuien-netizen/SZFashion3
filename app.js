@@ -1850,7 +1850,7 @@ function renderQuickEdit() {
   els.quickEditTail.value = form.tailInput || "";
   els.quickEditUnitsPerBox.value = form.unitsPerBoxInput || "";
   els.quickEditItemBoxes.value = form.itemBoxes || "";
-  if (els.quickEditSign) els.quickEditSign.value = sanitizeSign(form.sign) || "+";
+  if (els.quickEditSign) els.quickEditSign.value = sanitizeSign(form.sign);
   if (els.quickEditFractionText) els.quickEditFractionText.value = form.fractionText || "";
   if (els.quickEditPackNotationSign) els.quickEditPackNotationSign.value = form.packNotationSign || "+";
   if (els.quickEditPackNotationCount) els.quickEditPackNotationCount.value = form.packNotationCount || "";
