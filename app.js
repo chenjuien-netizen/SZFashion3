@@ -922,14 +922,6 @@ function setFieldWidth_(fieldEl, inputEl, value, fallbackValue, minChars, maxCha
   inputEl.style.width = widthInCh + "ch";
 }
 
-function setFixedControlWidth_(fieldEl, inputEl, widthPx) {
-  if (!fieldEl || !inputEl) return;
-  const width = Math.max(0, Math.round(Number(widthPx) || 0));
-  if (!width) return;
-  fieldEl.style.width = width + "px";
-  inputEl.style.width = width + "px";
-}
-
 function isVisibleQuickEditAnchor_(element) {
   if (!element || element.classList.contains("hidden")) return false;
   const rect = element.getBoundingClientRect();
@@ -1800,11 +1792,11 @@ function syncQuickEditFieldWidths_() {
   const form = state.quickEditForm || {};
   setFieldWidth_(document.getElementById("quickEditTailSegment"), document.getElementById("quickEditTail"), form.tailInput, document.getElementById("quickEditTail").placeholder, 7, 12, 0);
   setFieldWidth_(document.getElementById("quickEditUnitsPerBoxField"), document.getElementById("quickEditUnitsPerBox"), form.unitsPerBoxInput, document.getElementById("quickEditUnitsPerBox").placeholder, 6, 10, 0);
-  setFixedControlWidth_(document.getElementById("quickEditItemBoxesField"), document.getElementById("quickEditItemBoxes"), 35);
-  setFixedControlWidth_(document.getElementById("quickEditSignField"), document.getElementById("quickEditSign"), 35);
+  setFieldWidth_(document.getElementById("quickEditItemBoxesField"), document.getElementById("quickEditItemBoxes"), form.itemBoxes, "1", 6, 8, 1);
+  setFieldWidth_(document.getElementById("quickEditSignField"), document.getElementById("quickEditSign"), sanitizeSign(form.sign), "+", 6, 7, 1);
   setFieldWidth_(document.getElementById("quickEditFractionTextField"), document.getElementById("quickEditFractionText"), form.fractionText, document.getElementById("quickEditFractionText").placeholder, 5, 7, 0);
-  setFixedControlWidth_(document.getElementById("quickEditPackSignField"), document.getElementById("quickEditPackNotationSign"), 35);
-  setFixedControlWidth_(document.getElementById("quickEditPackCountField"), document.getElementById("quickEditPackNotationCount"), 35);
+  setFieldWidth_(document.getElementById("quickEditPackSignField"), document.getElementById("quickEditPackNotationSign"), form.packNotationSign, "+", 6, 7, 1);
+  setFieldWidth_(document.getElementById("quickEditPackCountField"), document.getElementById("quickEditPackNotationCount"), form.packNotationCount, "0", 6, 8, 1);
   scheduleQuickEditMeasuredLayout_();
 }
 
