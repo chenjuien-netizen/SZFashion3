@@ -675,19 +675,74 @@ function getInventorySummary(items) {
   const positiveCount = items.filter(function(item) {
     return item.stockState === "positive";
   }).length;
-  const totalPieces = items.reduce(function(sum, item) {
-    return sum + stateModelToPieces(item);
-  }, 0);
-  const totalBoxes = items.reduce(function(sum, item) {
-    return sum + Math.max(0, toInt(item.itemBoxes));
-  }, 0);
+  const totals = (items || []).reduce(function(acc, item) {
+    const tail = getTailActualPieces(item);
+    const unitsPerBox = parsePositiveNumber(item && item.unitsPerBox);
+    const itemBoxes = parsePositiveNumber(item && item.itemBoxes);
+    const sign = String(item && item.sign ? item.sign : "").trim();
+    const fractionValue = parsePositiveNumber(item && item.fractionValue) || parseFractionValue(item && item.fractionText);
+    const colisage = parsePositiveNumber(item && item.colisage);
+    let itemPieces = tail;
+    let cartonCount = tail > 0 ? 1 : 0;
+
+    if (unitsPerBox > 0) {
+      if (sign === "+") {
+        itemPieces += (unitsPerBox * itemBoxes) + (unitsPerBox * fractionValue);
+        cartonCount += itemBoxes + (fractionValue > 0 ? 1 : 0);
+      } else if (sign === "×") {
+        if (itemBoxes > 1) {
+          itemPieces += unitsPerBox * itemBoxes * fractionValue;
+          cartonCount += itemBoxes;
+        } else if (itemBoxes > 0) {
+          itemPieces += unitsPerBox * fractionValue;
+          cartonCount += itemBoxes;
+        } else if (fractionValue > 0) {
+          itemPieces += unitsPerBox * fractionValue;
+          cartonCount += 1;
+        }
+      } else {
+        itemPieces += unitsPerBox * itemBoxes;
+        cartonCount += itemBoxes;
+        if (fractionValue > 0) cartonCount += 1;
+      }
+    } else if (fractionValue > 0 && itemBoxes <= 0) {
+      cartonCount += 1;
+    }
+
+    const packMeta = parsePackNotation(getMainPackNotationFromState(item));
+    if (packMeta.count > 0 && colisage > 0) {
+      itemPieces += (packMeta.sign === "-" ? -1 : 1) * (packMeta.count * colisage);
+    }
+
+    acc.totalPieces += itemPieces;
+    acc.totalBoxes += cartonCount;
+    if (colisage > 0) {
+      acc.totalPacks += Math.floor(itemPieces / colisage);
+      acc.hasPackData = true;
+    }
+    return acc;
+  }, {
+    totalBoxes: 0,
+    totalPieces: 0,
+    totalPacks: 0,
+    hasPackData: false
+  });
+
   return {
     visibleCount: items.length,
     positiveCount: positiveCount,
     zeroCount: Math.max(0, items.length - positiveCount),
-    totalPieces: totalPieces,
-    totalBoxes: totalBoxes
+    totalPieces: totals.totalPieces,
+    totalBoxes: totals.totalBoxes,
+    totalPacks: totals.totalPacks,
+    hasPackData: totals.hasPackData
   };
+}
+
+function formatMetricNumber(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return "0";
+  return String(Math.max(0, Math.floor(numeric)));
 }
 
 function getColumnCount() {
@@ -2319,10 +2374,10 @@ function renderInventoryPage() {
   inventoryGrid.innerHTML = renderColumnLayoutMarkup(columns);
   emptyState.classList.toggle("hidden", items.length > 0);
   summaryDate.textContent = formatDateLabel(new Date().toISOString());
-  summaryRefs.textContent = summary.visibleCount + " refs";
+  summaryRefs.textContent = summary.visibleCount + " " + (summary.visibleCount === 1 ? "ref" : "refs");
   summaryPositive.textContent = summary.positiveCount + " en stock";
   summaryZero.textContent = summary.zeroCount + " en rupture";
-  summaryTotals.textContent = summary.totalBoxes + " 箱 " + summary.totalPieces + " 件";
+  summaryTotals.textContent = formatMetricNumber(summary.totalBoxes) + "箱 " + formatMetricNumber(summary.totalPieces) + "件";
   if (networkStatus) networkStatus.textContent = navigator.onLine ? "En ligne" : "Hors ligne";
   summaryStatus.textContent = state.query ? "Recherche" : "Pret";
   if (refreshButton && !refreshButton.dataset.bound) {
