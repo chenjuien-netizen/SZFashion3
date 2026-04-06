@@ -3,6 +3,7 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./local-data.js",
+  "./remote-data.js",
   "./app.js",
   "./style.css",
   "./manifest.webmanifest",

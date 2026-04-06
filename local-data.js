@@ -155,9 +155,9 @@
         }),
         historyItems: [historyEntry].concat(snapshot.historyItems),
         pendingMutations: Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations.slice() : [],
-        syncStatus: snapshot.syncStatus || "idle",
+        syncStatus: "idle",
         lastSyncAt: typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : "",
-        dataSource: snapshot.dataSource || "local"
+        dataSource: "local-edited"
       };
       writeSnapshot(nextSnapshot);
       return {
@@ -169,11 +169,53 @@
       };
     }
 
+    function replaceSnapshot(partialPayload) {
+      const snapshot = readSnapshot();
+      const payload = partialPayload || {};
+      const nextSnapshot = {
+        items: Array.isArray(payload.items) ? payload.items.map(deps.hydrateItem) : snapshot.items.slice(),
+        historyItems: Array.isArray(payload.historyItems) ? payload.historyItems.slice() : snapshot.historyItems.slice(),
+        pendingMutations: Array.isArray(payload.pendingMutations) ? payload.pendingMutations.slice() : (Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations.slice() : []),
+        syncStatus: payload.syncStatus || snapshot.syncStatus || "idle",
+        lastSyncAt: typeof payload.lastSyncAt === "string" ? payload.lastSyncAt : (typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : ""),
+        dataSource: payload.dataSource || snapshot.dataSource || "local"
+      };
+
+      if (payload.item && payload.reference) {
+        const normalizedReference = deps.normalizeReference(payload.reference);
+        const nextItem = deps.hydrateItem(payload.item);
+        nextSnapshot.items = nextSnapshot.items.map(function(entry) {
+          return deps.normalizeReference(entry.reference) === normalizedReference ? nextItem : entry;
+        });
+        if (!nextSnapshot.items.some(function(entry) {
+          return deps.normalizeReference(entry.reference) === normalizedReference;
+        })) {
+          nextSnapshot.items = [nextItem].concat(nextSnapshot.items);
+        }
+      }
+
+      if (Array.isArray(payload.history) && payload.reference) {
+        const normalizedReference = deps.normalizeReference(payload.reference);
+        const otherHistory = nextSnapshot.historyItems.filter(function(entry) {
+          return deps.normalizeReference(entry.reference) !== normalizedReference;
+        });
+        nextSnapshot.historyItems = payload.history.slice().concat(otherHistory);
+      }
+
+      writeSnapshot(nextSnapshot);
+      return {
+        items: nextSnapshot.items.slice(),
+        historyItems: nextSnapshot.historyItems.slice(),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
     return {
       loadInventory: loadInventory,
       loadHistory: loadHistory,
       loadDetail: loadDetail,
       saveQuickEdit: saveQuickEdit,
+      replaceSnapshot: replaceSnapshot,
       getMeta: function() {
         return getMeta(readSnapshot());
       }

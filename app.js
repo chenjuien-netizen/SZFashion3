@@ -1,4 +1,8 @@
 let dataSource = null;
+let remoteDataSource = null;
+let remoteRefreshPromise = null;
+let remoteDetailRefreshReference = "";
+let hasLocalWritesThisSession = false;
 
 const state = {
   items: [],
@@ -27,6 +31,105 @@ const state = {
   quickEditForm: null,
   quickExitForm: null
 };
+
+function applyDataMeta(meta) {
+  state.pendingMutations = meta && Array.isArray(meta.pendingMutations) ? meta.pendingMutations : [];
+  state.syncStatus = meta && meta.syncStatus ? meta.syncStatus : "idle";
+  state.lastSyncAt = meta && typeof meta.lastSyncAt === "string" ? meta.lastSyncAt : "";
+  state.dataSource = meta && meta.dataSource ? meta.dataSource : "local";
+}
+
+function isRemoteReadAllowed(options) {
+  if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) return false;
+  if (!navigator.onLine) return false;
+  if (options && options.force) return true;
+  return !hasLocalWritesThisSession && state.dataSource !== "local-edited";
+}
+
+function getSyncStatusLabel(defaultLabel) {
+  if (state.syncStatus === "refreshing") return "Refresh...";
+  if (state.syncStatus === "offline") return "Hors ligne";
+  if (state.syncStatus === "error") return "Erreur";
+  return defaultLabel;
+}
+
+function refreshRemoteSnapshot(options) {
+  if (!isRemoteReadAllowed(options)) {
+    if (navigator.onLine === false) state.syncStatus = "offline";
+    return Promise.resolve(false);
+  }
+  if (remoteRefreshPromise) return remoteRefreshPromise;
+
+  state.syncStatus = "refreshing";
+  renderAll();
+
+  remoteRefreshPromise = Promise.all([
+    remoteDataSource.fetchInventory(),
+    remoteDataSource.fetchHistory()
+  ]).then(function(results) {
+    const inventoryPayload = results[0];
+    const historyPayload = results[1];
+    const snapshotResult = dataSource.replaceSnapshot({
+      items: inventoryPayload.items,
+      historyItems: historyPayload.items,
+      syncStatus: "idle",
+      lastSyncAt: inventoryPayload.generatedAt || historyPayload.generatedAt || new Date().toISOString(),
+      dataSource: "remote-cache"
+    });
+    state.items = Array.isArray(snapshotResult.items) ? snapshotResult.items : state.items;
+    state.historyItems = Array.isArray(snapshotResult.historyItems) ? snapshotResult.historyItems : state.historyItems;
+    applyDataMeta(snapshotResult.meta);
+    renderAll();
+    return true;
+  }).catch(function(error) {
+    console.warn("Remote read-only refresh failed", error);
+    state.syncStatus = navigator.onLine ? "error" : "offline";
+    renderAll();
+    return false;
+  }).finally(function() {
+    remoteRefreshPromise = null;
+  });
+
+  return remoteRefreshPromise;
+}
+
+function refreshRemoteDetail(reference, options) {
+  const normalizedReference = normalizeReference(reference);
+  if (!normalizedReference) return Promise.resolve(false);
+  if (!isRemoteReadAllowed(options)) return Promise.resolve(false);
+  if (remoteDetailRefreshReference === normalizedReference) return Promise.resolve(false);
+
+  remoteDetailRefreshReference = normalizedReference;
+  if (!options || !options.silent) {
+    state.syncStatus = "refreshing";
+    renderAll();
+  }
+
+  return remoteDataSource.fetchDetail(normalizedReference).then(function(payload) {
+    const snapshotResult = dataSource.replaceSnapshot({
+      reference: normalizedReference,
+      item: payload.item,
+      history: payload.history,
+      syncStatus: "idle",
+      lastSyncAt: payload.generatedAt || state.lastSyncAt,
+      dataSource: "remote-cache"
+    });
+    state.items = Array.isArray(snapshotResult.items) ? snapshotResult.items : state.items;
+    state.historyItems = Array.isArray(snapshotResult.historyItems) ? snapshotResult.historyItems : state.historyItems;
+    applyDataMeta(snapshotResult.meta);
+    renderAll();
+    return true;
+  }).catch(function(error) {
+    console.warn("Remote detail refresh failed", error);
+    if (!options || !options.silent) {
+      state.syncStatus = navigator.onLine ? "error" : "offline";
+      renderAll();
+    }
+    return false;
+  }).finally(function() {
+    remoteDetailRefreshReference = "";
+  });
+}
 
 function getCurrentPage() {
   return document.body ? document.body.dataset.page || "" : "";
@@ -76,6 +179,9 @@ function handleRouteChange() {
   state.detailReference = route.ref;
   syncActiveShell();
   renderAll();
+  if (route.view === "detail" && route.ref) {
+    refreshRemoteDetail(route.ref, { silent: true });
+  }
 }
 
 function escapeHtml(value) {
@@ -2161,12 +2267,10 @@ function handleQuickEditSave() {
   request.localActionType = state.quickEditTab === "quick-exit" ? "exit" : "adjustment";
   state.quickEditSaving = true;
   const result = dataSource.saveQuickEdit(request);
+  hasLocalWritesThisSession = true;
   state.items = Array.isArray(result.items) ? result.items : state.items;
   state.historyItems = Array.isArray(result.historyItems) ? result.historyItems : state.historyItems;
-  state.pendingMutations = result.meta && Array.isArray(result.meta.pendingMutations) ? result.meta.pendingMutations : [];
-  state.syncStatus = result.meta && result.meta.syncStatus ? result.meta.syncStatus : "idle";
-  state.lastSyncAt = result.meta && typeof result.meta.lastSyncAt === "string" ? result.meta.lastSyncAt : "";
-  state.dataSource = result.meta && result.meta.dataSource ? result.meta.dataSource : "local";
+  applyDataMeta(result.meta);
   closeQuickEdit();
   renderAll();
 }
@@ -2369,11 +2473,11 @@ function renderInventoryPage() {
   summaryZero.textContent = summary.zeroCount + " en rupture";
   summaryTotals.textContent = formatMetricNumber(summary.totalBoxes) + "箱 " + formatMetricNumber(summary.totalPieces) + "件";
   if (networkStatus) networkStatus.textContent = navigator.onLine ? "En ligne" : "Hors ligne";
-  summaryStatus.textContent = state.query ? "Recherche" : "Pret";
+  summaryStatus.textContent = getSyncStatusLabel(state.query ? "Recherche" : "Pret");
   if (refreshButton && !refreshButton.dataset.bound) {
     refreshButton.dataset.bound = "true";
     refreshButton.addEventListener("click", function() {
-      renderInventoryPage();
+      refreshRemoteSnapshot({ force: false });
     });
   }
 }
@@ -2394,14 +2498,14 @@ function renderHistoryPage() {
   const items = filterHistoryItems(state.historyQuery, state.historyActionType);
   const hasFilters = !!(state.historyQuery || state.historyActionType);
   historyList.innerHTML = items.map(renderHistoryCard).join("");
-  historyStatus.textContent = hasFilters ? "Filtré" : "Pret";
+  historyStatus.textContent = getSyncStatusLabel(hasFilters ? "Filtré" : "Pret");
   historyEmptyState.classList.toggle("hidden", items.length > 0);
   historyEmptyTitle.textContent = hasFilters ? "Aucun resultat" : "Aucun historique";
   historyEmptyMessage.textContent = hasFilters ? "Aucun mouvement ne correspond à la recherche." : "Aucun mouvement à afficher.";
   if (historyRefreshButton && !historyRefreshButton.dataset.bound) {
     historyRefreshButton.dataset.bound = "true";
     historyRefreshButton.addEventListener("click", function() {
-      renderHistoryPage();
+      refreshRemoteSnapshot({ force: false });
     });
   }
 }
@@ -2574,14 +2678,12 @@ function initApp() {
     buildOptimisticItemFromRequest: buildOptimisticItemFromRequest,
     buildHistoryEntryFromLocalChange: buildHistoryEntryFromLocalChange
   });
+  remoteDataSource = window.createRemoteDataSource ? window.createRemoteDataSource() : null;
   const inventoryResult = dataSource.loadInventory();
   const historyResult = dataSource.loadHistory();
   state.items = Array.isArray(inventoryResult.items) ? inventoryResult.items : [];
   state.historyItems = Array.isArray(historyResult.items) ? historyResult.items : [];
-  state.pendingMutations = inventoryResult.meta && Array.isArray(inventoryResult.meta.pendingMutations) ? inventoryResult.meta.pendingMutations : [];
-  state.syncStatus = inventoryResult.meta && inventoryResult.meta.syncStatus ? inventoryResult.meta.syncStatus : "idle";
-  state.lastSyncAt = inventoryResult.meta && typeof inventoryResult.meta.lastSyncAt === "string" ? inventoryResult.meta.lastSyncAt : "";
-  state.dataSource = inventoryResult.meta && inventoryResult.meta.dataSource ? inventoryResult.meta.dataSource : "local";
+  applyDataMeta(inventoryResult.meta);
   state.columnCount = getColumnCount();
   const route = parseCurrentRoute();
   state.currentView = route.view;
@@ -2594,6 +2696,10 @@ function initApp() {
   syncActiveShell();
   renderAll();
   registerServiceWorker();
+  refreshRemoteSnapshot({ silent: true });
+  if (state.currentView === "detail" && state.detailReference) {
+    refreshRemoteDetail(state.detailReference, { silent: true });
+  }
 
   let resizeTimer = 0;
   window.addEventListener("resize", function() {
@@ -2602,8 +2708,17 @@ function initApp() {
       syncColumnLayout(false);
     }, 100);
   });
-  window.addEventListener("online", renderAll);
-  window.addEventListener("offline", renderAll);
+  window.addEventListener("online", function() {
+    renderAll();
+    refreshRemoteSnapshot({ silent: true });
+    if (state.currentView === "detail" && state.detailReference) {
+      refreshRemoteDetail(state.detailReference, { silent: true });
+    }
+  });
+  window.addEventListener("offline", function() {
+    state.syncStatus = "offline";
+    renderAll();
+  });
   window.addEventListener("hashchange", handleRouteChange);
 }
 
