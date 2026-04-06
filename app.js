@@ -2,6 +2,7 @@ let dataSource = null;
 let remoteDataSource = null;
 let remoteRefreshPromise = null;
 let remoteDetailRefreshReference = "";
+let remoteMutationSyncPromise = null;
 let hasLocalWritesThisSession = false;
 
 const state = {
@@ -129,6 +130,56 @@ function refreshRemoteDetail(reference, options) {
   }).finally(function() {
     remoteDetailRefreshReference = "";
   });
+}
+
+function syncPendingMutations(options) {
+  if (remoteMutationSyncPromise) return remoteMutationSyncPromise;
+  if (!remoteDataSource || !remoteDataSource.pushMutation) return Promise.resolve(false);
+  if (!navigator.onLine) {
+    state.syncStatus = "offline";
+    renderAll();
+    return Promise.resolve(false);
+  }
+  if (!state.pendingMutations.length) return Promise.resolve(false);
+
+  state.syncStatus = "refreshing";
+  if (!options || !options.silent) renderAll();
+
+  remoteMutationSyncPromise = Promise.resolve().then(function syncNext() {
+    const mutation = state.pendingMutations[0];
+    if (!mutation) {
+      return refreshRemoteSnapshot({ silent: true }).then(function() {
+        state.syncStatus = "idle";
+        renderAll();
+        return true;
+      });
+    }
+
+    return remoteDataSource.pushMutation(mutation).then(function(result) {
+      const committed = dataSource.commitSyncedMutation({
+        mutationId: mutation.id,
+        item: result.item,
+        historyEntry: result.historyEntry,
+        syncStatus: "idle",
+        lastSyncAt: result.generatedAt || new Date().toISOString(),
+        dataSource: state.pendingMutations.length > 1 ? "remote-with-pending" : "remote-cache"
+      });
+      state.items = Array.isArray(committed.items) ? committed.items : state.items;
+      state.historyItems = Array.isArray(committed.historyItems) ? committed.historyItems : state.historyItems;
+      applyDataMeta(committed.meta);
+      renderAll();
+      return refreshRemoteSnapshot({ silent: true }).then(syncNext);
+    });
+  }).catch(function(error) {
+    console.warn("Remote mutation sync failed", error);
+    state.syncStatus = navigator.onLine ? "error" : "offline";
+    renderAll();
+    return false;
+  }).finally(function() {
+    remoteMutationSyncPromise = null;
+  });
+
+  return remoteMutationSyncPromise;
 }
 
 function getCurrentPage() {
@@ -2273,6 +2324,9 @@ function handleQuickEditSave() {
   applyDataMeta(result.meta);
   closeQuickEdit();
   renderAll();
+  if (navigator.onLine) {
+    syncPendingMutations({ silent: true });
+  }
 }
 
 function bindQuickEditEvents() {
@@ -2696,7 +2750,12 @@ function initApp() {
   syncActiveShell();
   renderAll();
   registerServiceWorker();
-  refreshRemoteSnapshot({ silent: true });
+  refreshRemoteSnapshot({ silent: true }).then(function() {
+    if (state.pendingMutations.length) {
+      return syncPendingMutations({ silent: true });
+    }
+    return false;
+  });
   if (state.currentView === "detail" && state.detailReference) {
     refreshRemoteDetail(state.detailReference, { silent: true });
   }
@@ -2710,10 +2769,17 @@ function initApp() {
   });
   window.addEventListener("online", function() {
     renderAll();
-    refreshRemoteSnapshot({ silent: true });
-    if (state.currentView === "detail" && state.detailReference) {
-      refreshRemoteDetail(state.detailReference, { silent: true });
-    }
+    refreshRemoteSnapshot({ silent: true }).then(function() {
+      if (state.pendingMutations.length) {
+        return syncPendingMutations({ silent: true });
+      }
+      return false;
+    }).then(function() {
+      if (state.currentView === "detail" && state.detailReference) {
+        return refreshRemoteDetail(state.detailReference, { silent: true });
+      }
+      return false;
+    });
   });
   window.addEventListener("offline", function() {
     state.syncStatus = "offline";

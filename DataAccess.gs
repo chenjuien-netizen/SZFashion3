@@ -414,3 +414,173 @@ function formatHistoryTimestamp_(value) {
   const timeZone = Session.getScriptTimeZone ? Session.getScriptTimeZone() : "Europe/Paris";
   return Utilities.formatDate(date, timeZone || "Europe/Paris", "dd/MM HH:mm");
 }
+
+function applyMutationPayload_(payload) {
+  const mutation = payload && payload.mutation ? payload.mutation : payload;
+  if (!mutation || mutation.type !== "quick_edit") {
+    throw new Error("Mutation non supportée.");
+  }
+  return applyQuickEditMutation_(mutation);
+}
+
+function applyQuickEditMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) {
+    throw new Error("Payload quick edit manquant.");
+  }
+
+  const sheet = getRequiredSheet_(SZFASHION_STOCK_SHEET);
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 1) {
+    throw new Error("La feuille STOCK ne contient aucun en-tête.");
+  }
+
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  const cols = resolveInventoryColumns_(headers);
+  if (cols.reference < 0) {
+    throw new Error("Colonne référence introuvable dans STOCK.");
+  }
+
+  const targetRowIndex = findInventoryRowIndex_(sheet, cols, mutation);
+  if (targetRowIndex < 2) {
+    throw new Error("Ligne stock introuvable pour la mutation.");
+  }
+
+  const beforeDisplayRow = sheet.getRange(targetRowIndex, 1, 1, lastCol).getDisplayValues()[0];
+  const beforeItem = buildInventoryItem_(beforeDisplayRow, cols, targetRowIndex);
+  if (!beforeItem) {
+    throw new Error("Impossible de charger l'article avant mutation.");
+  }
+
+  writeQuickEditToStockRow_(sheet, cols, targetRowIndex, request, beforeItem);
+
+  const afterDisplayRow = sheet.getRange(targetRowIndex, 1, 1, lastCol).getDisplayValues()[0];
+  const afterItem = buildInventoryItem_(afterDisplayRow, cols, targetRowIndex);
+  if (!afterItem) {
+    throw new Error("Impossible de relire l'article après mutation.");
+  }
+
+  const historyEntry = appendHistoryForMutation_(mutation, beforeItem, afterItem);
+
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    item: afterItem,
+    historyEntry: historyEntry,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function findInventoryRowIndex_(sheet, cols, mutation) {
+  const request = mutation && mutation.request ? mutation.request : {};
+  const itemId = String(mutation && mutation.itemId || request.id || "");
+  const itemIdMatch = itemId.match(/^row_(\d+)$/);
+  if (itemIdMatch) {
+    const rowIndex = Number(itemIdMatch[1]);
+    if (rowIndex >= 2 && rowIndex <= sheet.getLastRow()) {
+      const currentReference = normalizeReference_(sheet.getRange(rowIndex, cols.reference + 1).getDisplayValue());
+      const expectedReference = normalizeReference_(mutation.reference || request.reference);
+      if (!expectedReference || currentReference === expectedReference) {
+        return rowIndex;
+      }
+    }
+  }
+
+  const expectedReference = normalizeReference_(mutation.reference || request.reference);
+  if (!expectedReference) return -1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  const references = sheet.getRange(2, cols.reference + 1, lastRow - 1, 1).getDisplayValues();
+  for (let index = 0; index < references.length; index++) {
+    if (normalizeReference_(references[index][0]) === expectedReference) {
+      return index + 2;
+    }
+  }
+  return -1;
+}
+
+function writeQuickEditToStockRow_(sheet, cols, rowIndex, request, beforeItem) {
+  writeCellIfPresent_(sheet, rowIndex, cols.tailRaw, Math.max(0, parseLooseInteger_(request.tail)));
+  writeCellIfPresent_(sheet, rowIndex, cols.unitsPerBoxRaw, Math.max(0, parseLooseInteger_(request.unitsPerBox || beforeItem.unitsPerBox)));
+  writeCellIfPresent_(sheet, rowIndex, cols.boxesRaw, Math.max(0, parseLooseInteger_(request.itemBoxes)));
+  writeCellIfPresent_(sheet, rowIndex, cols.signRaw, normalizeSign_(request.sign));
+  writeCellIfPresent_(sheet, rowIndex, cols.fractionRaw, normalizeFractionText_(request.fractionText));
+  writeCellIfPresent_(sheet, rowIndex, cols.packNotation, normalizePackNotation_(request.packNotation));
+  writeCellIfPresent_(sheet, rowIndex, cols.remark, String(request.remark || "").trim());
+}
+
+function writeCellIfPresent_(sheet, rowIndex, columnIndex, value) {
+  if (columnIndex < 0) return;
+  sheet.getRange(rowIndex, columnIndex + 1).setValue(value);
+}
+
+function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
+  const sheet = getOrCreateHistorySheet_();
+  const timestamp = new Date();
+  const actionType = normalizeHistoryActionType_(mutation.actionType || (mutation.request && mutation.request.localActionType) || "adjustment") || "adjustment";
+  const remark = String(mutation.request && mutation.request.remark || "").trim();
+  const row = [
+    timestamp,
+    actionType,
+    String(afterItem.reference || ""),
+    String(afterItem.id || ""),
+    String(beforeItem.stockDisplay || ""),
+    String(afterItem.stockDisplay || ""),
+    remark,
+    "stock_mobile_sync",
+    Number(stateModelToPieces_(beforeItem) || 0),
+    Number(stateModelToPieces_(afterItem) || 0)
+  ];
+  sheet.appendRow(row);
+
+  return {
+    id: "srv-his-" + String(sheet.getLastRow()),
+    timestampRaw: timestamp.toISOString(),
+    timestampLabel: formatHistoryTimestamp_(timestamp),
+    actionType: actionType,
+    reference: String(afterItem.reference || ""),
+    rowId: String(afterItem.id || ""),
+    beforeDisplay: String(beforeItem.stockDisplay || ""),
+    afterDisplay: String(afterItem.stockDisplay || ""),
+    remark: remark,
+    source: "stock_mobile_sync",
+    beforeTotalPieces: Number(stateModelToPieces_(beforeItem) || 0),
+    afterTotalPieces: Number(stateModelToPieces_(afterItem) || 0)
+  };
+}
+
+function getOrCreateHistorySheet_() {
+  const existing = getOptionalSheet_(SZFASHION_HISTORY_SHEET);
+  if (existing) {
+    ensureHistoryHeaders_(existing);
+    return existing;
+  }
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(SZFASHION_HISTORY_SHEET);
+  ensureHistoryHeaders_(sheet);
+  return sheet;
+}
+
+function ensureHistoryHeaders_(sheet) {
+  const headers = [
+    "timestamp",
+    "action_type",
+    "reference",
+    "row_id",
+    "before_display",
+    "after_display",
+    "remark",
+    "source",
+    "before_total_pieces",
+    "after_total_pieces"
+  ];
+  const lastCol = sheet.getLastColumn();
+  const firstRow = lastCol > 0 ? sheet.getRange(1, 1, 1, Math.max(lastCol, headers.length)).getDisplayValues()[0] : [];
+  const normalizedFirst = firstRow.map(normalizeHeader_);
+  const matches = headers.every(function(header, index) {
+    return normalizedFirst[index] === normalizeHeader_(header);
+  });
+  if (!matches) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+}

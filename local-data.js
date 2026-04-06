@@ -274,12 +274,49 @@
       };
     }
 
+    function commitSyncedMutation(payload) {
+      const snapshot = readSnapshot();
+      const nextPayload = payload || {};
+      const mutationId = String(nextPayload.mutationId || "");
+      const nextPendingMutations = (Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations : []).filter(function(entry) {
+        return String(entry && entry.id || "") !== mutationId;
+      });
+      let nextItems = Array.isArray(snapshot.items) ? snapshot.items.slice() : [];
+      let nextHistoryItems = Array.isArray(snapshot.historyItems) ? snapshot.historyItems.slice() : [];
+
+      if (nextPayload.item) {
+        const normalizedReference = deps.normalizeReference(nextPayload.item.reference);
+        nextItems = replaceItemInList(nextItems, deps.hydrateItem(nextPayload.item), normalizedReference);
+      }
+
+      if (nextPayload.historyEntry) {
+        nextHistoryItems = mergeHistoryEntry(nextHistoryItems, nextPayload.historyEntry);
+      }
+
+      const nextSnapshot = {
+        items: nextItems,
+        historyItems: nextHistoryItems,
+        pendingMutations: nextPendingMutations,
+        syncStatus: nextPayload.syncStatus || "idle",
+        lastSyncAt: typeof nextPayload.lastSyncAt === "string" ? nextPayload.lastSyncAt : snapshot.lastSyncAt || "",
+        dataSource: nextPayload.dataSource || (nextPendingMutations.length ? "remote-with-pending" : "remote-cache")
+      };
+
+      writeSnapshot(nextSnapshot);
+      return {
+        items: nextSnapshot.items.slice(),
+        historyItems: nextSnapshot.historyItems.slice(),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
     return {
       loadInventory: loadInventory,
       loadHistory: loadHistory,
       loadDetail: loadDetail,
       saveQuickEdit: saveQuickEdit,
       mergeRemoteSnapshot: mergeRemoteSnapshot,
+      commitSyncedMutation: commitSyncedMutation,
       getMeta: function() {
         return getMeta(readSnapshot());
       }

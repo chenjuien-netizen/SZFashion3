@@ -18,6 +18,21 @@ function doGet(e) {
   }
 }
 
+function doPost(e) {
+  const params = e && e.parameter ? e.parameter : {};
+  const route = String(params.route || "").trim().toLowerCase();
+
+  try {
+    const payload = parseJsonBody_(e);
+    if (route === "mutate") {
+      return apiJson_(applyMutationPayload_(payload));
+    }
+    return apiError_("Route introuvable. Utilise route=mutate.", 404);
+  } catch (error) {
+    return apiError_(error && error.message ? error.message : "Erreur serveur inconnue.", 500);
+  }
+}
+
 function apiJson_(payload) {
   return ContentService
     .createTextOutput(JSON.stringify(payload))
@@ -30,4 +45,14 @@ function apiError_(message, status) {
     status: Number(status || 500),
     message: String(message || "Erreur serveur.")
   });
+}
+
+function parseJsonBody_(e) {
+  const raw = e && e.postData && typeof e.postData.contents === "string" ? e.postData.contents : "";
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (_error) {
+    throw new Error("Body JSON invalide.");
+  }
 }

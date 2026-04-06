@@ -36,6 +36,27 @@
     });
   }
 
+  function postJson(url, body) {
+    return fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body || {})
+    }).then(function(response) {
+      if (!response.ok) {
+        throw new Error("Ecriture distante impossible (" + response.status + ").");
+      }
+      return response.json().then(function(payload) {
+        if (payload && payload.error) {
+          throw new Error(String(payload.message || "Ecriture distante impossible."));
+        }
+        return payload;
+      });
+    });
+  }
+
   function normalizeInventoryPayload(payload) {
     return {
       items: Array.isArray(payload && payload.items) ? payload.items : [],
@@ -65,6 +86,17 @@
     };
   }
 
+  function normalizeMutationPayload(payload) {
+    return {
+      ok: !!(payload && payload.ok),
+      mutationId: payload && payload.mutationId ? String(payload.mutationId) : "",
+      item: payload && payload.item ? payload.item : null,
+      historyEntry: payload && payload.historyEntry ? payload.historyEntry : null,
+      generatedAt: payload && typeof payload.generatedAt === "string" ? payload.generatedAt : "",
+      source: payload && payload.source ? payload.source : "google_sheets"
+    };
+  }
+
   window.createRemoteDataSource = function createRemoteDataSource(config) {
     const baseUrl = getBaseUrl(config);
 
@@ -91,6 +123,10 @@
         return fetchJson(buildUrl(baseUrl, "detail", { reference: reference })).then(function(payload) {
           return normalizeDetailPayload(payload, reference);
         });
+      },
+      pushMutation: function(mutation) {
+        ensureConfigured();
+        return postJson(buildUrl(baseUrl, "mutate"), { mutation: mutation }).then(normalizeMutationPayload);
       }
     };
   };
