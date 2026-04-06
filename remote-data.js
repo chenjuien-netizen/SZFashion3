@@ -27,7 +27,12 @@
       if (!response.ok) {
         throw new Error("Lecture distante impossible (" + response.status + ").");
       }
-      return response.json();
+      return response.json().then(function(payload) {
+        if (payload && payload.error) {
+          throw new Error(String(payload.message || "Lecture distante impossible."));
+        }
+        return payload;
+      });
     });
   }
 
