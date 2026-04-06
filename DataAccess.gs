@@ -517,6 +517,8 @@ function writeCellIfPresent_(sheet, rowIndex, columnIndex, value) {
 
 function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
   const sheet = getOrCreateHistorySheet_();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  const cols = resolveHistoryColumns_(headers);
   const timestamp = new Date();
   const actionType = normalizeHistoryActionType_(mutation.actionType || (mutation.request && mutation.request.localActionType) || "adjustment") || "adjustment";
   const remark = String(mutation.request && mutation.request.remark || "").trim();
@@ -532,10 +534,17 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     Number(stateModelToPieces_(beforeItem) || 0),
     Number(stateModelToPieces_(afterItem) || 0)
   ];
-  sheet.appendRow(row);
+  const targetRow = sheet.getLastRow() + 1;
+  if (cols.reference >= 0) {
+    sheet.getRange(targetRow, cols.reference + 1).setNumberFormat("@");
+  }
+  sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
+  if (cols.reference >= 0) {
+    sheet.getRange(targetRow, cols.reference + 1).setValue(String(afterItem.reference || ""));
+  }
 
   return {
-    id: "srv-his-" + String(sheet.getLastRow()),
+    id: "srv-his-" + String(targetRow),
     timestampRaw: timestamp.toISOString(),
     timestampLabel: formatHistoryTimestamp_(timestamp),
     actionType: actionType,
@@ -582,5 +591,9 @@ function ensureHistoryHeaders_(sheet) {
   });
   if (!matches) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+  const referenceColumnIndex = headers.indexOf("reference");
+  if (referenceColumnIndex >= 0) {
+    sheet.getRange(1, referenceColumnIndex + 1, Math.max(sheet.getMaxRows(), 1), 1).setNumberFormat("@");
   }
 }
