@@ -40,8 +40,7 @@
     return fetch(url, {
       method: "POST",
       headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "text/plain;charset=utf-8"
       },
       body: JSON.stringify(body || {})
     }).then(function(response) {
