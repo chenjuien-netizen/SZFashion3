@@ -2,6 +2,7 @@ const CACHE_NAME = "szfashion-shell-v1";
 const APP_SHELL = [
   "./",
   "./index.html",
+  "./local-data.js",
   "./app.js",
   "./style.css",
   "./manifest.webmanifest",
