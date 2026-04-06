@@ -4,7 +4,12 @@
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
     <meta name="theme-color" content="#f7f9fb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>SZFASHION | Inventaire</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon.svg" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script>
       tailwind.config = {
@@ -126,7 +131,7 @@
     <link rel="stylesheet" href="./style.css" />
     <script src="./app.js" defer></script>
   </head>
-  <body class="h-[100dvh] max-h-[100dvh] overflow-hidden bg-background text-on-surface antialiased" data-page="inventory">
+  <body class="h-[100dvh] max-h-[100dvh] overflow-hidden bg-background text-on-surface antialiased" data-page="app">
     <div class="fixed inset-x-0 top-0 bottom-16 overflow-hidden bg-background" id="inventoryAppShell">
       <main class="flex h-full min-h-0 flex-col overflow-hidden">
         <div class="sticky top-0 z-40 shrink-0 bg-background">
@@ -162,7 +167,7 @@
                   <span class="text-outline-variant/40">//</span>
                   <span id="summaryZero">0 en rupture</span>
                   <span class="text-outline-variant/40">//</span>
-                  <span id="summaryTotals">0 pcs</span>
+                  <span id="summaryTotals">0箱 0件</span>
                 </div>
               </div>
               <div class="flex items-center gap-2 text-right text-[8px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">
@@ -184,15 +189,128 @@
       </main>
     </div>
 
+    <div class="fixed inset-x-0 top-0 bottom-16 hidden overflow-hidden bg-background" id="historyAppShell">
+      <main class="flex h-full min-h-0 flex-col overflow-hidden">
+        <div class="sticky top-0 z-40 shrink-0 bg-background">
+          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
+            <div class="flex items-center gap-3">
+              <div>
+                <h1 class="text-lg font-extrabold uppercase tracking-tight text-slate-900">Historique</h1>
+              </div>
+            </div>
+            <button aria-label="Rafraîchir" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="historyRefreshButton" type="button">
+              <span class="material-symbols-outlined">refresh</span>
+            </button>
+          </header>
+
+          <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
+              <input autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" id="historySearchInput" placeholder="RECHERCHE RÉFÉRENCE / TYPE / REMARQUE..." type="search" />
+            </div>
+            <div class="mt-2 flex items-center gap-2">
+              <label class="min-w-0 flex-1">
+                <select class="w-full border-outline-variant/30 bg-surface-container-lowest text-[12px] font-medium text-on-surface" id="historyActionTypeFilter">
+                  <option value="">Tous types</option>
+                  <option value="entry">entrée</option>
+                  <option value="exit">sortie</option>
+                  <option value="adjustment">ajustement</option>
+                </select>
+              </label>
+              <div class="shrink-0 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" id="historyStatus">Pret</div>
+            </div>
+          </section>
+        </div>
+
+        <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-outline-variant/20" id="historyScroll">
+          <div class="flex flex-col gap-px bg-outline-variant/20" id="historyList"></div>
+          <div class="hidden border-t border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center" id="historyEmptyState">
+            <p class="text-[12px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant" id="historyEmptyTitle">Aucun historique</p>
+            <p class="mt-1 text-[12px] text-on-surface-variant" id="historyEmptyMessage">Aucun mouvement à afficher.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="fixed inset-x-0 top-0 bottom-16 hidden overflow-hidden bg-background" id="detailAppShell">
+      <main class="flex h-full min-h-0 flex-col overflow-hidden">
+        <div class="sticky top-0 z-40 shrink-0 bg-background">
+          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
+            <div class="flex min-w-0 items-center gap-3">
+              <button aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="detailBackButton" type="button">
+                <span class="material-symbols-outlined">arrow_back</span>
+              </button>
+              <div class="min-w-0">
+                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900" id="detailReference">-</h1>
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="detailSubline">Fiche produit</p>
+              </div>
+            </div>
+            <button class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="detailQuickEditButton" type="button">Modifier</button>
+          </header>
+        </div>
+
+        <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface px-4 py-4" id="detailScroll">
+          <div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
+            <div class="hidden border border-error/20 bg-error-container/15 px-4 py-3 text-[12px] font-medium text-on-error-container" id="detailNotFoundBanner">
+              Référence introuvable dans le stock courant.
+            </div>
+
+            <section class="border border-outline-variant/20 bg-surface-container-lowest p-4" id="detailMainSection">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Stock actuel</div>
+                  <div class="mt-1 truncate text-2xl font-black tracking-tight text-on-surface" id="detailStockDisplay">-</div>
+                </div>
+                <div class="shrink-0 text-right text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="detailStockState">-</div>
+              </div>
+              <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
+                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Entrepot</div>
+                  <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailWarehouse">-</div>
+                </div>
+                <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
+                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Création</div>
+                  <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailCreatedAt">-</div>
+                </div>
+                <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
+                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Dernier mouvement</div>
+                  <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailLastMovement">-</div>
+                </div>
+                <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
+                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Résumé</div>
+                  <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailSummary">-</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="border border-outline-variant/20 bg-surface-container-lowest p-4" id="detailRemarkSection">
+              <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Remarque</div>
+              <div class="mt-2 whitespace-pre-wrap text-[12px] leading-5 text-on-surface" id="detailRemark">-</div>
+            </section>
+
+            <section class="border border-outline-variant/20 bg-surface-container-lowest">
+              <div class="border-b border-outline-variant/20 px-4 py-3">
+                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Historique récent</div>
+              </div>
+              <div class="flex flex-col gap-px bg-outline-variant/20" id="detailHistoryList"></div>
+              <div class="hidden px-4 py-5 text-center" id="detailHistoryEmpty">
+                <p class="text-[12px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Aucun historique</p>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
     <nav class="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch justify-around border-t border-slate-200 bg-slate-50">
       <button class="flex flex-1 flex-col items-center justify-center bg-slate-200 px-2 py-1 text-slate-900" id="navInventoryButton" type="button" aria-current="page">
         <span class="material-symbols-outlined">inventory_2</span>
         <span class="mt-1 text-[10px] font-bold uppercase tracking-widest">Inventaire</span>
       </button>
-      <a class="flex flex-1 flex-col items-center justify-center px-2 py-1 text-slate-400" href="./history.html" id="navHistoryButton">
+      <button class="flex flex-1 flex-col items-center justify-center px-2 py-1 text-slate-400" id="navHistoryButton" type="button">
         <span class="material-symbols-outlined">history</span>
         <span class="mt-1 text-[10px] font-bold uppercase tracking-widest">Historique</span>
-      </a>
+      </button>
     </nav>
 
     <div class="quick-edit-overlay fixed inset-0 z-[60] hidden items-center justify-center bg-on-background/35 px-3 py-6" id="quickEditOverlay" role="presentation">

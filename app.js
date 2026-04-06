@@ -36,6 +36,7 @@ const state = {
   historyActionType: "",
   columnCount: 2,
   currentView: "inventory",
+  previousView: "inventory",
   detailReference: "",
   quickEditOpen: false,
   quickEditTab: "quick-exit",
@@ -57,6 +58,48 @@ function getCurrentPage() {
 
 function getParam(name) {
   return new URLSearchParams(window.location.search).get(name) || "";
+}
+
+function parseCurrentRoute() {
+  const hash = String(window.location.hash || "").replace(/^#\/?/, "").trim();
+  if (!hash) {
+    const queryReference = getParam("ref");
+    return queryReference ? { view: "detail", ref: normalizeReference(queryReference) } : { view: "inventory", ref: "" };
+  }
+  if (hash === "inventory") return { view: "inventory", ref: "" };
+  if (hash === "history") return { view: "history", ref: "" };
+  if (hash.indexOf("detail/") === 0) {
+    return { view: "detail", ref: normalizeReference(decodeURIComponent(hash.slice("detail/".length))) };
+  }
+  return { view: "inventory", ref: "" };
+}
+
+function buildHashRoute(view, ref) {
+  if (view === "history") return "#history";
+  if (view === "detail" && ref) return "#detail/" + encodeURIComponent(normalizeReference(ref));
+  return "#inventory";
+}
+
+function navigateTo(view, options) {
+  const nextHash = buildHashRoute(view, options && options.ref);
+  if (window.location.hash === nextHash) {
+    handleRouteChange();
+    return;
+  }
+  window.location.hash = nextHash;
+}
+
+function handleRouteChange() {
+  const route = parseCurrentRoute();
+  if (route.view === "detail") {
+    state.previousView = state.currentView === "history" ? "history" : "inventory";
+  } else {
+    state.previousView = route.view;
+  }
+  state.currentView = route.view;
+  state.detailReference = route.ref;
+  syncActiveShell();
+  renderAll();
 }
 
 function escapeHtml(value) {
@@ -786,7 +829,7 @@ function renderInventoryCard(item) {
     + '</div>'
     + '</div>'
     + '</button>'
-    + '<a class="reference-detail-trigger flex w-10 shrink-0 touch-manipulation select-none items-center justify-center border-l border-outline-variant/20 text-outline-variant transition-colors duration-150 hover:bg-surface-container-highest hover:text-on-surface-variant active:bg-surface-container-high" href="./detail.html?ref=' + encodeURIComponent(reference) + '" aria-label="Ouvrir la fiche de ' + escapeHtml(reference) + '">'
+    + '<a class="reference-detail-trigger flex w-10 shrink-0 touch-manipulation select-none items-center justify-center border-l border-outline-variant/20 text-outline-variant transition-colors duration-150 hover:bg-surface-container-highest hover:text-on-surface-variant active:bg-surface-container-high" href="#detail/' + encodeURIComponent(reference) + '" aria-label="Ouvrir la fiche de ' + escapeHtml(reference) + '">'
     + '<span class="material-symbols-outlined !text-[16px]">chevron_right</span>'
     + '</a>'
     + '</article>';
@@ -804,7 +847,7 @@ function renderHistoryCard(entry) {
     + '<article class="bg-surface-container-lowest px-4 py-3 shadow-ledger" data-history-reference="' + escapeHtml(entry.reference) + '">'
     + '<div class="flex items-start justify-between gap-3">'
     + '<div class="min-w-0">'
-    + '<a class="truncate text-left text-[12px] font-bold tracking-tight text-primary" href="./detail.html?ref=' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
+    + '<a class="truncate text-left text-[12px] font-bold tracking-tight text-primary" href="#detail/' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
     + '<div class="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">' + escapeHtml(entry.timestampLabel || formatHistoryTimestamp(entry.timestampRaw)) + '</div>'
     + '</div>'
     + '<span class="shrink-0 rounded px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
@@ -2434,7 +2477,7 @@ function renderDetailPage() {
   const detailQuickEditButton = document.getElementById("detailQuickEditButton");
   if (!detailReference) return;
 
-  const reference = state.detailReference || getParam("ref");
+  const reference = state.detailReference;
   state.detailReference = reference;
   const item = getInventoryByReference(reference);
   if (!item) {
@@ -2480,6 +2523,30 @@ function renderAll() {
   if (state.quickEditOpen) renderQuickEdit();
 }
 
+function syncActiveShell() {
+  const inventoryShell = document.getElementById("inventoryAppShell");
+  const historyShell = document.getElementById("historyAppShell");
+  const detailShell = document.getElementById("detailAppShell");
+  const navInventoryButton = document.getElementById("navInventoryButton");
+  const navHistoryButton = document.getElementById("navHistoryButton");
+  const view = state.currentView || "inventory";
+
+  if (inventoryShell) inventoryShell.classList.toggle("hidden", view !== "inventory");
+  if (historyShell) historyShell.classList.toggle("hidden", view !== "history");
+  if (detailShell) detailShell.classList.toggle("hidden", view !== "detail");
+
+  if (navInventoryButton) {
+    const active = view === "inventory" || view === "detail";
+    navInventoryButton.className = "flex flex-1 flex-col items-center justify-center px-2 py-1 " + (active ? "bg-slate-200 text-slate-900" : "text-slate-400");
+    navInventoryButton.setAttribute("aria-current", active ? "page" : "false");
+  }
+  if (navHistoryButton) {
+    const active = view === "history";
+    navHistoryButton.className = "flex flex-1 flex-col items-center justify-center px-2 py-1 " + (active ? "bg-slate-200 text-slate-900" : "text-slate-400");
+    navHistoryButton.setAttribute("aria-current", active ? "page" : "false");
+  }
+}
+
 function syncColumnLayout(force) {
   const nextCount = getColumnCount();
   if (!force && nextCount === state.columnCount) return;
@@ -2490,11 +2557,23 @@ function syncColumnLayout(force) {
 function bindInventoryEvents() {
   const searchInput = document.getElementById("searchInput");
   const inventoryGrid = document.getElementById("inventoryGrid");
+  const navInventoryButton = document.getElementById("navInventoryButton");
+  const navHistoryButton = document.getElementById("navHistoryButton");
   if (!searchInput || !inventoryGrid) return;
   searchInput.addEventListener("input", function(event) {
     state.query = String(event.target.value || "").trim();
     renderInventoryPage();
   });
+  if (navInventoryButton) {
+    navInventoryButton.addEventListener("click", function() {
+      navigateTo("inventory");
+    });
+  }
+  if (navHistoryButton) {
+    navHistoryButton.addEventListener("click", function() {
+      navigateTo("history");
+    });
+  }
   inventoryGrid.addEventListener("click", function(event) {
     const trigger = event.target.closest('[data-action="open-quick-edit"]');
     if (!trigger) return;
@@ -2521,31 +2600,38 @@ function bindDetailEvents() {
   const detailQuickEditButton = document.getElementById("detailQuickEditButton");
   if (detailBackButton) {
     detailBackButton.addEventListener("click", function() {
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.location.href = "./index.html";
-      }
+      navigateTo(state.previousView || "inventory");
     });
   }
   if (detailQuickEditButton) {
     detailQuickEditButton.addEventListener("click", function() {
-      const item = getInventoryByReference(state.detailReference || getParam("ref"));
+      const item = getInventoryByReference(state.detailReference);
       if (item) openQuickEdit(item);
     });
   }
 }
 
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("./service-worker.js").catch(function(error) {
+    console.warn("Service worker registration failed", error);
+  });
+}
+
 function initApp() {
   loadState();
   state.columnCount = getColumnCount();
-  state.currentView = getCurrentPage();
-  state.detailReference = getParam("ref");
+  const route = parseCurrentRoute();
+  state.currentView = route.view;
+  state.previousView = route.view === "detail" ? "inventory" : route.view;
+  state.detailReference = route.ref;
   bindInventoryEvents();
   bindHistoryEvents();
   bindDetailEvents();
   bindQuickEditEvents();
+  syncActiveShell();
   renderAll();
+  registerServiceWorker();
 
   let resizeTimer = 0;
   window.addEventListener("resize", function() {
@@ -2556,6 +2642,7 @@ function initApp() {
   });
   window.addEventListener("online", renderAll);
   window.addEventListener("offline", renderAll);
+  window.addEventListener("hashchange", handleRouteChange);
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
