@@ -1,36 +1,12 @@
-const STORAGE_KEY = "szfashion-stockmobile-local-v1";
-
-const seedItems = [
-  { id: "row_2", reference: "SZ-DR-014", sortKey: "SZ-DR-014", tail: 85, unitsPerBox: 144, itemBoxes: 3, sign: "+", fractionText: "1/2", fractionValue: 0.5, colisage: 12, packNotation: "+2包", remark: "B2 haut droite", warehouse: "B2", createdAt: "15/02/2026" },
-  { id: "row_3", reference: "SZ-TS-001", sortKey: "SZ-TS-001", tail: 0, unitsPerBox: 120, itemBoxes: 4, sign: "+", fractionText: "1/3", fractionValue: 1 / 3, colisage: 10, packNotation: "", remark: "A1 table 3", warehouse: "A1", createdAt: "12/02/2026" },
-  { id: "row_4", reference: "SZ-JK-203", sortKey: "SZ-JK-203", tail: 0, unitsPerBox: 96, itemBoxes: 2, sign: "", fractionText: "", fractionValue: 0, colisage: 12, packNotation: "", remark: "B1 rack veste", warehouse: "B1", createdAt: "18/02/2026" },
-  { id: "row_5", reference: "SZ-BL-032", sortKey: "SZ-BL-032", tail: 0, unitsPerBox: 72, itemBoxes: 5, sign: "+", fractionText: "2/3", fractionValue: 2 / 3, colisage: 6, packNotation: "", remark: "", warehouse: "A2", createdAt: "20/02/2026" },
-  { id: "row_6", reference: "SZ-KN-087", sortKey: "SZ-KN-087", tail: 24, unitsPerBox: 48, itemBoxes: 2, sign: "+", fractionText: "1/4", fractionValue: 0.25, colisage: 12, packNotation: "+1包", remark: "C1 maille", warehouse: "C1", createdAt: "24/02/2026" },
-  { id: "row_7", reference: "SZ-PT-119", sortKey: "SZ-PT-119", tail: 0, unitsPerBox: 60, itemBoxes: 1, sign: "+", fractionText: "1/2", fractionValue: 0.5, colisage: 12, packNotation: "", remark: "C3 bas", warehouse: "C3", createdAt: "01/03/2026" },
-  { id: "row_8", reference: "SZ-SH-021", sortKey: "SZ-SH-021", tail: 0, unitsPerBox: 84, itemBoxes: 3, sign: "", fractionText: "", fractionValue: 0, colisage: 12, packNotation: "", remark: "A2 entrée", warehouse: "A2", createdAt: "04/03/2026" },
-  { id: "row_9", reference: "SZ-AC-410", sortKey: "SZ-AC-410", tail: 0, unitsPerBox: 144, itemBoxes: 1, sign: "+", fractionText: "1/6", fractionValue: 1 / 6, colisage: 24, packNotation: "", remark: "C3 accessoires", warehouse: "C3", createdAt: "08/03/2026" },
-  { id: "row_10", reference: "SZ-DR-028", sortKey: "SZ-DR-028", tail: 1, unitsPerBox: 96, itemBoxes: 0, sign: "", fractionText: "", fractionValue: 0, colisage: 12, packNotation: "", remark: "Showroom", warehouse: "B1", createdAt: "11/03/2026" },
-  { id: "row_11", reference: "SZ-SK-055", sortKey: "SZ-SK-055", tail: 2, unitsPerBox: 72, itemBoxes: 0, sign: "", fractionText: "", fractionValue: 0, colisage: 6, packNotation: "", remark: "Reste ouvert", warehouse: "B2", createdAt: "09/03/2026" },
-  { id: "row_12", reference: "SZ-CT-301", sortKey: "SZ-CT-301", tail: 0, unitsPerBox: 120, itemBoxes: 0, sign: "", fractionText: "", fractionValue: 0, colisage: 10, packNotation: "", remark: "", warehouse: "C2", createdAt: "27/02/2026" },
-  { id: "row_13", reference: "SZ-TS-008", sortKey: "SZ-TS-008", tail: 0, unitsPerBox: 120, itemBoxes: 0, sign: "", fractionText: "", fractionValue: 0, colisage: 10, packNotation: "", remark: "Rupture", warehouse: "A1", createdAt: "18/01/2026" }
-];
-
-const seedHistory = [
-  { timestampRaw: "2026-03-28T09:10:00.000Z", actionType: "adjustment", reference: "SZ-TS-001", rowId: "row_3", beforeDisplay: "120p×4", afterDisplay: "120p×4+1/3", remark: "Ajustement comptage", source: "stock_mobile_quick_edit", beforeTotalPieces: 480, afterTotalPieces: 520 },
-  { timestampRaw: "2026-03-27T16:30:00.000Z", actionType: "exit", reference: "SZ-DR-014", rowId: "row_2", beforeDisplay: "(85p)+144p×3+2/3+2包", afterDisplay: "(85p)+144p×3+1/2+2包", remark: "Sortie showroom", source: "stock_mobile_quick_edit", beforeTotalPieces: 649, afterTotalPieces: 643 },
-  { timestampRaw: "2026-03-27T11:45:00.000Z", actionType: "adjustment", reference: "SZ-BL-032", rowId: "row_5", beforeDisplay: "72p×5+1/2", afterDisplay: "72p×5+2/3", remark: "Correction fraction", source: "stock_mobile_quick_edit", beforeTotalPieces: 396, afterTotalPieces: 408 },
-  { timestampRaw: "2026-03-26T18:05:00.000Z", actionType: "exit", reference: "SZ-JK-203", rowId: "row_4", beforeDisplay: "96p×3", afterDisplay: "96p×2", remark: "Client export", source: "stock_mobile_quick_edit", beforeTotalPieces: 288, afterTotalPieces: 192 },
-  { timestampRaw: "2026-03-26T10:20:00.000Z", actionType: "entry", reference: "SZ-SH-021", rowId: "row_8", beforeDisplay: "84p×2", afterDisplay: "84p×3", remark: "Réception repassage", source: "stock_mobile_quick_edit", beforeTotalPieces: 168, afterTotalPieces: 252 },
-  { timestampRaw: "2026-03-25T17:15:00.000Z", actionType: "exit", reference: "SZ-TS-008", rowId: "row_13", beforeDisplay: "120p×1", afterDisplay: "-", remark: "Fin de lot", source: "stock_mobile_quick_edit", beforeTotalPieces: 120, afterTotalPieces: 0 },
-  { timestampRaw: "2026-03-25T09:40:00.000Z", actionType: "entry", reference: "SZ-KN-087", rowId: "row_6", beforeDisplay: "(24p)+48p×2+1/4", afterDisplay: "(24p)+48p×2+1/4+1包", remark: "Ajout paquets", source: "stock_mobile_quick_edit", beforeTotalPieces: 132, afterTotalPieces: 144 },
-  { timestampRaw: "2026-03-24T15:50:00.000Z", actionType: "adjustment", reference: "SZ-AC-410", rowId: "row_9", beforeDisplay: "144p×1", afterDisplay: "144p×1+1/6", remark: "", source: "stock_mobile_quick_edit", beforeTotalPieces: 144, afterTotalPieces: 168 }
-].map(function(entry, index) {
-  return Object.assign({ id: "seed-his-" + String(index + 1), timestampLabel: formatHistoryTimestamp(entry.timestampRaw) }, entry);
-});
+let dataSource = null;
 
 const state = {
   items: [],
   historyItems: [],
+  pendingMutations: [],
+  syncStatus: "idle",
+  lastSyncAt: "",
+  dataSource: "local",
   query: "",
   historyQuery: "",
   historyActionType: "",
@@ -618,34 +594,6 @@ function buildHistoryEntryFromLocalChange(actionType, beforeItem, afterItem, rem
     beforeTotalPieces: stateModelToPieces(beforeItem),
     afterTotalPieces: stateModelToPieces(afterItem)
   };
-}
-
-function saveState() {
-  const payload = {
-    items: state.items,
-    historyItems: state.historyItems
-  };
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-}
-
-function loadState() {
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    state.items = seedItems.map(hydrateItem);
-    state.historyItems = seedHistory.slice();
-    saveState();
-    return;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    state.items = (Array.isArray(parsed.items) ? parsed.items : seedItems).map(hydrateItem);
-    state.historyItems = Array.isArray(parsed.historyItems) ? parsed.historyItems.slice() : seedHistory.slice();
-  } catch (_error) {
-    state.items = seedItems.map(hydrateItem);
-    state.historyItems = seedHistory.slice();
-    saveState();
-  }
 }
 
 function getInventoryByReference(reference) {
@@ -2210,16 +2158,15 @@ function handleQuickEditSave() {
     renderQuickEdit();
     return;
   }
+  request.localActionType = state.quickEditTab === "quick-exit" ? "exit" : "adjustment";
   state.quickEditSaving = true;
-  const historyEntry = buildHistoryEntryFromLocalChange(
-    state.quickEditTab === "quick-exit" ? "exit" : "adjustment",
-    currentItem,
-    optimisticItem,
-    optimisticItem.remark
-  );
-  replaceItem(optimisticItem);
-  state.historyItems = [historyEntry].concat(state.historyItems);
-  saveState();
+  const result = dataSource.saveQuickEdit(request);
+  state.items = Array.isArray(result.items) ? result.items : state.items;
+  state.historyItems = Array.isArray(result.historyItems) ? result.historyItems : state.historyItems;
+  state.pendingMutations = result.meta && Array.isArray(result.meta.pendingMutations) ? result.meta.pendingMutations : [];
+  state.syncStatus = result.meta && result.meta.syncStatus ? result.meta.syncStatus : "idle";
+  state.lastSyncAt = result.meta && typeof result.meta.lastSyncAt === "string" ? result.meta.lastSyncAt : "";
+  state.dataSource = result.meta && result.meta.dataSource ? result.meta.dataSource : "local";
   closeQuickEdit();
   renderAll();
 }
@@ -2479,7 +2426,8 @@ function renderDetailPage() {
 
   const reference = state.detailReference;
   state.detailReference = reference;
-  const item = getInventoryByReference(reference);
+  const detailResult = dataSource ? dataSource.loadDetail(reference) : { item: null, history: [], notFoundInStock: true };
+  const item = detailResult.item;
   if (!item) {
     detailReference.textContent = reference || "-";
     detailSubline.textContent = "Fiche produit";
@@ -2492,7 +2440,7 @@ function renderDetailPage() {
     return;
   }
 
-  const itemHistory = getHistoryForReference(item.reference);
+  const itemHistory = Array.isArray(detailResult.history) ? detailResult.history : [];
   detailReference.textContent = item.reference;
   detailSubline.textContent = "Fiche produit";
   detailStockDisplay.textContent = item.stockDisplay || "-";
@@ -2619,7 +2567,21 @@ function registerServiceWorker() {
 }
 
 function initApp() {
-  loadState();
+  dataSource = window.createLocalDataSource({
+    hydrateItem: hydrateItem,
+    normalizeReference: normalizeReference,
+    formatHistoryTimestamp: formatHistoryTimestamp,
+    buildOptimisticItemFromRequest: buildOptimisticItemFromRequest,
+    buildHistoryEntryFromLocalChange: buildHistoryEntryFromLocalChange
+  });
+  const inventoryResult = dataSource.loadInventory();
+  const historyResult = dataSource.loadHistory();
+  state.items = Array.isArray(inventoryResult.items) ? inventoryResult.items : [];
+  state.historyItems = Array.isArray(historyResult.items) ? historyResult.items : [];
+  state.pendingMutations = inventoryResult.meta && Array.isArray(inventoryResult.meta.pendingMutations) ? inventoryResult.meta.pendingMutations : [];
+  state.syncStatus = inventoryResult.meta && inventoryResult.meta.syncStatus ? inventoryResult.meta.syncStatus : "idle";
+  state.lastSyncAt = inventoryResult.meta && typeof inventoryResult.meta.lastSyncAt === "string" ? inventoryResult.meta.lastSyncAt : "";
+  state.dataSource = inventoryResult.meta && inventoryResult.meta.dataSource ? inventoryResult.meta.dataSource : "local";
   state.columnCount = getColumnCount();
   const route = parseCurrentRoute();
   state.currentView = route.view;
