@@ -1,32 +1,6 @@
 (function() {
   const STORAGE_KEY = "szfashion-stockmobile-local-v1";
 
-  const seedItems = [
-    { id: "row_2", reference: "SZ-DR-014", sortKey: "SZ-DR-014", tail: 85, unitsPerBox: 144, itemBoxes: 3, sign: "+", fractionText: "1/2", fractionValue: 0.5, colisage: 12, packNotation: "+2包", remark: "B2 haut droite", warehouse: "B2", createdAt: "15/02/2026" },
-    { id: "row_3", reference: "SZ-TS-001", sortKey: "SZ-TS-001", tail: 0, unitsPerBox: 120, itemBoxes: 4, sign: "+", fractionText: "1/3", fractionValue: 1 / 3, colisage: 10, packNotation: "", remark: "A1 table 3", warehouse: "A1", createdAt: "12/02/2026" },
-    { id: "row_4", reference: "SZ-JK-203", sortKey: "SZ-JK-203", tail: 0, unitsPerBox: 96, itemBoxes: 2, sign: "", fractionText: "", fractionValue: 0, colisage: 12, packNotation: "", remark: "B1 rack veste", warehouse: "B1", createdAt: "18/02/2026" },
-    { id: "row_5", reference: "SZ-BL-032", sortKey: "SZ-BL-032", tail: 0, unitsPerBox: 72, itemBoxes: 5, sign: "+", fractionText: "2/3", fractionValue: 2 / 3, colisage: 6, packNotation: "", remark: "", warehouse: "A2", createdAt: "20/02/2026" },
-    { id: "row_6", reference: "SZ-KN-087", sortKey: "SZ-KN-087", tail: 24, unitsPerBox: 48, itemBoxes: 2, sign: "+", fractionText: "1/4", fractionValue: 0.25, colisage: 12, packNotation: "+1包", remark: "C1 maille", warehouse: "C1", createdAt: "24/02/2026" },
-    { id: "row_7", reference: "SZ-PT-119", sortKey: "SZ-PT-119", tail: 0, unitsPerBox: 60, itemBoxes: 1, sign: "+", fractionText: "1/2", fractionValue: 0.5, colisage: 12, packNotation: "", remark: "C3 bas", warehouse: "C3", createdAt: "01/03/2026" },
-    { id: "row_8", reference: "SZ-SH-021", sortKey: "SZ-SH-021", tail: 0, unitsPerBox: 84, itemBoxes: 3, sign: "", fractionText: "", fractionValue: 0, colisage: 12, packNotation: "", remark: "A2 entrée", warehouse: "A2", createdAt: "04/03/2026" },
-    { id: "row_9", reference: "SZ-AC-410", sortKey: "SZ-AC-410", tail: 0, unitsPerBox: 144, itemBoxes: 1, sign: "+", fractionText: "1/6", fractionValue: 1 / 6, colisage: 24, packNotation: "", remark: "C3 accessoires", warehouse: "C3", createdAt: "08/03/2026" },
-    { id: "row_10", reference: "SZ-DR-028", sortKey: "SZ-DR-028", tail: 1, unitsPerBox: 96, itemBoxes: 0, sign: "", fractionText: "", fractionValue: 0, colisage: 12, packNotation: "", remark: "Showroom", warehouse: "B1", createdAt: "11/03/2026" },
-    { id: "row_11", reference: "SZ-SK-055", sortKey: "SZ-SK-055", tail: 2, unitsPerBox: 72, itemBoxes: 0, sign: "", fractionText: "", fractionValue: 0, colisage: 6, packNotation: "", remark: "Reste ouvert", warehouse: "B2", createdAt: "09/03/2026" },
-    { id: "row_12", reference: "SZ-CT-301", sortKey: "SZ-CT-301", tail: 0, unitsPerBox: 120, itemBoxes: 0, sign: "", fractionText: "", fractionValue: 0, colisage: 10, packNotation: "", remark: "", warehouse: "C2", createdAt: "27/02/2026" },
-    { id: "row_13", reference: "SZ-TS-008", sortKey: "SZ-TS-008", tail: 0, unitsPerBox: 120, itemBoxes: 0, sign: "", fractionText: "", fractionValue: 0, colisage: 10, packNotation: "", remark: "Rupture", warehouse: "A1", createdAt: "18/01/2026" }
-  ];
-
-  const seedHistoryRaw = [
-    { timestampRaw: "2026-03-28T09:10:00.000Z", actionType: "adjustment", reference: "SZ-TS-001", rowId: "row_3", beforeDisplay: "120p×4", afterDisplay: "120p×4+1/3", remark: "Ajustement comptage", source: "stock_mobile_quick_edit", beforeTotalPieces: 480, afterTotalPieces: 520 },
-    { timestampRaw: "2026-03-27T16:30:00.000Z", actionType: "exit", reference: "SZ-DR-014", rowId: "row_2", beforeDisplay: "(85p)+144p×3+2/3+2包", afterDisplay: "(85p)+144p×3+1/2+2包", remark: "Sortie showroom", source: "stock_mobile_quick_edit", beforeTotalPieces: 649, afterTotalPieces: 643 },
-    { timestampRaw: "2026-03-27T11:45:00.000Z", actionType: "adjustment", reference: "SZ-BL-032", rowId: "row_5", beforeDisplay: "72p×5+1/2", afterDisplay: "72p×5+2/3", remark: "Correction fraction", source: "stock_mobile_quick_edit", beforeTotalPieces: 396, afterTotalPieces: 408 },
-    { timestampRaw: "2026-03-26T18:05:00.000Z", actionType: "exit", reference: "SZ-JK-203", rowId: "row_4", beforeDisplay: "96p×3", afterDisplay: "96p×2", remark: "Client export", source: "stock_mobile_quick_edit", beforeTotalPieces: 288, afterTotalPieces: 192 },
-    { timestampRaw: "2026-03-26T10:20:00.000Z", actionType: "entry", reference: "SZ-SH-021", rowId: "row_8", beforeDisplay: "84p×2", afterDisplay: "84p×3", remark: "Réception repassage", source: "stock_mobile_quick_edit", beforeTotalPieces: 168, afterTotalPieces: 252 },
-    { timestampRaw: "2026-03-25T17:15:00.000Z", actionType: "exit", reference: "SZ-TS-008", rowId: "row_13", beforeDisplay: "120p×1", afterDisplay: "-", remark: "Fin de lot", source: "stock_mobile_quick_edit", beforeTotalPieces: 120, afterTotalPieces: 0 },
-    { timestampRaw: "2026-03-25T09:40:00.000Z", actionType: "entry", reference: "SZ-KN-087", rowId: "row_6", beforeDisplay: "(24p)+48p×2+1/4", afterDisplay: "(24p)+48p×2+1/4+1包", remark: "Ajout paquets", source: "stock_mobile_quick_edit", beforeTotalPieces: 132, afterTotalPieces: 144 },
-    { timestampRaw: "2026-03-24T15:50:00.000Z", actionType: "adjustment", reference: "SZ-AC-410", rowId: "row_9", beforeDisplay: "144p×1", afterDisplay: "144p×1+1/6", remark: "", source: "stock_mobile_quick_edit", beforeTotalPieces: 144, afterTotalPieces: 168 }
-  ];
-
   function cloneMeta(meta) {
     const nextMeta = meta || {};
     return {
@@ -38,20 +12,102 @@
   }
 
   window.createLocalDataSource = function createLocalDataSource(deps) {
-    function buildSeedHistory() {
-      return seedHistoryRaw.map(function(entry, index) {
-        return Object.assign({ id: "seed-his-" + String(index + 1), timestampLabel: deps.formatHistoryTimestamp(entry.timestampRaw) }, entry);
-      });
-    }
-
     function buildBootstrapSnapshot() {
       return {
-        items: seedItems.map(deps.hydrateItem),
-        historyItems: buildSeedHistory(),
+        items: [],
+        historyItems: [],
         pendingMutations: [],
         syncStatus: "idle",
         lastSyncAt: "",
-        dataSource: "local"
+        dataSource: "local-empty"
+      };
+    }
+
+    function cloneRequestPayload(request) {
+      return JSON.parse(JSON.stringify(request || {}));
+    }
+
+    function buildPendingMutation(request, item) {
+      return {
+        id: "mut_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+        type: "quick_edit",
+        createdAt: new Date().toISOString(),
+        reference: String((item && item.reference) || request.reference || ""),
+        itemId: String((item && item.id) || request.id || ""),
+        actionType: String(request.localActionType || "adjustment"),
+        request: cloneRequestPayload(request)
+      };
+    }
+
+    function replaceItemInList(items, nextItem, normalizedReference) {
+      const list = Array.isArray(items) ? items.slice() : [];
+      let replaced = false;
+      const nextList = list.map(function(entry) {
+        const sameId = nextItem && entry && nextItem.id && entry.id === nextItem.id;
+        const sameReference = normalizedReference && deps.normalizeReference(entry.reference) === normalizedReference;
+        if (sameId || sameReference) {
+          replaced = true;
+          return nextItem;
+        }
+        return entry;
+      });
+      if (!replaced && nextItem) nextList.unshift(nextItem);
+      return nextList;
+    }
+
+    function mergeHistoryEntry(historyItems, historyEntry) {
+      const list = Array.isArray(historyItems) ? historyItems.slice() : [];
+      if (!historyEntry) return list;
+      const exists = list.some(function(entry) {
+        return entry && historyEntry && entry.id && historyEntry.id && entry.id === historyEntry.id;
+      });
+      if (!exists) list.unshift(historyEntry);
+      list.sort(function(a, b) {
+        return new Date(b.timestampRaw || 0) - new Date(a.timestampRaw || 0);
+      });
+      return list;
+    }
+
+    function applyPendingMutations(snapshot, pendingMutations) {
+      const baseSnapshot = {
+        items: Array.isArray(snapshot && snapshot.items) ? snapshot.items.slice() : [],
+        historyItems: Array.isArray(snapshot && snapshot.historyItems) ? snapshot.historyItems.slice() : [],
+        pendingMutations: Array.isArray(pendingMutations) ? pendingMutations.slice() : []
+      };
+
+      baseSnapshot.pendingMutations.forEach(function(mutation) {
+        if (!mutation || mutation.type !== "quick_edit" || !mutation.request) return;
+
+        const normalizedReference = deps.normalizeReference(mutation.reference || mutation.request.reference);
+        const baseItem = baseSnapshot.items.find(function(entry) {
+          if (mutation.itemId && entry.id === mutation.itemId) return true;
+          return normalizedReference && deps.normalizeReference(entry.reference) === normalizedReference;
+        }) || null;
+
+        if (!baseItem) return;
+
+        const replayRequest = cloneRequestPayload(mutation.request);
+        const nextItem = deps.buildOptimisticItemFromRequest(baseItem, replayRequest);
+        if (!nextItem) return;
+
+        const historyEntry = deps.buildHistoryEntryFromLocalChange(
+          mutation.actionType || replayRequest.localActionType || "adjustment",
+          baseItem,
+          nextItem,
+          nextItem.remark
+        );
+
+        if (historyEntry && mutation.id) {
+          historyEntry.id = "pending-history-" + mutation.id;
+        }
+
+        baseSnapshot.items = replaceItemInList(baseSnapshot.items, nextItem, normalizedReference);
+        baseSnapshot.historyItems = mergeHistoryEntry(baseSnapshot.historyItems, historyEntry);
+      });
+
+      return {
+        items: baseSnapshot.items,
+        historyItems: baseSnapshot.historyItems
       };
     }
 
@@ -76,7 +132,7 @@
       try {
         const parsed = JSON.parse(raw);
         const items = Array.isArray(parsed.items) ? parsed.items.map(deps.hydrateItem) : buildBootstrapSnapshot().items;
-        const historyItems = Array.isArray(parsed.historyItems) ? parsed.historyItems.slice() : buildSeedHistory();
+        const historyItems = Array.isArray(parsed.historyItems) ? parsed.historyItems.slice() : [];
         return {
           items: items,
           historyItems: historyItems,
@@ -149,15 +205,17 @@
         nextItem,
         nextItem.remark
       );
+      const pendingMutation = buildPendingMutation(request, nextItem);
+      if (historyEntry && pendingMutation.id) {
+        historyEntry.id = "pending-history-" + pendingMutation.id;
+      }
       const nextSnapshot = {
-        items: snapshot.items.map(function(entry) {
-          return entry.id === nextItem.id ? nextItem : entry;
-        }),
+        items: replaceItemInList(snapshot.items, nextItem, deps.normalizeReference(nextItem.reference)),
         historyItems: [historyEntry].concat(snapshot.historyItems),
-        pendingMutations: Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations.slice() : [],
+        pendingMutations: (Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations.slice() : []).concat(pendingMutation),
         syncStatus: "idle",
         lastSyncAt: typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : "",
-        dataSource: "local-edited"
+        dataSource: "local-pending"
       };
       writeSnapshot(nextSnapshot);
       return {
@@ -169,38 +227,44 @@
       };
     }
 
-    function replaceSnapshot(partialPayload) {
+    function mergeRemoteSnapshot(partialPayload) {
       const snapshot = readSnapshot();
       const payload = partialPayload || {};
-      const nextSnapshot = {
-        items: Array.isArray(payload.items) ? payload.items.map(deps.hydrateItem) : snapshot.items.slice(),
-        historyItems: Array.isArray(payload.historyItems) ? payload.historyItems.slice() : snapshot.historyItems.slice(),
-        pendingMutations: Array.isArray(payload.pendingMutations) ? payload.pendingMutations.slice() : (Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations.slice() : []),
-        syncStatus: payload.syncStatus || snapshot.syncStatus || "idle",
-        lastSyncAt: typeof payload.lastSyncAt === "string" ? payload.lastSyncAt : (typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : ""),
-        dataSource: payload.dataSource || snapshot.dataSource || "local"
-      };
+      const nextPendingMutations = Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations.slice() : [];
+      let nextItems = Array.isArray(payload.items) ? payload.items.map(deps.hydrateItem) : snapshot.items.slice();
+      let nextHistoryItems = Array.isArray(payload.historyItems) ? payload.historyItems.slice() : snapshot.historyItems.slice();
+      const hasScopedReference = !!payload.reference;
+      const normalizedReference = hasScopedReference ? deps.normalizeReference(payload.reference) : "";
 
-      if (payload.item && payload.reference) {
-        const normalizedReference = deps.normalizeReference(payload.reference);
-        const nextItem = deps.hydrateItem(payload.item);
-        nextSnapshot.items = nextSnapshot.items.map(function(entry) {
-          return deps.normalizeReference(entry.reference) === normalizedReference ? nextItem : entry;
+      if (hasScopedReference && Object.prototype.hasOwnProperty.call(payload, "item")) {
+        nextItems = nextItems.filter(function(entry) {
+          return deps.normalizeReference(entry.reference) !== normalizedReference;
         });
-        if (!nextSnapshot.items.some(function(entry) {
-          return deps.normalizeReference(entry.reference) === normalizedReference;
-        })) {
-          nextSnapshot.items = [nextItem].concat(nextSnapshot.items);
+        if (payload.item) {
+          nextItems.unshift(deps.hydrateItem(payload.item));
         }
       }
 
-      if (Array.isArray(payload.history) && payload.reference) {
-        const normalizedReference = deps.normalizeReference(payload.reference);
-        const otherHistory = nextSnapshot.historyItems.filter(function(entry) {
+      if (hasScopedReference && Array.isArray(payload.history)) {
+        const otherHistory = nextHistoryItems.filter(function(entry) {
           return deps.normalizeReference(entry.reference) !== normalizedReference;
         });
-        nextSnapshot.historyItems = payload.history.slice().concat(otherHistory);
+        nextHistoryItems = payload.history.slice().concat(otherHistory);
       }
+
+      const replayedSnapshot = applyPendingMutations({
+        items: nextItems,
+        historyItems: nextHistoryItems
+      }, nextPendingMutations);
+
+      const nextSnapshot = {
+        items: replayedSnapshot.items,
+        historyItems: replayedSnapshot.historyItems,
+        pendingMutations: Array.isArray(payload.pendingMutations) ? payload.pendingMutations.slice() : nextPendingMutations,
+        syncStatus: payload.syncStatus || snapshot.syncStatus || "idle",
+        lastSyncAt: typeof payload.lastSyncAt === "string" ? payload.lastSyncAt : (typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : ""),
+        dataSource: payload.dataSource || (nextPendingMutations.length ? "remote-with-pending" : snapshot.dataSource || "local")
+      };
 
       writeSnapshot(nextSnapshot);
       return {
@@ -215,7 +279,7 @@
       loadHistory: loadHistory,
       loadDetail: loadDetail,
       saveQuickEdit: saveQuickEdit,
-      replaceSnapshot: replaceSnapshot,
+      mergeRemoteSnapshot: mergeRemoteSnapshot,
       getMeta: function() {
         return getMeta(readSnapshot());
       }

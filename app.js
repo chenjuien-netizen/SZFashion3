@@ -42,8 +42,7 @@ function applyDataMeta(meta) {
 function isRemoteReadAllowed(options) {
   if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) return false;
   if (!navigator.onLine) return false;
-  if (options && options.force) return true;
-  return !hasLocalWritesThisSession && state.dataSource !== "local-edited";
+  return !(options && options.disabled);
 }
 
 function getSyncStatusLabel(defaultLabel) {
@@ -69,12 +68,13 @@ function refreshRemoteSnapshot(options) {
   ]).then(function(results) {
     const inventoryPayload = results[0];
     const historyPayload = results[1];
-    const snapshotResult = dataSource.replaceSnapshot({
+    const pendingCount = state.pendingMutations.length;
+    const snapshotResult = dataSource.mergeRemoteSnapshot({
       items: inventoryPayload.items,
       historyItems: historyPayload.items,
       syncStatus: "idle",
       lastSyncAt: inventoryPayload.generatedAt || historyPayload.generatedAt || new Date().toISOString(),
-      dataSource: "remote-cache"
+      dataSource: pendingCount ? "remote-with-pending" : "remote-cache"
     });
     state.items = Array.isArray(snapshotResult.items) ? snapshotResult.items : state.items;
     state.historyItems = Array.isArray(snapshotResult.historyItems) ? snapshotResult.historyItems : state.historyItems;
@@ -106,13 +106,13 @@ function refreshRemoteDetail(reference, options) {
   }
 
   return remoteDataSource.fetchDetail(normalizedReference).then(function(payload) {
-    const snapshotResult = dataSource.replaceSnapshot({
+    const snapshotResult = dataSource.mergeRemoteSnapshot({
       reference: normalizedReference,
       item: payload.item,
       history: payload.history,
       syncStatus: "idle",
       lastSyncAt: payload.generatedAt || state.lastSyncAt,
-      dataSource: "remote-cache"
+      dataSource: state.pendingMutations.length ? "remote-with-pending" : "remote-cache"
     });
     state.items = Array.isArray(snapshotResult.items) ? snapshotResult.items : state.items;
     state.historyItems = Array.isArray(snapshotResult.historyItems) ? snapshotResult.historyItems : state.historyItems;
