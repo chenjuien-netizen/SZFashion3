@@ -751,17 +751,21 @@ function renderDetailStockStateMarkup(item) {
   const boxesDisplay = toInt(item.itemBoxes) > 0 ? String(toInt(item.itemBoxes)) : "-";
   const totalPieces = formatMetricNumber(stateModelToPieces(item));
   const totalBoxes = toInt(item.itemBoxes);
-  const packText = item.packCounterText || getInventoryPackLine(item) || "-";
+  const packText = item.packCounterText ? item.packCounterText + "包" : (getMainPackNotationFromState(item) || "0包");
   return ''
     + '<table class="w-full border-collapse text-left">'
     + '<thead><tr class="border-b border-outline-variant/20 bg-surface-container-low">'
     + '<th class="px-3 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</th>'
+    + '<th class="px-1 py-2"></th>'
     + '<th class="px-3 py-2 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</th>'
+    + '<th class="px-1 py-2"></th>'
     + '<th class="px-3 py-2 text-right text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</th>'
     + '</tr></thead>'
     + '<tbody><tr>'
     + '<td class="px-3 py-3 text-lg font-black tracking-tight text-on-surface">' + escapeHtml(tailDisplay) + '</td>'
+    + '<td class="px-1 py-3 text-center text-lg font-black text-on-surface-variant/60">+</td>'
     + '<td class="px-3 py-3 text-center text-lg font-black tracking-tight text-on-surface">' + escapeHtml(unitsDisplay) + '</td>'
+    + '<td class="px-1 py-3 text-center text-lg font-black text-on-surface-variant/60">×</td>'
     + '<td class="px-3 py-3 text-right text-lg font-black tracking-tight text-on-surface">' + escapeHtml(boxesDisplay) + '</td>'
     + '</tr></tbody>'
     + '</table>'
@@ -1002,12 +1006,10 @@ function renderInventoryCard(item) {
 }
 
 function getInventoryPackLine(item) {
-  const parts = [];
   const mainPack = getMainPackNotationFromState(item);
-  if (mainPack) parts.push(mainPack);
-  if (item.packCounterText) parts.push(item.packCounterText + "包");
-  if (toInt(item.colisage) > 0) parts.push(String(toInt(item.colisage)) + "件/包");
-  return parts.join(" · ");
+  if (item.packCounterText) return item.packCounterText + "包";
+  if (mainPack) return mainPack;
+  return "";
 }
 
 function renderColumnLayoutMarkup(columns) {
@@ -1018,18 +1020,18 @@ function renderColumnLayoutMarkup(columns) {
 }
 
 function renderHistoryCard(entry) {
-  const timeLabel = formatHistoryTimeLabel(entry.timestampRaw, entry.timestampLabel);
+  const timeLabel = formatHistoryCompactDateTime(entry.timestampRaw, entry.timestampLabel);
+  const movementText = (entry.beforeDisplay || "-") + " → " + (entry.afterDisplay || "-");
   return ''
     + '<article class="bg-surface-container-lowest px-3 py-2 shadow-ledger" data-history-reference="' + escapeHtml(entry.reference) + '">'
-    + '<div class="grid grid-cols-[3.1rem_minmax(3.8rem,0.9fr)_auto_minmax(0,1.5fr)] items-start gap-2">'
-    + '<time class="pt-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(timeLabel) + '</time>'
+    + '<div class="grid grid-cols-[4.8rem_minmax(3.8rem,0.75fr)_minmax(0,1.6fr)_auto] items-start gap-2">'
+    + '<time class="pt-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">' + escapeHtml(timeLabel) + '</time>'
     + '<a class="truncate text-[12px] font-bold tracking-tight text-primary" href="#detail/' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
-    + '<span class="shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
-    + '<div class="min-w-0 space-y-0.5 text-[10px] leading-4 text-on-surface">'
-    + '<div class="truncate"><span class="font-bold uppercase tracking-[0.12em] text-on-surface-variant">AV</span><span class="ml-1">' + escapeHtml(entry.beforeDisplay || "-") + '</span></div>'
-    + '<div class="truncate"><span class="font-bold uppercase tracking-[0.12em] text-on-surface-variant">AP</span><span class="ml-1">' + escapeHtml(entry.afterDisplay || "-") + '</span></div>'
+    + '<div class="min-w-0 text-[10px] leading-4 text-on-surface">'
+    + '<div class="truncate font-medium">' + escapeHtml(movementText) + '</div>'
     + (entry.remark ? '<div class="truncate text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
     + '</div>'
+    + '<span class="justify-self-end shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
     + '</article>';
 }
 
@@ -1057,29 +1059,18 @@ function getHistoryDateGroupLabel(timestampRaw) {
   return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(date);
 }
 
-function formatHistoryTimeLabel(timestampRaw, fallback) {
+function formatHistoryCompactDateTime(timestampRaw, fallback) {
   const date = new Date(timestampRaw);
   if (!Number.isNaN(date.getTime())) {
-    return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date).replace(":", "h");
+    const day = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(date);
+    const time = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date);
+    return day + " " + time;
   }
   return fallback || "--:--";
 }
 
 function renderDetailHistoryCard(entry) {
-  return ''
-    + '<article class="bg-surface-container-lowest px-4 py-3 shadow-ledger">'
-    + '<div class="flex items-start justify-between gap-3">'
-    + '<div class="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">' + escapeHtml(entry.timestampLabel || formatHistoryTimestamp(entry.timestampRaw)) + '</div>'
-    + '<div class="flex items-center gap-2">'
-    + '<span class="shrink-0 rounded px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
-    + '</div>'
-    + '</div>'
-    + '<div class="mt-2 space-y-1">'
-    + '<div class="text-[11px] text-on-surface"><span class="font-bold uppercase tracking-[0.14em] text-on-surface-variant">AVANT</span><span class="ml-2">' + escapeHtml(entry.beforeDisplay || "-") + '</span></div>'
-    + '<div class="text-[11px] text-on-surface"><span class="font-bold uppercase tracking-[0.14em] text-on-surface-variant">APRÈS</span><span class="ml-2">' + escapeHtml(entry.afterDisplay || "-") + '</span></div>'
-    + (entry.remark ? '<div class="text-[11px] text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
-    + '</div>'
-    + '</article>';
+  return renderHistoryCard(entry);
 }
 
 function getQuickEditElements() {
@@ -2697,7 +2688,7 @@ function renderDetailPage() {
   const item = detailResult.item;
   if (!item) {
     detailReference.textContent = "Fiche produit";
-    detailSubline.textContent = reference || "-";
+    detailSubline.textContent = "";
     if (detailPrimaryReference) detailPrimaryReference.textContent = reference || "-";
     detailNotFoundBanner.classList.remove("hidden");
     detailMainSection.classList.add("hidden");
@@ -2711,7 +2702,7 @@ function renderDetailPage() {
 
   const itemHistory = Array.isArray(detailResult.history) ? detailResult.history : [];
   detailReference.textContent = "Fiche produit";
-  detailSubline.textContent = item.reference || "-";
+  detailSubline.textContent = "";
   if (detailPrimaryReference) detailPrimaryReference.textContent = item.reference || "-";
   detailStockDisplay.textContent = item.stockDisplay || "-";
   detailStockState.textContent = item.stockState === "positive" ? "En stock" : "En rupture";
