@@ -186,6 +186,12 @@ function buildHistoryEntry_(displayRow, rawRow, cols) {
   const actionType = normalizeHistoryActionType_(getRowCell_(displayRow, cols.actionType));
   const timestampRaw = historyTimestampRaw_(getRowCell_(rawRow, cols.timestamp));
   if (!reference && !actionType && !timestampRaw) return null;
+  console.log(
+    "readHistory reference raw=%s display=%s normalized=%s",
+    String(getRowCell_(rawRow, cols.reference) || ""),
+    String(getRowCell_(displayRow, cols.reference) || ""),
+    reference
+  );
 
   return {
     timestampRaw: timestampRaw,
@@ -516,8 +522,20 @@ function writeCellIfPresent_(sheet, rowIndex, columnIndex, value) {
 }
 
 function toSheetText_(value) {
-  const text = String(value == null ? "" : value).trim();
-  return text ? "'" + text : "";
+  return String(value == null ? "" : value).trim();
+}
+
+function escapeFormulaText_(value) {
+  return String(value == null ? "" : value).replace(/"/g, '""');
+}
+
+function writeHistoryReferenceCell_(range, value) {
+  const text = toSheetText_(value);
+  range
+    .setNumberFormat("@")
+    .clearContent()
+    .setFormula('="' + escapeFormulaText_(text) + '"');
+  SpreadsheetApp.flush();
 }
 
 function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
@@ -541,17 +559,26 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     Number(stateModelToPieces_(afterItem) || 0)
   ];
   if (cols.reference >= 0) {
-    row[cols.reference] = toSheetText_(referenceText);
+    row[cols.reference] = "";
   }
+  console.log(
+    "appendHistory before write referenceText=%s cols.reference=%s rowReference=%s",
+    referenceText,
+    String(cols.reference),
+    cols.reference >= 0 ? String(row[cols.reference] || "") : ""
+  );
   const targetRow = sheet.getLastRow() + 1;
-  if (cols.reference >= 0) {
-    sheet.getRange(targetRow, cols.reference + 1).setNumberFormat("@");
-  }
   sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
   if (cols.reference >= 0) {
-    sheet.getRange(targetRow, cols.reference + 1)
-      .setNumberFormat("@")
-      .setValue(toSheetText_(referenceText));
+    const referenceRange = sheet.getRange(targetRow, cols.reference + 1);
+    writeHistoryReferenceCell_(referenceRange, referenceText);
+    console.log(
+      "appendHistory after write reference getValue=%s getDisplayValue=%s getFormula=%s getNumberFormat=%s",
+      String(referenceRange.getValue() || ""),
+      String(referenceRange.getDisplayValue() || ""),
+      String(referenceRange.getFormula() || ""),
+      String(referenceRange.getNumberFormat() || "")
+    );
   }
 
   return {
