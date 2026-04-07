@@ -941,6 +941,7 @@ function getArrivalGroupMeta(item) {
   const sort = getArrivalUpdatedAtSort(item);
   return {
     note: hasNote ? note : "",
+    label: String(item && item.arrivalUpdatedAtLabel || "").trim(),
     sort: sort,
     rank: hasNote && sort > 0 ? 0 : (hasNote ? 1 : 2)
   };
@@ -949,7 +950,7 @@ function getArrivalGroupMeta(item) {
 function getArrivalUpdatedAtSort(item) {
   const numeric = Number(item && item.arrivalUpdatedAtSort);
   if (Number.isFinite(numeric) && numeric > 0) return numeric;
-  const parsed = parseInventoryDateMillis(item && (item.arrivalUpdatedAt || item.arrivalUpdatedAtLabel || item.createdAt));
+  const parsed = parseInventoryDateMillis(item && (item.arrivalUpdatedAt || item.arrivalUpdatedAtLabel));
   return parsed > 0 ? parsed : 0;
 }
 
@@ -1169,7 +1170,7 @@ function renderArrivalColumnMarkup(items) {
 
 function formatArrivalGroupLabel(group, item) {
   if (!group || group.rank === 2) return "Sans 到货单";
-  const dateText = group.sort > 0 ? formatInventoryShortDate(group.sort) : "date inconnue";
+  const dateText = group.label || (group.sort > 0 ? formatInventoryShortDate(group.sort) : "date inconnue");
   return "到货单 " + (group.note || getArrivalNote(item)) + " · " + dateText;
 }
 

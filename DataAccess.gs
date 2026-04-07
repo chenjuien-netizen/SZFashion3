@@ -4,8 +4,8 @@ const SZFASHION_ARRIVALS_SHEET = "ARRIVAGES_DB";
 
 function getInventoryPayload_() {
   const sheet = getRequiredSheet_(SZFASHION_STOCK_SHEET);
-  const arrivalsByNote = readArrivalsUpdatedAtLookup_();
-  const items = enrichInventoryItemsWithArrivalDates_(readInventoryItems_(sheet), arrivalsByNote);
+  const arrivalsByReference = readArrivalsUpdatedAtLookup_();
+  const items = enrichInventoryItemsWithArrivalDates_(readInventoryItems_(sheet), arrivalsByReference);
   const generatedAt = new Date().toISOString();
   return {
     items: items,
@@ -52,7 +52,7 @@ function getDetailPayload_(reference) {
 function findInventoryItemByReference_(reference) {
   const sheet = getOptionalSheet_(SZFASHION_STOCK_SHEET);
   if (!sheet) return null;
-  const items = readInventoryItems_(sheet);
+  const items = enrichInventoryItemsWithArrivalDates_(readInventoryItems_(sheet), readArrivalsUpdatedAtLookup_());
   for (let i = 0; i < items.length; i++) {
     if (normalizeReference_(items[i].reference) === reference) return items[i];
   }
@@ -142,16 +142,18 @@ function buildInventoryItem_(row, cols, rowIndex) {
   };
 }
 
-function enrichInventoryItemsWithArrivalDates_(items, arrivalsByNote) {
-  const lookup = arrivalsByNote || {};
+function enrichInventoryItemsWithArrivalDates_(items, arrivalsByReference) {
+  const lookup = arrivalsByReference || {};
   return (Array.isArray(items) ? items : []).map(function(item) {
-    const noteKey = normalizeArrivalNoteKey_(item && item.arrivalNote);
-    const arrival = noteKey ? lookup[noteKey] : null;
+    const referenceKey = normalizeReference_(item && item.reference);
+    const arrival = referenceKey ? lookup[referenceKey] : null;
     if (!arrival) return item;
     return Object.assign({}, item, {
+      arrivalNote: String(arrival.arrivalId || item.arrivalNote || ""),
       arrivalUpdatedAt: String(arrival.raw || ""),
       arrivalUpdatedAtLabel: String(arrival.label || ""),
-      arrivalUpdatedAtSort: Number(arrival.sort || 0)
+      arrivalUpdatedAtSort: Number(arrival.sort || 0),
+      arrivalWarehouse: String(arrival.warehouse || "")
     });
   });
 }
@@ -164,9 +166,11 @@ function readArrivalsUpdatedAtLookup_() {
   if (lastRow < 2 || lastCol < 1) return {};
 
   const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
-  const noteColumn = findColumn_(headers, ["到货单", "arrivalNote", "arrival", "ASN", "asn", "deliveryNote", "bon de livraison"]);
+  const referenceColumn = findColumn_(headers, ["货号", "Reference", "Référence", "ref"]);
+  const arrivalIdColumn = findColumn_(headers, ["ArrivageID", "到货单", "arrivalNote", "arrival", "ASN", "asn", "deliveryNote", "bon de livraison"]);
   const updatedAtColumn = findColumn_(headers, ["UpdatedAt", "updatedAt", "updated_at"]);
-  if (noteColumn < 0 || updatedAtColumn < 0) return {};
+  const warehouseColumn = findColumn_(headers, ["Entrepot", "Entrepôt", "仓库"]);
+  if (referenceColumn < 0 || updatedAtColumn < 0) return {};
 
   const range = sheet.getRange(2, 1, lastRow - 1, lastCol);
   const displayValues = range.getDisplayValues();
@@ -174,12 +178,15 @@ function readArrivalsUpdatedAtLookup_() {
   const lookup = {};
 
   for (let index = 0; index < rawValues.length; index++) {
-    const noteKey = normalizeArrivalNoteKey_(getRowCell_(displayValues[index], noteColumn));
-    if (!noteKey) continue;
+    const referenceKey = normalizeReference_(getRowCell_(displayValues[index], referenceColumn));
+    if (!referenceKey) continue;
     const parsed = parseArrivalUpdatedAt_(getRowCell_(rawValues[index], updatedAtColumn), getRowCell_(displayValues[index], updatedAtColumn));
-    if (!parsed.sort) continue;
-    if (!lookup[noteKey] || Number(parsed.sort || 0) > Number(lookup[noteKey].sort || 0)) {
-      lookup[noteKey] = parsed;
+    const arrival = Object.assign({}, parsed, {
+      arrivalId: String(getRowCell_(displayValues[index], arrivalIdColumn) || "").trim(),
+      warehouse: String(getRowCell_(displayValues[index], warehouseColumn) || "").trim()
+    });
+    if (!lookup[referenceKey] || Number(arrival.sort || 0) > Number(lookup[referenceKey].sort || 0)) {
+      lookup[referenceKey] = arrival;
     }
   }
 
@@ -332,10 +339,17 @@ function normalizeArrivalNoteKey_(value) {
 function parseArrivalUpdatedAt_(rawValue, displayValue) {
   const label = String(displayValue || "").trim();
   let date = rawValue instanceof Date && !isNaN(rawValue.getTime()) ? rawValue : null;
+  let hasTime = date ? hasTimePart_(date) : false;
+  if (!date && typeof rawValue === "number" && isFinite(rawValue)) {
+    const millis = Math.round((rawValue - 25569) * 86400000);
+    date = new Date(millis);
+    hasTime = Math.abs(rawValue - Math.floor(rawValue)) > 0.000001;
+  }
   if (!date) {
     const text = String(rawValue || displayValue || "").trim();
     const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
     if (match) {
+      hasTime = typeof match[4] !== "undefined";
       date = new Date(
         Number(match[3]),
         Number(match[2]) - 1,
@@ -356,9 +370,23 @@ function parseArrivalUpdatedAt_(rawValue, displayValue) {
 
   return {
     raw: date.toISOString(),
-    label: label || formatHistoryTimestamp_(date),
+    label: hasTime ? formatArrivalTimestamp_(date) : (label || formatArrivalDate_(date)),
     sort: date.getTime()
   };
+}
+
+function hasTimePart_(date) {
+  return !!date && (date.getHours() !== 0 || date.getMinutes() !== 0 || date.getSeconds() !== 0);
+}
+
+function formatArrivalDate_(date) {
+  const timeZone = Session.getScriptTimeZone ? Session.getScriptTimeZone() : "Europe/Paris";
+  return Utilities.formatDate(date, timeZone || "Europe/Paris", "dd/MM/yyyy");
+}
+
+function formatArrivalTimestamp_(date) {
+  const timeZone = Session.getScriptTimeZone ? Session.getScriptTimeZone() : "Europe/Paris";
+  return Utilities.formatDate(date, timeZone || "Europe/Paris", "dd/MM/yyyy HH:mm");
 }
 
 function normalizeHeader_(value) {
