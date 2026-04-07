@@ -13,8 +13,11 @@ const state = {
   lastSyncAt: "",
   dataSource: "local",
   query: "",
+  inventoryStockFilter: "",
+  inventorySort: "reference",
   historyQuery: "",
   historyActionType: "",
+  historyPeriod: "all",
   columnCount: 2,
   currentView: "inventory",
   previousView: "inventory",
@@ -735,6 +738,39 @@ function summarizeDetailItem(item) {
   return parts.join(" · ") || item.stockDisplay || "-";
 }
 
+function getArrivalNote(item) {
+  return String(
+    (item && (item.arrivalNote || item.arrival || item.asn || item.arrivalNumber || item.deliveryNote)) || ""
+  ).trim() || "-";
+}
+
+function renderDetailStockStateMarkup(item) {
+  if (!item) return "";
+  const tailDisplay = toInt(item.tail) > 0 ? "(" + toInt(item.tail) + "p)" : "-";
+  const unitsDisplay = toInt(item.unitsPerBox) > 0 ? toInt(item.unitsPerBox) + "p" : "-";
+  const boxesDisplay = toInt(item.itemBoxes) > 0 ? String(toInt(item.itemBoxes)) : "-";
+  const totalPieces = formatMetricNumber(stateModelToPieces(item));
+  const totalBoxes = toInt(item.itemBoxes);
+  const packText = item.packCounterText || getInventoryPackLine(item) || "-";
+  return ''
+    + '<table class="w-full border-collapse text-left">'
+    + '<thead><tr class="border-b border-outline-variant/20 bg-surface-container-low">'
+    + '<th class="px-3 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</th>'
+    + '<th class="px-3 py-2 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</th>'
+    + '<th class="px-3 py-2 text-right text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</th>'
+    + '</tr></thead>'
+    + '<tbody><tr>'
+    + '<td class="px-3 py-3 text-lg font-black tracking-tight text-on-surface">' + escapeHtml(tailDisplay) + '</td>'
+    + '<td class="px-3 py-3 text-center text-lg font-black tracking-tight text-on-surface">' + escapeHtml(unitsDisplay) + '</td>'
+    + '<td class="px-3 py-3 text-right text-lg font-black tracking-tight text-on-surface">' + escapeHtml(boxesDisplay) + '</td>'
+    + '</tr></tbody>'
+    + '</table>'
+    + '<div class="border-t border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-center">'
+    + '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Total</div>'
+    + '<div class="mt-0.5 text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(totalBoxes + "箱 · " + packText + " · " + totalPieces + "件") + '</div>'
+    + '</div>';
+}
+
 function buildHistoryEntryFromLocalChange(actionType, beforeItem, afterItem, remark) {
   const timestampRaw = new Date().toISOString();
   return {
@@ -777,8 +813,12 @@ function getHistoryForReference(reference) {
     });
 }
 
-function sortItems(items) {
+function sortItems(items, sortMode) {
   return items.slice().sort(function(a, b) {
+    if (sortMode === "warehouse") {
+      const warehouseCompare = String(a.warehouse || "").localeCompare(String(b.warehouse || ""));
+      if (warehouseCompare !== 0) return warehouseCompare;
+    }
     const leftSortKey = String(a && a.sortKey ? a.sortKey : "").trim();
     const rightSortKey = String(b && b.sortKey ? b.sortKey : "").trim();
     if (leftSortKey && rightSortKey && leftSortKey !== rightSortKey) return leftSortKey.localeCompare(rightSortKey);
@@ -791,18 +831,36 @@ function sortItems(items) {
 function filterInventoryItems(query) {
   const normalizedQuery = normalizeText(query);
   const filtered = state.items.filter(function(item) {
+    if (state.inventoryStockFilter === "positive" && item.stockState !== "positive") return false;
+    if (state.inventoryStockFilter === "zero" && item.stockState !== "zero") return false;
     if (!normalizedQuery) return true;
     const haystack = normalizeText([item.reference, item.warehouse, item.stockDisplay, item.remark].join(" "));
     return haystack.indexOf(normalizedQuery) !== -1;
   });
-  return sortItems(filtered);
+  return sortItems(filtered, state.inventorySort);
 }
 
-function filterHistoryItems(query, actionType) {
+function isHistoryEntryInPeriod(entry, period) {
+  if (!period || period === "all") return true;
+  const date = new Date(entry.timestampRaw);
+  if (Number.isNaN(date.getTime())) return true;
+  const now = new Date();
+  if (period === "week") {
+    const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    return date >= sevenDaysAgo;
+  }
+  if (period === "month") {
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  }
+  return true;
+}
+
+function filterHistoryItems(query, actionType, period) {
   const normalizedQuery = normalizeText(query);
   return state.historyItems
     .filter(function(entry) {
       if (actionType && entry.actionType !== actionType) return false;
+      if (!isHistoryEntryInPeriod(entry, period || state.historyPeriod)) return false;
       if (!normalizedQuery) return true;
       const haystack = normalizeText([
         entry.reference,
@@ -920,17 +978,20 @@ function renderInventoryCard(item) {
   const stockDisplay = item.stockDisplay || "-";
   const accentClass = item.stockState === "positive" ? "border-emerald-400/50" : "border-rose-400/50";
   const stockClass = item.stockState === "positive" ? "text-primary" : "text-on-surface-variant";
+  const warehouse = item.warehouse || "-";
+  const packLine = getInventoryPackLine(item);
 
   return ''
     + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[4.1rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-item-id="' + escapeHtml(itemId) + '" data-reference="' + escapeHtml(reference) + '" data-stock-display="' + escapeHtml(stockDisplay) + '" data-stock-state="' + escapeHtml(item.stockState) + '">'
     + '<button class="inventory-card-main flex min-w-0 flex-1 flex-col justify-between px-2.5 py-2 text-left" type="button" data-action="open-quick-edit" data-item-id="' + escapeHtml(itemId) + '">'
-    + '<div class="flex items-start gap-2">'
+    + '<div class="flex items-start justify-between gap-2">'
     + '<span class="truncate pr-2 text-[12px] font-bold tracking-tight text-on-surface">' + escapeHtml(reference) + '</span>'
+    + '<span class="max-w-[45%] truncate text-right text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml(warehouse) + '</span>'
     + '</div>'
     + '<div class="mt-1.5 flex items-end justify-between gap-2">'
     + '<div class="min-w-0">'
     + '<span class="block truncate text-[13px] font-medium ' + stockClass + '">' + escapeHtml(stockDisplay) + '</span>'
-    + '<span class="mt-0.5 block truncate text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">Entrepot ' + escapeHtml(item.warehouse || "-") + '</span>'
+    + (packLine ? '<span class="mt-0.5 block truncate text-[9px] font-bold uppercase tracking-[0.16em] text-primary/80">' + escapeHtml(packLine) + '</span>' : '')
     + '</div>'
     + '</div>'
     + '</button>'
@@ -938,6 +999,15 @@ function renderInventoryCard(item) {
     + '<span class="material-symbols-outlined !text-[16px]">chevron_right</span>'
     + '</a>'
     + '</article>';
+}
+
+function getInventoryPackLine(item) {
+  const parts = [];
+  const mainPack = getMainPackNotationFromState(item);
+  if (mainPack) parts.push(mainPack);
+  if (item.packCounterText) parts.push(item.packCounterText + "包");
+  if (toInt(item.colisage) > 0) parts.push(String(toInt(item.colisage)) + "件/包");
+  return parts.join(" · ");
 }
 
 function renderColumnLayoutMarkup(columns) {
@@ -948,21 +1018,51 @@ function renderColumnLayoutMarkup(columns) {
 }
 
 function renderHistoryCard(entry) {
+  const timeLabel = formatHistoryTimeLabel(entry.timestampRaw, entry.timestampLabel);
   return ''
-    + '<article class="bg-surface-container-lowest px-4 py-3 shadow-ledger" data-history-reference="' + escapeHtml(entry.reference) + '">'
-    + '<div class="flex items-start justify-between gap-3">'
-    + '<div class="min-w-0">'
-    + '<a class="truncate text-left text-[12px] font-bold tracking-tight text-primary" href="#detail/' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
-    + '<div class="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">' + escapeHtml(entry.timestampLabel || formatHistoryTimestamp(entry.timestampRaw)) + '</div>'
-    + '</div>'
-    + '<span class="shrink-0 rounded px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
-    + '</div>'
-    + '<div class="mt-3 space-y-1">'
-    + '<div class="text-[11px] text-on-surface"><span class="font-bold uppercase tracking-[0.14em] text-on-surface-variant">AVANT</span><span class="ml-2">' + escapeHtml(entry.beforeDisplay || "-") + '</span></div>'
-    + '<div class="text-[11px] text-on-surface"><span class="font-bold uppercase tracking-[0.14em] text-on-surface-variant">APRÈS</span><span class="ml-2">' + escapeHtml(entry.afterDisplay || "-") + '</span></div>'
-    + (entry.remark ? '<div class="text-[11px] text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
+    + '<article class="bg-surface-container-lowest px-3 py-2 shadow-ledger" data-history-reference="' + escapeHtml(entry.reference) + '">'
+    + '<div class="grid grid-cols-[3.1rem_minmax(3.8rem,0.9fr)_auto_minmax(0,1.5fr)] items-start gap-2">'
+    + '<time class="pt-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(timeLabel) + '</time>'
+    + '<a class="truncate text-[12px] font-bold tracking-tight text-primary" href="#detail/' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
+    + '<span class="shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
+    + '<div class="min-w-0 space-y-0.5 text-[10px] leading-4 text-on-surface">'
+    + '<div class="truncate"><span class="font-bold uppercase tracking-[0.12em] text-on-surface-variant">AV</span><span class="ml-1">' + escapeHtml(entry.beforeDisplay || "-") + '</span></div>'
+    + '<div class="truncate"><span class="font-bold uppercase tracking-[0.12em] text-on-surface-variant">AP</span><span class="ml-1">' + escapeHtml(entry.afterDisplay || "-") + '</span></div>'
+    + (entry.remark ? '<div class="truncate text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
     + '</div>'
     + '</article>';
+}
+
+function renderHistoryListMarkup(items) {
+  let lastGroup = "";
+  return items.map(function(entry) {
+    const group = getHistoryDateGroupLabel(entry.timestampRaw);
+    const separator = group !== lastGroup
+      ? '<div class="sticky top-0 z-10 border-y border-outline-variant/20 bg-surface-container-high px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant">' + escapeHtml(group) + '</div>'
+      : "";
+    lastGroup = group;
+    return separator + renderHistoryCard(entry);
+  }).join("");
+}
+
+function getHistoryDateGroupLabel(timestampRaw) {
+  const date = new Date(timestampRaw);
+  if (Number.isNaN(date.getTime())) return "Date inconnue";
+  const today = new Date();
+  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((startToday - startDate) / 86400000);
+  if (diffDays === 0) return "Aujourd’hui";
+  if (diffDays === 1) return "Hier";
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(date);
+}
+
+function formatHistoryTimeLabel(timestampRaw, fallback) {
+  const date = new Date(timestampRaw);
+  if (!Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date).replace(":", "h");
+  }
+  return fallback || "--:--";
 }
 
 function renderDetailHistoryCard(entry) {
@@ -2503,6 +2603,8 @@ function bindQuickEditEvents() {
 
 function renderInventoryPage() {
   const searchInput = document.getElementById("searchInput");
+  const stockFilter = document.getElementById("inventoryStockFilter");
+  const sortSelect = document.getElementById("inventorySortSelect");
   const networkStatus = document.getElementById("networkStatus");
   const refreshButton = document.getElementById("refreshButton");
   const summaryDate = document.getElementById("summaryDate");
@@ -2516,6 +2618,8 @@ function renderInventoryPage() {
   if (!searchInput || !inventoryGrid) return;
 
   searchInput.value = state.query;
+  if (stockFilter) stockFilter.value = state.inventoryStockFilter;
+  if (sortSelect) sortSelect.value = state.inventorySort;
   const items = filterInventoryItems(state.query);
   const columns = buildColumnLayout_(items, state.columnCount);
   const summary = getInventorySummary(items);
@@ -2539,6 +2643,7 @@ function renderInventoryPage() {
 function renderHistoryPage() {
   const searchInput = document.getElementById("historySearchInput");
   const actionTypeFilter = document.getElementById("historyActionTypeFilter");
+  const periodFilter = document.getElementById("historyPeriodFilter");
   const historyRefreshButton = document.getElementById("historyRefreshButton");
   const historyStatus = document.getElementById("historyStatus");
   const historyList = document.getElementById("historyList");
@@ -2549,9 +2654,10 @@ function renderHistoryPage() {
 
   searchInput.value = state.historyQuery;
   actionTypeFilter.value = state.historyActionType;
-  const items = filterHistoryItems(state.historyQuery, state.historyActionType);
-  const hasFilters = !!(state.historyQuery || state.historyActionType);
-  historyList.innerHTML = items.map(renderHistoryCard).join("");
+  if (periodFilter) periodFilter.value = state.historyPeriod;
+  const items = filterHistoryItems(state.historyQuery, state.historyActionType, state.historyPeriod);
+  const hasFilters = !!(state.historyQuery || state.historyActionType || (state.historyPeriod && state.historyPeriod !== "all"));
+  historyList.innerHTML = renderHistoryListMarkup(items);
   historyStatus.textContent = getSyncStatusLabel(hasFilters ? "Filtré" : "Pret");
   historyEmptyState.classList.toggle("hidden", items.length > 0);
   historyEmptyTitle.textContent = hasFilters ? "Aucun resultat" : "Aucun historique";
@@ -2567,6 +2673,7 @@ function renderHistoryPage() {
 function renderDetailPage() {
   const detailReference = document.getElementById("detailReference");
   const detailSubline = document.getElementById("detailSubline");
+  const detailPrimaryReference = document.getElementById("detailPrimaryReference");
   const detailNotFoundBanner = document.getElementById("detailNotFoundBanner");
   const detailMainSection = document.getElementById("detailMainSection");
   const detailStockDisplay = document.getElementById("detailStockDisplay");
@@ -2575,6 +2682,8 @@ function renderDetailPage() {
   const detailCreatedAt = document.getElementById("detailCreatedAt");
   const detailLastMovement = document.getElementById("detailLastMovement");
   const detailSummary = document.getElementById("detailSummary");
+  const detailStockStateSection = document.getElementById("detailStockStateSection");
+  const detailStockStateTable = document.getElementById("detailStockStateTable");
   const detailRemarkSection = document.getElementById("detailRemarkSection");
   const detailRemark = document.getElementById("detailRemark");
   const detailHistoryList = document.getElementById("detailHistoryList");
@@ -2587,10 +2696,12 @@ function renderDetailPage() {
   const detailResult = dataSource ? dataSource.loadDetail(reference) : { item: null, history: [], notFoundInStock: true };
   const item = detailResult.item;
   if (!item) {
-    detailReference.textContent = reference || "-";
-    detailSubline.textContent = "Fiche produit";
+    detailReference.textContent = "Fiche produit";
+    detailSubline.textContent = reference || "-";
+    if (detailPrimaryReference) detailPrimaryReference.textContent = reference || "-";
     detailNotFoundBanner.classList.remove("hidden");
     detailMainSection.classList.add("hidden");
+    if (detailStockStateSection) detailStockStateSection.classList.add("hidden");
     detailRemarkSection.classList.add("hidden");
     detailHistoryList.innerHTML = "";
     detailHistoryEmpty.classList.remove("hidden");
@@ -2599,16 +2710,19 @@ function renderDetailPage() {
   }
 
   const itemHistory = Array.isArray(detailResult.history) ? detailResult.history : [];
-  detailReference.textContent = item.reference;
-  detailSubline.textContent = "Fiche produit";
+  detailReference.textContent = "Fiche produit";
+  detailSubline.textContent = item.reference || "-";
+  if (detailPrimaryReference) detailPrimaryReference.textContent = item.reference || "-";
   detailStockDisplay.textContent = item.stockDisplay || "-";
   detailStockState.textContent = item.stockState === "positive" ? "En stock" : "En rupture";
   detailWarehouse.textContent = item.warehouse || "-";
   detailCreatedAt.textContent = item.createdAt || "-";
   detailLastMovement.textContent = itemHistory.length ? (itemHistory[0].timestampLabel || formatHistoryTimestamp(itemHistory[0].timestampRaw)) : "-";
-  detailSummary.textContent = summarizeDetailItem(item);
+  detailSummary.textContent = getArrivalNote(item);
+  if (detailStockStateTable) detailStockStateTable.innerHTML = renderDetailStockStateMarkup(item);
   detailNotFoundBanner.classList.add("hidden");
   detailMainSection.classList.remove("hidden");
+  if (detailStockStateSection) detailStockStateSection.classList.remove("hidden");
   if (detailQuickEditButton) detailQuickEditButton.classList.remove("hidden");
 
   if (item.remark) {
@@ -2662,6 +2776,8 @@ function syncColumnLayout(force) {
 
 function bindInventoryEvents() {
   const searchInput = document.getElementById("searchInput");
+  const stockFilter = document.getElementById("inventoryStockFilter");
+  const sortSelect = document.getElementById("inventorySortSelect");
   const inventoryGrid = document.getElementById("inventoryGrid");
   const navInventoryButton = document.getElementById("navInventoryButton");
   const navHistoryButton = document.getElementById("navHistoryButton");
@@ -2670,6 +2786,18 @@ function bindInventoryEvents() {
     state.query = String(event.target.value || "").trim();
     renderInventoryPage();
   });
+  if (stockFilter) {
+    stockFilter.addEventListener("change", function(event) {
+      state.inventoryStockFilter = String(event.target.value || "").trim();
+      renderInventoryPage();
+    });
+  }
+  if (sortSelect) {
+    sortSelect.addEventListener("change", function(event) {
+      state.inventorySort = String(event.target.value || "reference").trim() || "reference";
+      renderInventoryPage();
+    });
+  }
   if (navInventoryButton) {
     navInventoryButton.addEventListener("click", function() {
       navigateTo("inventory");
@@ -2690,6 +2818,7 @@ function bindInventoryEvents() {
 function bindHistoryEvents() {
   const searchInput = document.getElementById("historySearchInput");
   const actionTypeFilter = document.getElementById("historyActionTypeFilter");
+  const periodFilter = document.getElementById("historyPeriodFilter");
   if (!searchInput || !actionTypeFilter) return;
   searchInput.addEventListener("input", function(event) {
     state.historyQuery = String(event.target.value || "").trim();
@@ -2699,6 +2828,12 @@ function bindHistoryEvents() {
     state.historyActionType = String(event.target.value || "").trim();
     renderHistoryPage();
   });
+  if (periodFilter) {
+    periodFilter.addEventListener("change", function(event) {
+      state.historyPeriod = String(event.target.value || "all").trim() || "all";
+      renderHistoryPage();
+    });
+  }
 }
 
 function bindDetailEvents() {

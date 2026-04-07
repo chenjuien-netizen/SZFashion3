@@ -154,6 +154,17 @@
               <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
               <input autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" id="searchInput" placeholder="RECHERCHE RÉFÉRENCE / STOCK..." type="search" />
             </div>
+            <div class="mt-1.5 grid grid-cols-2 gap-2">
+              <select class="border-outline-variant/30 bg-surface-container-lowest py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface" id="inventoryStockFilter">
+                <option value="">Tous stocks</option>
+                <option value="positive">En stock</option>
+                <option value="zero">Rupture</option>
+              </select>
+              <select class="border-outline-variant/30 bg-surface-container-lowest py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface" id="inventorySortSelect">
+                <option value="reference">Tri réf</option>
+                <option value="warehouse">Tri entrepôt</option>
+              </select>
+            </div>
           </section>
 
           <section class="border-b border-outline-variant/30 bg-surface-container-high px-3 py-1.5">
@@ -211,7 +222,14 @@
               <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
               <input autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" id="historySearchInput" placeholder="RECHERCHE RÉFÉRENCE / TYPE / REMARQUE..." type="search" />
             </div>
-            <div class="mt-2 flex items-center gap-2">
+            <div class="mt-2 grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+              <label class="min-w-0">
+                <select class="w-full border-outline-variant/30 bg-surface-container-lowest text-[12px] font-medium text-on-surface" id="historyPeriodFilter">
+                  <option value="week">Cette semaine</option>
+                  <option value="month">Ce mois</option>
+                  <option value="all">Tout</option>
+                </select>
+              </label>
               <label class="min-w-0 flex-1">
                 <select class="w-full border-outline-variant/30 bg-surface-container-lowest text-[12px] font-medium text-on-surface" id="historyActionTypeFilter">
                   <option value="">Tous types</option>
@@ -244,8 +262,8 @@
                 <span class="material-symbols-outlined">arrow_back</span>
               </button>
               <div class="min-w-0">
-                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900" id="detailReference">-</h1>
-                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="detailSubline">Fiche produit</p>
+                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900" id="detailReference">Fiche produit</h1>
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="detailSubline">-</p>
               </div>
             </div>
             <button class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="detailQuickEditButton" type="button">Modifier</button>
@@ -261,8 +279,9 @@
             <section class="border border-outline-variant/20 bg-surface-container-lowest p-4" id="detailMainSection">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Stock actuel</div>
-                  <div class="mt-1 truncate text-2xl font-black tracking-tight text-on-surface" id="detailStockDisplay">-</div>
+                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Référence</div>
+                  <div class="mt-1 truncate text-2xl font-black tracking-tight text-on-surface" id="detailPrimaryReference">-</div>
+                  <div class="mt-1 truncate text-[15px] font-black tracking-tight text-primary" id="detailStockDisplay">-</div>
                 </div>
                 <div class="shrink-0 text-right text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="detailStockState">-</div>
               </div>
@@ -280,10 +299,17 @@
                   <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailLastMovement">-</div>
                 </div>
                 <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
-                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Résumé</div>
+                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">到货单</div>
                   <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailSummary">-</div>
                 </div>
               </div>
+            </section>
+
+            <section class="border border-outline-variant/20 bg-surface-container-lowest" id="detailStockStateSection">
+              <div class="border-b border-outline-variant/20 px-4 py-3">
+                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">État du stock</div>
+              </div>
+              <div id="detailStockStateTable">-</div>
             </section>
 
             <section class="border border-outline-variant/20 bg-surface-container-lowest p-4" id="detailRemarkSection">
