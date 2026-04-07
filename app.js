@@ -14,7 +14,7 @@ const state = {
   dataSource: "local",
   query: "",
   inventoryStockFilter: "",
-  inventorySort: "reference",
+  inventorySort: "arrival",
   historyQuery: "",
   historyActionType: "",
   historyPeriod: "all",
@@ -902,6 +902,14 @@ function getHistoryForReference(reference) {
 
 function sortItems(items, sortMode) {
   return items.slice().sort(function(a, b) {
+    if (sortMode === "arrival") {
+      const leftGroup = getArrivalGroupMeta(a);
+      const rightGroup = getArrivalGroupMeta(b);
+      if (leftGroup.rank !== rightGroup.rank) return leftGroup.rank - rightGroup.rank;
+      if (leftGroup.sort !== rightGroup.sort) return rightGroup.sort - leftGroup.sort;
+      const noteCompare = leftGroup.note.localeCompare(rightGroup.note);
+      if (noteCompare !== 0) return noteCompare;
+    }
     if (sortMode === "warehouse") {
       const warehouseCompare = String(a.warehouse || "").localeCompare(String(b.warehouse || ""));
       if (warehouseCompare !== 0) return warehouseCompare;
@@ -925,6 +933,44 @@ function filterInventoryItems(query) {
     return haystack.indexOf(normalizedQuery) !== -1;
   });
   return sortItems(filtered, state.inventorySort);
+}
+
+function getArrivalGroupMeta(item) {
+  const note = getArrivalNote(item);
+  const hasNote = !!note && note !== "-";
+  const sort = getArrivalUpdatedAtSort(item);
+  return {
+    note: hasNote ? note : "",
+    sort: sort,
+    rank: hasNote && sort > 0 ? 0 : (hasNote ? 1 : 2)
+  };
+}
+
+function getArrivalUpdatedAtSort(item) {
+  const numeric = Number(item && item.arrivalUpdatedAtSort);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const parsed = parseInventoryDateMillis(item && (item.arrivalUpdatedAt || item.arrivalUpdatedAtLabel || item.createdAt));
+  return parsed > 0 ? parsed : 0;
+}
+
+function parseInventoryDateMillis(value) {
+  if (!value) return 0;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.getTime();
+  const text = String(value || "").trim();
+  const frMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (frMatch) {
+    const year = Number(frMatch[3].length === 2 ? "20" + frMatch[3] : frMatch[3]);
+    return new Date(
+      year,
+      Number(frMatch[2]) - 1,
+      Number(frMatch[1]),
+      Number(frMatch[4] || 0),
+      Number(frMatch[5] || 0),
+      Number(frMatch[6] || 0)
+    ).getTime();
+  }
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
 }
 
 function isHistoryEntryInPeriod(entry, period) {
@@ -1091,6 +1137,41 @@ function renderColumnLayoutMarkup(columns) {
   return '<div class="flex items-start gap-px bg-outline-variant/20">' + columns.map(function(columnItems) {
     return '<div class="inventory-column flex min-w-0 flex-1 flex-col gap-px bg-outline-variant/20">' + columnItems.map(renderInventoryCard).join("") + '</div>';
   }).join("") + '</div>';
+}
+
+function renderInventoryListMarkup(items) {
+  if (state.inventorySort !== "arrival") {
+    return renderColumnLayoutMarkup(buildColumnLayout_(items, state.columnCount));
+  }
+  return renderArrivalGroupedInventoryMarkup(items);
+}
+
+function renderArrivalGroupedInventoryMarkup(items) {
+  let lastGroupKey = "";
+  return (items || []).map(function(item) {
+    const group = getArrivalGroupMeta(item);
+    const groupKey = group.rank + "::" + group.note + "::" + group.sort;
+    const separator = groupKey !== lastGroupKey
+      ? '<div class="sticky top-0 z-10 border-y border-outline-variant/20 bg-surface-container-high px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant">' + escapeHtml(formatArrivalGroupLabel(group, item)) + '</div>'
+      : "";
+    lastGroupKey = groupKey;
+    return separator + renderInventoryCard(item);
+  }).join("");
+}
+
+function formatArrivalGroupLabel(group, item) {
+  if (!group || group.rank === 2) return "Sans 到货单";
+  const dateText = group.sort > 0 ? formatInventoryShortDate(group.sort) : "date inconnue";
+  return "到货单 " + (group.note || getArrivalNote(item)) + " · " + dateText;
+}
+
+function formatInventoryShortDate(value) {
+  const date = value instanceof Date ? value : new Date(Number(value || 0));
+  if (Number.isNaN(date.getTime())) return "date inconnue";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+  return day + "/" + month + "/" + year;
 }
 
 function renderHistoryCard(entry) {
@@ -2731,7 +2812,6 @@ function renderInventoryPage() {
   const sortSelect = document.getElementById("inventorySortSelect");
   const networkStatus = document.getElementById("networkStatus");
   const refreshButton = document.getElementById("refreshButton");
-  const summaryDate = document.getElementById("summaryDate");
   const summaryRefs = document.getElementById("summaryRefs");
   const summaryPositive = document.getElementById("summaryPositive");
   const summaryZero = document.getElementById("summaryZero");
@@ -2745,11 +2825,9 @@ function renderInventoryPage() {
   if (stockFilter) stockFilter.value = state.inventoryStockFilter;
   if (sortSelect) sortSelect.value = state.inventorySort;
   const items = filterInventoryItems(state.query);
-  const columns = buildColumnLayout_(items, state.columnCount);
   const summary = getInventorySummary(items);
-  inventoryGrid.innerHTML = renderColumnLayoutMarkup(columns);
+  inventoryGrid.innerHTML = renderInventoryListMarkup(items);
   emptyState.classList.toggle("hidden", items.length > 0);
-  summaryDate.textContent = formatDateLabel(new Date().toISOString());
   summaryRefs.textContent = summary.visibleCount + " " + (summary.visibleCount === 1 ? "ref" : "refs");
   summaryPositive.textContent = summary.positiveCount + " en stock";
   summaryZero.textContent = summary.zeroCount + " en rupture";

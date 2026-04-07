@@ -1,9 +1,11 @@
 const SZFASHION_STOCK_SHEET = "STOCK";
 const SZFASHION_HISTORY_SHEET = "STOCK_HISTORY";
+const SZFASHION_ARRIVALS_SHEET = "ARRIVAGES_DB";
 
 function getInventoryPayload_() {
   const sheet = getRequiredSheet_(SZFASHION_STOCK_SHEET);
-  const items = readInventoryItems_(sheet);
+  const arrivalsByNote = readArrivalsUpdatedAtLookup_();
+  const items = enrichInventoryItemsWithArrivalDates_(readInventoryItems_(sheet), arrivalsByNote);
   const generatedAt = new Date().toISOString();
   return {
     items: items,
@@ -66,7 +68,7 @@ function readInventoryItems_(sheet) {
 
   const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
   const cols = resolveInventoryColumns_(headers);
-  if (!cols.reference) {
+  if (cols.reference < 0) {
     throw new Error("Colonne référence introuvable dans STOCK.");
   }
   if (lastRow < 2) return [];
@@ -133,8 +135,55 @@ function buildInventoryItem_(row, cols, rowIndex) {
     dynamicFractions: [],
     warehouse: warehouse,
     createdAt: createdAt,
-    arrivalNote: arrivalNote
+    arrivalNote: arrivalNote,
+    arrivalUpdatedAt: "",
+    arrivalUpdatedAtLabel: "",
+    arrivalUpdatedAtSort: 0
   };
+}
+
+function enrichInventoryItemsWithArrivalDates_(items, arrivalsByNote) {
+  const lookup = arrivalsByNote || {};
+  return (Array.isArray(items) ? items : []).map(function(item) {
+    const noteKey = normalizeArrivalNoteKey_(item && item.arrivalNote);
+    const arrival = noteKey ? lookup[noteKey] : null;
+    if (!arrival) return item;
+    return Object.assign({}, item, {
+      arrivalUpdatedAt: String(arrival.raw || ""),
+      arrivalUpdatedAtLabel: String(arrival.label || ""),
+      arrivalUpdatedAtSort: Number(arrival.sort || 0)
+    });
+  });
+}
+
+function readArrivalsUpdatedAtLookup_() {
+  const sheet = getOptionalSheet_(SZFASHION_ARRIVALS_SHEET);
+  if (!sheet) return {};
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return {};
+
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  const noteColumn = findColumn_(headers, ["到货单", "arrivalNote", "arrival", "ASN", "asn", "deliveryNote", "bon de livraison"]);
+  const updatedAtColumn = findColumn_(headers, ["UpdatedAt", "updatedAt", "updated_at"]);
+  if (noteColumn < 0 || updatedAtColumn < 0) return {};
+
+  const range = sheet.getRange(2, 1, lastRow - 1, lastCol);
+  const displayValues = range.getDisplayValues();
+  const rawValues = range.getValues();
+  const lookup = {};
+
+  for (let index = 0; index < rawValues.length; index++) {
+    const noteKey = normalizeArrivalNoteKey_(getRowCell_(displayValues[index], noteColumn));
+    if (!noteKey) continue;
+    const parsed = parseArrivalUpdatedAt_(getRowCell_(rawValues[index], updatedAtColumn), getRowCell_(displayValues[index], updatedAtColumn));
+    if (!parsed.sort) continue;
+    if (!lookup[noteKey] || Number(parsed.sort || 0) > Number(lookup[noteKey].sort || 0)) {
+      lookup[noteKey] = parsed;
+    }
+  }
+
+  return lookup;
 }
 
 function buildInventorySummary_(items, totalRows, isPartial, generatedAt) {
@@ -274,6 +323,42 @@ function getOptionalSheet_(sheetName) {
 function getRowCell_(row, index) {
   if (!Array.isArray(row) || index < 0 || index >= row.length) return "";
   return row[index];
+}
+
+function normalizeArrivalNoteKey_(value) {
+  return String(value || "").toUpperCase().replace(/\s+/g, " ").trim();
+}
+
+function parseArrivalUpdatedAt_(rawValue, displayValue) {
+  const label = String(displayValue || "").trim();
+  let date = rawValue instanceof Date && !isNaN(rawValue.getTime()) ? rawValue : null;
+  if (!date) {
+    const text = String(rawValue || displayValue || "").trim();
+    const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (match) {
+      date = new Date(
+        Number(match[3]),
+        Number(match[2]) - 1,
+        Number(match[1]),
+        Number(match[4] || 0),
+        Number(match[5] || 0),
+        Number(match[6] || 0)
+      );
+    } else {
+      const parsed = new Date(text);
+      date = isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+
+  if (!date || isNaN(date.getTime())) {
+    return { raw: String(rawValue || displayValue || "").trim(), label: label, sort: 0 };
+  }
+
+  return {
+    raw: date.toISOString(),
+    label: label || formatHistoryTimestamp_(date),
+    sort: date.getTime()
+  };
 }
 
 function normalizeHeader_(value) {
