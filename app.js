@@ -1067,7 +1067,7 @@ function renderHistoryCard(entry) {
     + '</div>'
     + '<div class="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-2 text-on-surface-variant">'
     + '<div class="text-right font-black">→</div>'
-    + '<div class="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.08em]">' + escapeHtml(movementText) + '</div>'
+    + '<div class="min-w-0 truncate font-semibold">' + escapeHtml(movementText) + '</div>'
     + '</div>'
     + '<div class="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-2">'
     + '<time class="whitespace-nowrap text-[10px] font-semibold text-on-surface-variant">' + escapeHtml(afterTimeLabel) + '</time>'
@@ -1087,14 +1087,7 @@ function getHistoryBeforeDateTime(entry) {
 }
 
 function formatHistoryMovement(entry) {
-  const before = Number(entry && entry.beforeTotalPieces);
-  const after = Number(entry && entry.afterTotalPieces);
-  if (Number.isFinite(before) && Number.isFinite(after) && before !== after) {
-    const delta = after - before;
-    const sign = delta > 0 ? "+" : "-";
-    return sign + formatMetricNumber(Math.abs(delta)) + "件";
-  }
-  return "";
+  return String(entry && (entry.movementDisplay || entry.movementText || entry.deltaDisplay) || "").trim();
 }
 
 function renderHistoryListMarkup(items) {
@@ -1138,7 +1131,9 @@ function formatHistoryJournalDateTime(timestampRaw, fallback) {
     const year = String(date.getFullYear()).slice(-2);
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
-    return day + "/" + month + "/" + year;
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    return day + "/" + month + "/" + year + " " + hour + ":" + minute;
   }
   return fallback || "--:--";
 }
