@@ -208,7 +208,8 @@ function buildHistoryEntry_(displayRow, rawRow, cols) {
     beforeTotalPieces: Number(getRowCell_(rawRow, cols.beforeTotalPieces) || 0),
     afterTotalPieces: Number(getRowCell_(rawRow, cols.afterTotalPieces) || 0),
     beforeTimestampRaw: historyTimestampRaw_(getRowCell_(rawRow, cols.beforeTimestamp)),
-    beforeTimestampLabel: formatHistoryTimestamp_(getRowCell_(rawRow, cols.beforeTimestamp))
+    beforeTimestampLabel: formatHistoryTimestamp_(getRowCell_(rawRow, cols.beforeTimestamp)),
+    movementDisplay: String(getRowCell_(displayRow, cols.movementDisplay) || "").trim()
   };
 }
 
@@ -242,7 +243,8 @@ function resolveHistoryColumns_(headers) {
     source: findColumn_(headers, ["source"]),
     beforeTotalPieces: findColumn_(headers, ["before_total_pieces"]),
     afterTotalPieces: findColumn_(headers, ["after_total_pieces"]),
-    beforeTimestamp: findColumn_(headers, ["before_timestamp"])
+    beforeTimestamp: findColumn_(headers, ["before_timestamp"]),
+    movementDisplay: findColumn_(headers, ["movement_display"])
   };
 }
 
@@ -406,6 +408,56 @@ function stateModelToPieces_(stateInput) {
   return Math.max(0, total);
 }
 
+function reduceMovementFraction_(num, den) {
+  function gcd_(left, right) {
+    return right ? gcd_(right, left % right) : left;
+  }
+  const safeNum = Math.max(0, parseLooseInteger_(num));
+  const safeDen = Math.max(1, parseLooseInteger_(den));
+  const divisor = gcd_(safeNum, safeDen);
+  return {
+    num: safeNum / divisor,
+    den: safeDen / divisor
+  };
+}
+
+function formatMovementDisplayFromPieces_(beforePieces, afterPieces, unitsPerBox, colisage) {
+  const before = Math.round(Number(beforePieces || 0));
+  const after = Math.round(Number(afterPieces || 0));
+  const delta = after - before;
+  if (!isFinite(delta) || delta === 0) return "";
+
+  const sign = delta > 0 ? "+" : "-";
+  const total = Math.abs(delta);
+  const units = Math.max(0, parseLooseInteger_(unitsPerBox));
+  const packSize = Math.max(0, parseLooseInteger_(colisage));
+
+  if (units > 0) {
+    const boxes = Math.floor(total / units);
+    const remainder = total - (boxes * units);
+    const parts = [];
+    if (boxes > 0) parts.push(boxes + "箱");
+    if (remainder === 0) return sign + parts.join(" ");
+    if (packSize > 0 && remainder % packSize === 0) {
+      const packs = remainder / packSize;
+      if (packs > 0) parts.push(packs + "包");
+      return parts.length ? sign + parts.join(" ") : "";
+    }
+    const fraction = reduceMovementFraction_(remainder, units);
+    if (fraction.num > 0 && fraction.den <= 12) {
+      parts.push(fraction.num + "/" + fraction.den + "箱");
+      return sign + parts.join(" ");
+    }
+    return "";
+  }
+
+  if (packSize > 0 && total % packSize === 0) {
+    return sign + (total / packSize) + "包";
+  }
+
+  return "";
+}
+
 function computeStockState_(stateInput) {
   return stateModelToPieces_(stateInput) > 0 ? "positive" : "zero";
 }
@@ -553,6 +605,14 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
   const remark = String(mutation.request && mutation.request.remark || "").trim();
   const referenceText = String(afterItem.reference || "").trim();
   const beforeTimestampRaw = findLatestHistoryTimestampForReference_(sheet, cols, referenceText);
+  const beforeTotalPieces = Number(stateModelToPieces_(beforeItem) || 0);
+  const afterTotalPieces = Number(stateModelToPieces_(afterItem) || 0);
+  const movementDisplay = formatMovementDisplayFromPieces_(
+    beforeTotalPieces,
+    afterTotalPieces,
+    afterItem.unitsPerBox || beforeItem.unitsPerBox,
+    afterItem.colisage || beforeItem.colisage
+  );
   const row = [
     timestamp,
     actionType,
@@ -562,11 +622,14 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     String(afterItem.stockDisplay || ""),
     remark,
     "stock_mobile_sync",
-    Number(stateModelToPieces_(beforeItem) || 0),
-    Number(stateModelToPieces_(afterItem) || 0)
+    beforeTotalPieces,
+    afterTotalPieces
   ];
   if (cols.beforeTimestamp >= 0) {
     row[cols.beforeTimestamp] = beforeTimestampRaw;
+  }
+  if (cols.movementDisplay >= 0) {
+    row[cols.movementDisplay] = movementDisplay;
   }
   if (cols.reference >= 0) {
     row[cols.reference] = "";
@@ -602,10 +665,11 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     afterDisplay: String(afterItem.stockDisplay || ""),
     remark: remark,
     source: "stock_mobile_sync",
-    beforeTotalPieces: Number(stateModelToPieces_(beforeItem) || 0),
-    afterTotalPieces: Number(stateModelToPieces_(afterItem) || 0),
+    beforeTotalPieces: beforeTotalPieces,
+    afterTotalPieces: afterTotalPieces,
     beforeTimestampRaw: beforeTimestampRaw,
-    beforeTimestampLabel: beforeTimestampRaw ? formatHistoryTimestamp_(beforeTimestampRaw) : ""
+    beforeTimestampLabel: beforeTimestampRaw ? formatHistoryTimestamp_(beforeTimestampRaw) : "",
+    movementDisplay: movementDisplay
   };
 }
 
@@ -648,7 +712,8 @@ function ensureHistoryHeaders_(sheet) {
     "source",
     "before_total_pieces",
     "after_total_pieces",
-    "before_timestamp"
+    "before_timestamp",
+    "movement_display"
   ];
   const lastCol = sheet.getLastColumn();
   const firstRow = lastCol > 0 ? sheet.getRange(1, 1, 1, Math.max(lastCol, headers.length)).getDisplayValues()[0] : [];

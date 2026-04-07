@@ -813,8 +813,47 @@ function renderStockStateValueCell(column) {
   return '<td class="whitespace-nowrap px-3 py-3 text-lg font-black tracking-tight text-on-surface ' + alignClass + '">' + escapeHtml(column.value || "-") + '</td>';
 }
 
+function formatMovementDisplayFromPieces(beforePieces, afterPieces, unitsPerBox, colisage) {
+  const before = Math.round(Number(beforePieces || 0));
+  const after = Math.round(Number(afterPieces || 0));
+  const delta = after - before;
+  if (!Number.isFinite(delta) || delta === 0) return "";
+
+  const sign = delta > 0 ? "+" : "-";
+  const total = Math.abs(delta);
+  const units = Math.max(0, toInt(unitsPerBox));
+  const packSize = Math.max(0, toInt(colisage));
+
+  if (units > 0) {
+    const boxes = Math.floor(total / units);
+    const remainder = total - (boxes * units);
+    const parts = [];
+    if (boxes > 0) parts.push(boxes + "箱");
+    if (remainder === 0) return sign + parts.join(" ");
+    if (packSize > 0 && remainder % packSize === 0) {
+      const packs = remainder / packSize;
+      if (packs > 0) parts.push(packs + "包");
+      return parts.length ? sign + parts.join(" ") : "";
+    }
+    const fraction = reduceFraction(remainder, units);
+    if (fraction.num > 0 && fraction.den <= 12) {
+      parts.push(fraction.num + "/" + fraction.den + "箱");
+      return sign + parts.join(" ");
+    }
+    return "";
+  }
+
+  if (packSize > 0 && total % packSize === 0) {
+    return sign + (total / packSize) + "包";
+  }
+
+  return "";
+}
+
 function buildHistoryEntryFromLocalChange(actionType, beforeItem, afterItem, remark) {
   const timestampRaw = new Date().toISOString();
+  const beforeTotalPieces = stateModelToPieces(beforeItem);
+  const afterTotalPieces = stateModelToPieces(afterItem);
   return {
     id: "local-his-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
     timestampRaw: timestampRaw,
@@ -826,8 +865,14 @@ function buildHistoryEntryFromLocalChange(actionType, beforeItem, afterItem, rem
     afterDisplay: afterItem.stockDisplay || "",
     remark: String(remark || "").trim(),
     source: "stock_mobile_quick_edit",
-    beforeTotalPieces: stateModelToPieces(beforeItem),
-    afterTotalPieces: stateModelToPieces(afterItem)
+    beforeTotalPieces: beforeTotalPieces,
+    afterTotalPieces: afterTotalPieces,
+    movementDisplay: formatMovementDisplayFromPieces(
+      beforeTotalPieces,
+      afterTotalPieces,
+      afterItem.unitsPerBox || beforeItem.unitsPerBox,
+      afterItem.colisage || beforeItem.colisage
+    )
   };
 }
 
