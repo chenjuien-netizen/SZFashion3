@@ -1105,7 +1105,8 @@ function renderHistoryCard(entry) {
     + '<a class="truncate text-[12px] font-bold tracking-tight text-primary" href="#detail/' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
     + '<span class="shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
     + '</div>'
-    + '<div class="mt-1 font-mono text-[11px] leading-4 text-on-surface">'
+    + '<div class="mt-1 grid grid-cols-[minmax(0,1fr)_auto] gap-3">'
+    + '<div class="min-w-0 font-mono text-[11px] leading-4 text-on-surface">'
     + '<div class="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-2">'
     + '<time class="whitespace-nowrap text-[10px] font-semibold text-on-surface-variant">' + escapeHtml(beforeTimeLabel || "—") + '</time>'
     + '<div class="min-w-0 truncate font-semibold">' + escapeHtml(beforeText) + '</div>'
@@ -1118,7 +1119,8 @@ function renderHistoryCard(entry) {
     + '<time class="whitespace-nowrap text-[10px] font-semibold text-on-surface-variant">' + escapeHtml(afterTimeLabel) + '</time>'
     + '<div class="min-w-0 truncate font-semibold text-primary">' + escapeHtml(afterText) + '</div>'
     + '</div>'
-    + (entry.remark ? '<div class="mt-1 truncate text-[10px] leading-4 text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
+    + '</div>'
+    + (entry.remark ? '<div class="max-w-[6.5rem] shrink-0 border-l border-outline-variant/20 pl-2 text-[10px] leading-4 text-on-surface-variant"><div class="truncate">' + escapeHtml(entry.remark) + '</div></div>' : '')
     + '</div>'
     + '</article>';
 }
