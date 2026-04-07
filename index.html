@@ -313,7 +313,10 @@
             </section>
 
             <section class="border border-outline-variant/20 bg-surface-container-lowest p-4" id="detailRemarkSection">
-              <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Remarque</div>
+              <div class="flex items-center justify-between gap-3">
+                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Remarque</div>
+                <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="detailRemarkEditButton" type="button">Modifier</button>
+              </div>
               <div class="mt-2 whitespace-pre-wrap text-[12px] leading-5 text-on-surface" id="detailRemark">-</div>
             </section>
 
@@ -504,8 +507,8 @@
             </form>
 
             <label class="block">
-              <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">放位</span>
-              <textarea class="min-h-[7rem] w-full border-outline-variant/30 bg-surface-container-low text-[16px] leading-tight text-on-surface md:text-sm" id="quickEditRemark" maxlength="240" placeholder="放位"></textarea>
+              <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Commentaire mouvement</span>
+              <textarea class="min-h-[7rem] w-full border-outline-variant/30 bg-surface-container-low text-[16px] leading-tight text-on-surface md:text-sm" id="quickEditRemark" maxlength="240" placeholder="Commentaire pour l'historique"></textarea>
             </label>
 
             <p class="hidden rounded border border-error/20 bg-error-container/20 px-3 py-2 text-[11px] font-medium text-on-error-container" id="quickEditMessage"></p>

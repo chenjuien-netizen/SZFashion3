@@ -481,10 +481,54 @@ function formatHistoryTimestamp_(value) {
 
 function applyMutationPayload_(payload) {
   const mutation = payload && payload.mutation ? payload.mutation : payload;
-  if (!mutation || mutation.type !== "quick_edit") {
+  if (!mutation) {
     throw new Error("Mutation non supportée.");
   }
-  return applyQuickEditMutation_(mutation);
+  if (mutation.type === "quick_edit") return applyQuickEditMutation_(mutation);
+  if (mutation.type === "product_remark") return applyProductRemarkMutation_(mutation);
+  throw new Error("Mutation non supportée.");
+}
+
+function applyProductRemarkMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) {
+    throw new Error("Payload remarque produit manquant.");
+  }
+
+  const sheet = getRequiredSheet_(SZFASHION_STOCK_SHEET);
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 1) {
+    throw new Error("La feuille STOCK ne contient aucun en-tête.");
+  }
+
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  const cols = resolveInventoryColumns_(headers);
+  if (cols.reference < 0) {
+    throw new Error("Colonne référence introuvable dans STOCK.");
+  }
+  if (cols.remark < 0) {
+    throw new Error("Colonne remarque produit introuvable dans STOCK.");
+  }
+
+  const targetRowIndex = findInventoryRowIndex_(sheet, cols, mutation);
+  if (targetRowIndex < 2) {
+    throw new Error("Ligne stock introuvable pour la mutation.");
+  }
+
+  writeCellIfPresent_(sheet, targetRowIndex, cols.remark, String(request.remark || "").trim());
+  const afterDisplayRow = sheet.getRange(targetRowIndex, 1, 1, lastCol).getDisplayValues()[0];
+  const afterItem = buildInventoryItem_(afterDisplayRow, cols, targetRowIndex);
+  if (!afterItem) {
+    throw new Error("Impossible de relire l'article après mutation.");
+  }
+
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    item: afterItem,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
 }
 
 function applyQuickEditMutation_(mutation) {
@@ -571,7 +615,6 @@ function writeQuickEditToStockRow_(sheet, cols, rowIndex, request, beforeItem) {
   writeCellIfPresent_(sheet, rowIndex, cols.signRaw, normalizeSign_(request.sign));
   writeCellIfPresent_(sheet, rowIndex, cols.fractionRaw, normalizeFractionText_(request.fractionText));
   writeCellIfPresent_(sheet, rowIndex, cols.packNotation, normalizePackNotation_(request.packNotation));
-  writeCellIfPresent_(sheet, rowIndex, cols.remark, String(request.remark || "").trim());
 }
 
 function writeCellIfPresent_(sheet, rowIndex, columnIndex, value) {

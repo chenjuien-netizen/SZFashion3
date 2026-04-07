@@ -39,6 +39,17 @@
       };
     }
 
+    function buildPendingProductRemarkMutation(request, item) {
+      return {
+        id: "mut_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+        type: "product_remark",
+        createdAt: new Date().toISOString(),
+        reference: String((item && item.reference) || request.reference || ""),
+        itemId: String((item && item.id) || request.id || ""),
+        request: cloneRequestPayload(request)
+      };
+    }
+
     function replaceItemInList(items, nextItem, normalizedReference) {
       const list = Array.isArray(items) ? items.slice() : [];
       let replaced = false;
@@ -76,7 +87,7 @@
       };
 
       baseSnapshot.pendingMutations.forEach(function(mutation) {
-        if (!mutation || mutation.type !== "quick_edit" || !mutation.request) return;
+        if (!mutation || !mutation.request) return;
 
         const normalizedReference = deps.normalizeReference(mutation.reference || mutation.request.reference);
         const baseItem = baseSnapshot.items.find(function(entry) {
@@ -86,6 +97,16 @@
 
         if (!baseItem) return;
 
+        if (mutation.type === "product_remark") {
+          const nextRemarkItem = deps.hydrateItem(Object.assign({}, baseItem, {
+            remark: String(mutation.request.remark || "").trim()
+          }));
+          baseSnapshot.items = replaceItemInList(baseSnapshot.items, nextRemarkItem, normalizedReference);
+          return;
+        }
+
+        if (mutation.type !== "quick_edit") return;
+
         const replayRequest = cloneRequestPayload(mutation.request);
         const nextItem = deps.buildOptimisticItemFromRequest(baseItem, replayRequest);
         if (!nextItem) return;
@@ -94,7 +115,7 @@
           mutation.actionType || replayRequest.localActionType || "adjustment",
           baseItem,
           nextItem,
-          nextItem.remark
+          replayRequest.remark
         );
 
         if (historyEntry && mutation.id) {
@@ -203,7 +224,7 @@
         request.localActionType || "adjustment",
         baseItem,
         nextItem,
-        nextItem.remark
+        request.remark
       );
       const pendingMutation = buildPendingMutation(request, nextItem);
       if (historyEntry && pendingMutation.id) {
@@ -221,6 +242,35 @@
       return {
         item: nextItem,
         historyEntry: historyEntry,
+        items: nextSnapshot.items.slice(),
+        historyItems: nextSnapshot.historyItems.slice(),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function saveProductRemark(request) {
+      const snapshot = readSnapshot();
+      const baseItem = snapshot.items.find(function(entry) {
+        return entry.id === request.id;
+      }) || null;
+      if (!baseItem) {
+        throw new Error("Reference introuvable. Merci de rafraichir.");
+      }
+      const nextItem = deps.hydrateItem(Object.assign({}, baseItem, {
+        remark: String(request.remark || "").trim()
+      }));
+      const pendingMutation = buildPendingProductRemarkMutation(request, nextItem);
+      const nextSnapshot = {
+        items: replaceItemInList(snapshot.items, nextItem, deps.normalizeReference(nextItem.reference)),
+        historyItems: snapshot.historyItems.slice(),
+        pendingMutations: (Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations.slice() : []).concat(pendingMutation),
+        syncStatus: "idle",
+        lastSyncAt: typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : "",
+        dataSource: "local-pending"
+      };
+      writeSnapshot(nextSnapshot);
+      return {
+        item: nextItem,
         items: nextSnapshot.items.slice(),
         historyItems: nextSnapshot.historyItems.slice(),
         meta: getMeta(nextSnapshot)
@@ -315,6 +365,7 @@
       loadHistory: loadHistory,
       loadDetail: loadDetail,
       saveQuickEdit: saveQuickEdit,
+      saveProductRemark: saveProductRemark,
       mergeRemoteSnapshot: mergeRemoteSnapshot,
       commitSyncedMutation: commitSyncedMutation,
       getMeta: function() {

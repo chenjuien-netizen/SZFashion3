@@ -2330,7 +2330,7 @@ function openQuickEdit(item) {
     fractionText: sanitizeFractionText(item.fractionText),
     packNotationSign: packNotationParts.sign,
     packNotationCount: packNotationParts.count,
-    remark: String(item.remark || "").trim()
+    remark: ""
   };
   state.quickEditTailOpen = hasQuickEditTailValue(state.quickEditForm);
   state.quickEditPartialOpen = hasQuickEditPartialValue(state.quickEditForm);
@@ -2498,9 +2498,26 @@ function buildOptimisticItemFromRequest(baseItem, request) {
     fractionText: nextFractionText,
     fractionValue: parseFractionValue(nextFractionText),
     packNotation: normalizePackNotation(request.packNotation, false),
-    remark: String(request.remark || "").trim()
+    remark: String(baseItem.remark || "").trim()
   });
   return hydrateItem(nextItem);
+}
+
+function saveProductRemark(item, remark) {
+  if (!item || !dataSource || !dataSource.saveProductRemark) return;
+  const request = {
+    id: item.id,
+    reference: item.reference,
+    remark: String(remark || "").trim()
+  };
+  const result = dataSource.saveProductRemark(request);
+  state.items = Array.isArray(result.items) ? result.items : state.items;
+  state.historyItems = Array.isArray(result.historyItems) ? result.historyItems : state.historyItems;
+  applyDataMeta(result.meta);
+  renderAll();
+  if (navigator.onLine) {
+    syncPendingMutations({ silent: true });
+  }
 }
 
 function handleQuickEditSave() {
@@ -2794,6 +2811,7 @@ function renderDetailPage() {
   const detailStockStateSection = document.getElementById("detailStockStateSection");
   const detailStockStateTable = document.getElementById("detailStockStateTable");
   const detailRemarkSection = document.getElementById("detailRemarkSection");
+  const detailRemarkEditButton = document.getElementById("detailRemarkEditButton");
   const detailRemark = document.getElementById("detailRemark");
   const detailHistoryList = document.getElementById("detailHistoryList");
   const detailHistoryEmpty = document.getElementById("detailHistoryEmpty");
@@ -2812,6 +2830,7 @@ function renderDetailPage() {
     detailMainSection.classList.add("hidden");
     if (detailStockStateSection) detailStockStateSection.classList.add("hidden");
     detailRemarkSection.classList.add("hidden");
+    if (detailRemarkEditButton) detailRemarkEditButton.classList.add("hidden");
     detailHistoryList.innerHTML = "";
     detailHistoryEmpty.classList.remove("hidden");
     if (detailQuickEditButton) detailQuickEditButton.classList.add("hidden");
@@ -2835,6 +2854,7 @@ function renderDetailPage() {
   if (detailQuickEditButton) detailQuickEditButton.classList.remove("hidden");
 
   detailRemarkSection.classList.remove("hidden");
+  if (detailRemarkEditButton) detailRemarkEditButton.classList.remove("hidden");
   detailRemark.textContent = item.remark || "-";
 
   detailHistoryList.innerHTML = itemHistory.map(renderDetailHistoryCard).join("");
@@ -2944,6 +2964,7 @@ function bindHistoryEvents() {
 function bindDetailEvents() {
   const detailBackButton = document.getElementById("detailBackButton");
   const detailQuickEditButton = document.getElementById("detailQuickEditButton");
+  const detailRemarkEditButton = document.getElementById("detailRemarkEditButton");
   if (detailBackButton) {
     detailBackButton.addEventListener("click", function() {
       navigateTo(state.previousView || "inventory");
@@ -2953,6 +2974,15 @@ function bindDetailEvents() {
     detailQuickEditButton.addEventListener("click", function() {
       const item = getInventoryByReference(state.detailReference);
       if (item) openQuickEdit(item);
+    });
+  }
+  if (detailRemarkEditButton) {
+    detailRemarkEditButton.addEventListener("click", function() {
+      const item = getInventoryByReference(state.detailReference);
+      if (!item) return;
+      const nextRemark = window.prompt("Remarque produit", String(item.remark || ""));
+      if (nextRemark === null) return;
+      saveProductRemark(item, nextRemark);
     });
   }
 }
