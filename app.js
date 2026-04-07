@@ -1147,26 +1147,23 @@ function renderInventoryListMarkup(items) {
 }
 
 function renderArrivalGroupedInventoryMarkup(items) {
-  const groups = [];
-  (items || []).forEach(function(item) {
+  const columns = buildColumnLayout_(items || [], state.columnCount);
+  if (!columns.length) return "";
+  return '<div class="flex items-start gap-px bg-outline-variant/20">' + columns.map(function(columnItems) {
+    return '<div class="inventory-column flex min-w-0 flex-1 flex-col gap-px bg-outline-variant/20">' + renderArrivalColumnMarkup(columnItems) + '</div>';
+  }).join("") + '</div>';
+}
+
+function renderArrivalColumnMarkup(items) {
+  let lastGroupKey = "";
+  return (items || []).map(function(item) {
     const group = getArrivalGroupMeta(item);
     const groupKey = group.rank + "::" + group.note + "::" + group.sort;
-    const lastGroup = groups[groups.length - 1];
-    if (!lastGroup || lastGroup.key !== groupKey) {
-      groups.push({
-        key: groupKey,
-        label: formatArrivalGroupLabel(group, item),
-        items: [item]
-      });
-      return;
-    }
-    lastGroup.items.push(item);
-  });
-
-  return groups.map(function(group) {
-    return ''
-      + '<div class="sticky top-0 z-10 border-y border-outline-variant/20 bg-surface-container-high px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant">' + escapeHtml(group.label) + '</div>'
-      + renderColumnLayoutMarkup(buildColumnLayout_(group.items, state.columnCount));
+    const separator = groupKey !== lastGroupKey
+      ? '<div class="sticky top-0 z-10 border-y border-outline-variant/20 bg-surface-container-high px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant">' + escapeHtml(formatArrivalGroupLabel(group, item)) + '</div>'
+      : "";
+    lastGroupKey = groupKey;
+    return separator + renderInventoryCard(item);
   }).join("");
 }
 
