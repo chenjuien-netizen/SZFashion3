@@ -99,6 +99,7 @@ function buildInventoryItem_(row, cols, rowIndex) {
   const remark = String(getRowCell_(row, cols.remark) || "").trim();
   const warehouse = String(getRowCell_(row, cols.warehouse) || "").trim();
   const createdAt = String(getRowCell_(row, cols.createdAt) || "").trim();
+  const arrivalNote = String(getRowCell_(row, cols.arrivalNote) || "").trim();
 
   const stateModel = {
     tail: tail,
@@ -131,7 +132,8 @@ function buildInventoryItem_(row, cols, rowIndex) {
     packCounterText: packNotation || "",
     dynamicFractions: [],
     warehouse: warehouse,
-    createdAt: createdAt
+    createdAt: createdAt,
+    arrivalNote: arrivalNote
   };
 }
 
@@ -221,7 +223,8 @@ function resolveInventoryColumns_(headers) {
     packNotation: findColumn_(headers, ["Notation paquets"]),
     remark: findColumn_(headers, ["放位/提醒"]),
     warehouse: findColumn_(headers, ["仓库", "entrepot", "entrepôt"]),
-    createdAt: findColumn_(headers, ["date de création", "修改日期", "进货"])
+    createdAt: findColumn_(headers, ["date de création", "修改日期", "进货"]),
+    arrivalNote: findColumn_(headers, ["到货单", "arrivalNote", "arrival", "ASN", "asn", "deliveryNote", "bon de livraison"])
   };
 }
 

@@ -740,8 +740,14 @@ function summarizeDetailItem(item) {
 
 function getArrivalNote(item) {
   return String(
-    (item && (item.arrivalNote || item.arrival || item.asn || item.arrivalNumber || item.deliveryNote)) || ""
+    (item && (item.arrivalNote || item.arrival || item.asn || item.arrivalNumber || item.deliveryNote || item["到货单"])) || ""
   ).trim() || "-";
+}
+
+function getItemPackTotal(item) {
+  const colisage = Math.max(0, toInt(item && item.colisage));
+  if (!(colisage > 0)) return null;
+  return Math.max(0, Math.floor(stateModelToPieces(item || {}) / colisage));
 }
 
 function renderDetailStockStateMarkup(item) {
@@ -751,7 +757,10 @@ function renderDetailStockStateMarkup(item) {
   const boxesDisplay = toInt(item.itemBoxes) > 0 ? String(toInt(item.itemBoxes)) : "-";
   const totalPieces = formatMetricNumber(stateModelToPieces(item));
   const totalBoxes = toInt(item.itemBoxes);
-  const packText = item.packCounterText ? item.packCounterText + "包" : (getMainPackNotationFromState(item) || "0包");
+  const totalPacks = getItemPackTotal(item);
+  const packText = totalPacks === null ? "-包" : formatMetricNumber(totalPacks) + "包";
+  const packsPerBox = computePacksPerBox(item.unitsPerBox, item.colisage);
+  const packsHint = buildQuickExitPacksHintMarkup(item.colisage, packsPerBox);
   return ''
     + '<table class="w-full border-collapse text-left">'
     + '<thead><tr class="border-b border-outline-variant/20 bg-surface-container-low">'
@@ -772,6 +781,7 @@ function renderDetailStockStateMarkup(item) {
     + '<div class="border-t border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-center">'
     + '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Total</div>'
     + '<div class="mt-0.5 text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(totalBoxes + "箱 · " + packText + " · " + totalPieces + "件") + '</div>'
+    + (packsHint ? '<div class="mt-1 overflow-hidden whitespace-nowrap text-[10px] text-on-surface-variant">' + packsHint + '</div>' : '')
     + '</div>';
 }
 
@@ -983,7 +993,6 @@ function renderInventoryCard(item) {
   const accentClass = item.stockState === "positive" ? "border-emerald-400/50" : "border-rose-400/50";
   const stockClass = item.stockState === "positive" ? "text-primary" : "text-on-surface-variant";
   const warehouse = item.warehouse || "-";
-  const packLine = getInventoryPackLine(item);
 
   return ''
     + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[4.1rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-item-id="' + escapeHtml(itemId) + '" data-reference="' + escapeHtml(reference) + '" data-stock-display="' + escapeHtml(stockDisplay) + '" data-stock-state="' + escapeHtml(item.stockState) + '">'
@@ -995,7 +1004,6 @@ function renderInventoryCard(item) {
     + '<div class="mt-1.5 flex items-end justify-between gap-2">'
     + '<div class="min-w-0">'
     + '<span class="block truncate text-[13px] font-medium ' + stockClass + '">' + escapeHtml(stockDisplay) + '</span>'
-    + (packLine ? '<span class="mt-0.5 block truncate text-[9px] font-bold uppercase tracking-[0.16em] text-primary/80">' + escapeHtml(packLine) + '</span>' : '')
     + '</div>'
     + '</div>'
     + '</button>'
@@ -1003,13 +1011,6 @@ function renderInventoryCard(item) {
     + '<span class="material-symbols-outlined !text-[16px]">chevron_right</span>'
     + '</a>'
     + '</article>';
-}
-
-function getInventoryPackLine(item) {
-  const mainPack = getMainPackNotationFromState(item);
-  if (item.packCounterText) return item.packCounterText + "包";
-  if (mainPack) return mainPack;
-  return "";
 }
 
 function renderColumnLayoutMarkup(columns) {
@@ -1020,18 +1021,21 @@ function renderColumnLayoutMarkup(columns) {
 }
 
 function renderHistoryCard(entry) {
-  const timeLabel = formatHistoryCompactDateTime(entry.timestampRaw, entry.timestampLabel);
-  const movementText = (entry.beforeDisplay || "-") + " → " + (entry.afterDisplay || "-");
+  const timeLabel = formatHistoryJournalDateTime(entry.timestampRaw, entry.timestampLabel);
+  const beforeText = entry.beforeDisplay || "-";
+  const afterText = entry.afterDisplay || "-";
   return ''
     + '<article class="bg-surface-container-lowest px-3 py-2 shadow-ledger" data-history-reference="' + escapeHtml(entry.reference) + '">'
-    + '<div class="grid grid-cols-[4.8rem_minmax(3.8rem,0.75fr)_minmax(0,1.6fr)_auto] items-start gap-2">'
-    + '<time class="pt-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">' + escapeHtml(timeLabel) + '</time>'
+    + '<div class="grid grid-cols-[5.6rem_minmax(3rem,0.65fr)_minmax(0,1.7fr)_auto] gap-x-2 gap-y-1">'
+    + '<time class="pt-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-on-surface-variant">' + escapeHtml(timeLabel) + '</time>'
     + '<a class="truncate text-[12px] font-bold tracking-tight text-primary" href="#detail/' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
-    + '<div class="min-w-0 text-[10px] leading-4 text-on-surface">'
-    + '<div class="truncate font-medium">' + escapeHtml(movementText) + '</div>'
-    + (entry.remark ? '<div class="truncate text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
+    + '<div class="min-w-0 truncate text-[11px] font-semibold leading-4 text-on-surface">' + escapeHtml(beforeText) + '</div>'
+    + '<span class="row-span-2 justify-self-end self-start rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
+    + '<div class="text-center text-[11px] font-black leading-4 text-on-surface-variant">→</div>'
+    + '<div></div>'
+    + '<div class="min-w-0 truncate text-[11px] font-black leading-4 text-primary">' + escapeHtml(afterText) + '</div>'
+    + (entry.remark ? '<div class="col-span-4 truncate pt-0.5 text-[10px] leading-4 text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
     + '</div>'
-    + '<span class="justify-self-end shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
     + '</article>';
 }
 
@@ -1065,6 +1069,19 @@ function formatHistoryCompactDateTime(timestampRaw, fallback) {
     const day = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(date);
     const time = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" }).format(date);
     return day + " " + time;
+  }
+  return fallback || "--:--";
+}
+
+function formatHistoryJournalDateTime(timestampRaw, fallback) {
+  const date = new Date(timestampRaw);
+  if (!Number.isNaN(date.getTime())) {
+    const year = String(date.getFullYear());
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    return year + "-" + month + "-" + day + " " + hour + ":" + minute;
   }
   return fallback || "--:--";
 }
@@ -2620,7 +2637,9 @@ function renderInventoryPage() {
   summaryRefs.textContent = summary.visibleCount + " " + (summary.visibleCount === 1 ? "ref" : "refs");
   summaryPositive.textContent = summary.positiveCount + " en stock";
   summaryZero.textContent = summary.zeroCount + " en rupture";
-  summaryTotals.textContent = formatMetricNumber(summary.totalBoxes) + "箱 " + formatMetricNumber(summary.totalPieces) + "件";
+  summaryTotals.textContent = formatMetricNumber(summary.totalBoxes) + "箱 "
+    + (summary.hasPackData ? formatMetricNumber(summary.totalPacks) + "包 " : "")
+    + formatMetricNumber(summary.totalPieces) + "件";
   if (networkStatus) networkStatus.textContent = navigator.onLine ? "En ligne" : "Hors ligne";
   summaryStatus.textContent = getSyncStatusLabel(state.query ? "Recherche" : "Pret");
   if (refreshButton && !refreshButton.dataset.bound) {
@@ -2716,12 +2735,8 @@ function renderDetailPage() {
   if (detailStockStateSection) detailStockStateSection.classList.remove("hidden");
   if (detailQuickEditButton) detailQuickEditButton.classList.remove("hidden");
 
-  if (item.remark) {
-    detailRemarkSection.classList.remove("hidden");
-    detailRemark.textContent = item.remark;
-  } else {
-    detailRemarkSection.classList.add("hidden");
-  }
+  detailRemarkSection.classList.remove("hidden");
+  detailRemark.textContent = item.remark || "-";
 
   detailHistoryList.innerHTML = itemHistory.map(renderDetailHistoryCard).join("");
   detailHistoryEmpty.classList.toggle("hidden", itemHistory.length > 0);
