@@ -1087,15 +1087,14 @@ function getHistoryBeforeDateTime(entry) {
 }
 
 function formatHistoryMovement(entry) {
-  const actionLabel = getActionLabel(entry && entry.actionType);
   const before = Number(entry && entry.beforeTotalPieces);
   const after = Number(entry && entry.afterTotalPieces);
   if (Number.isFinite(before) && Number.isFinite(after) && before !== after) {
     const delta = after - before;
     const sign = delta > 0 ? "+" : "-";
-    return actionLabel + " · " + sign + formatMetricNumber(Math.abs(delta)) + "件";
+    return sign + formatMetricNumber(Math.abs(delta)) + "件";
   }
-  return actionLabel;
+  return "";
 }
 
 function renderHistoryListMarkup(items) {
@@ -1136,12 +1135,10 @@ function formatHistoryJournalDateTime(timestampRaw, fallback) {
   if (!timestampRaw && !fallback) return "";
   const date = new Date(timestampRaw);
   if (!Number.isNaN(date.getTime())) {
-    const year = String(date.getFullYear());
+    const year = String(date.getFullYear()).slice(-2);
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
-    const hour = String(date.getHours()).padStart(2, "0");
-    const minute = String(date.getMinutes()).padStart(2, "0");
-    return year + "-" + month + "-" + day + " " + hour + ":" + minute;
+    return day + "/" + month + "/" + year;
   }
   return fallback || "--:--";
 }
