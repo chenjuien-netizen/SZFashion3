@@ -206,7 +206,9 @@ function buildHistoryEntry_(displayRow, rawRow, cols) {
     remark: String(getRowCell_(displayRow, cols.remark) || "").trim(),
     source: String(getRowCell_(displayRow, cols.source) || "").trim(),
     beforeTotalPieces: Number(getRowCell_(rawRow, cols.beforeTotalPieces) || 0),
-    afterTotalPieces: Number(getRowCell_(rawRow, cols.afterTotalPieces) || 0)
+    afterTotalPieces: Number(getRowCell_(rawRow, cols.afterTotalPieces) || 0),
+    beforeTimestampRaw: historyTimestampRaw_(getRowCell_(rawRow, cols.beforeTimestamp)),
+    beforeTimestampLabel: formatHistoryTimestamp_(getRowCell_(rawRow, cols.beforeTimestamp))
   };
 }
 
@@ -239,7 +241,8 @@ function resolveHistoryColumns_(headers) {
     remark: findColumn_(headers, ["remark"]),
     source: findColumn_(headers, ["source"]),
     beforeTotalPieces: findColumn_(headers, ["before_total_pieces"]),
-    afterTotalPieces: findColumn_(headers, ["after_total_pieces"])
+    afterTotalPieces: findColumn_(headers, ["after_total_pieces"]),
+    beforeTimestamp: findColumn_(headers, ["before_timestamp"])
   };
 }
 
@@ -549,6 +552,7 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
   const actionType = normalizeHistoryActionType_(mutation.actionType || (mutation.request && mutation.request.localActionType) || "adjustment") || "adjustment";
   const remark = String(mutation.request && mutation.request.remark || "").trim();
   const referenceText = String(afterItem.reference || "").trim();
+  const beforeTimestampRaw = findLatestHistoryTimestampForReference_(sheet, cols, referenceText);
   const row = [
     timestamp,
     actionType,
@@ -561,6 +565,9 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     Number(stateModelToPieces_(beforeItem) || 0),
     Number(stateModelToPieces_(afterItem) || 0)
   ];
+  if (cols.beforeTimestamp >= 0) {
+    row[cols.beforeTimestamp] = beforeTimestampRaw;
+  }
   if (cols.reference >= 0) {
     row[cols.reference] = "";
   }
@@ -596,8 +603,26 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     remark: remark,
     source: "stock_mobile_sync",
     beforeTotalPieces: Number(stateModelToPieces_(beforeItem) || 0),
-    afterTotalPieces: Number(stateModelToPieces_(afterItem) || 0)
+    afterTotalPieces: Number(stateModelToPieces_(afterItem) || 0),
+    beforeTimestampRaw: beforeTimestampRaw,
+    beforeTimestampLabel: beforeTimestampRaw ? formatHistoryTimestamp_(beforeTimestampRaw) : ""
   };
+}
+
+function findLatestHistoryTimestampForReference_(sheet, cols, reference) {
+  if (!sheet || cols.reference < 0 || cols.timestamp < 0 || !reference) return "";
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return "";
+  const rawRows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  const displayRows = sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues();
+  const normalizedReference = normalizeReference_(reference);
+  for (let index = displayRows.length - 1; index >= 0; index--) {
+    if (normalizeReference_(getRowCell_(displayRows[index], cols.reference)) === normalizedReference) {
+      return historyTimestampRaw_(getRowCell_(rawRows[index], cols.timestamp));
+    }
+  }
+  return "";
 }
 
 function getOrCreateHistorySheet_() {
@@ -622,7 +647,8 @@ function ensureHistoryHeaders_(sheet) {
     "remark",
     "source",
     "before_total_pieces",
-    "after_total_pieces"
+    "after_total_pieces",
+    "before_timestamp"
   ];
   const lastCol = sheet.getLastColumn();
   const firstRow = lastCol > 0 ? sheet.getRange(1, 1, 1, Math.max(lastCol, headers.length)).getDisplayValues()[0] : [];

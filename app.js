@@ -752,37 +752,65 @@ function getItemPackTotal(item) {
 
 function renderDetailStockStateMarkup(item) {
   if (!item) return "";
+  const tailValue = toInt(item.tail);
   const tailDisplay = toInt(item.tail) > 0 ? "(" + toInt(item.tail) + "p)" : "-";
   const unitsDisplay = toInt(item.unitsPerBox) > 0 ? toInt(item.unitsPerBox) + "p" : "-";
   const boxesDisplay = toInt(item.itemBoxes) > 0 ? String(toInt(item.itemBoxes)) : "-";
+  const fractionDisplay = item.fractionText ? String(item.fractionText).trim() : "";
+  const fractionSign = fractionDisplay ? (item.sign || "+") : "";
+  const packMeta = parsePackNotation(getMainPackNotationFromState(item));
+  const packDisplay = packMeta.count > 0 ? String(packMeta.count) + "包" : "";
   const totalPieces = formatMetricNumber(stateModelToPieces(item));
   const totalBoxes = toInt(item.itemBoxes);
   const totalPacks = getItemPackTotal(item);
   const packText = totalPacks === null ? "-包" : formatMetricNumber(totalPacks) + "包";
   const packsPerBox = computePacksPerBox(item.unitsPerBox, item.colisage);
   const packsHint = buildQuickExitPacksHintMarkup(item.colisage, packsPerBox);
+  const columns = [
+    { label: "尾箱", value: tailDisplay, align: "left" },
+    { label: "", value: tailValue > 0 ? "+" : "", operator: true },
+    { label: "件/箱", value: unitsDisplay, align: "center" },
+    { label: "", value: "×", operator: true },
+    { label: "箱数", value: boxesDisplay, align: "right" }
+  ];
+  if (fractionDisplay) {
+    columns.push({ label: "", value: fractionSign, operator: true });
+    columns.push({ label: "分数", value: fractionDisplay, align: "center" });
+  }
+  if (packDisplay) {
+    columns.push({ label: "", value: packMeta.sign || "+", operator: true });
+    columns.push({ label: "包", value: packDisplay, align: "right" });
+  }
   return ''
+    + '<div class="w-full overflow-x-auto">'
     + '<table class="w-full border-collapse text-left">'
     + '<thead><tr class="border-b border-outline-variant/20 bg-surface-container-low">'
-    + '<th class="px-3 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</th>'
-    + '<th class="px-1 py-2"></th>'
-    + '<th class="px-3 py-2 text-center text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</th>'
-    + '<th class="px-1 py-2"></th>'
-    + '<th class="px-3 py-2 text-right text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</th>'
+    + columns.map(renderStockStateHeaderCell).join("")
     + '</tr></thead>'
     + '<tbody><tr>'
-    + '<td class="px-3 py-3 text-lg font-black tracking-tight text-on-surface">' + escapeHtml(tailDisplay) + '</td>'
-    + '<td class="px-1 py-3 text-center text-lg font-black text-on-surface-variant/60">+</td>'
-    + '<td class="px-3 py-3 text-center text-lg font-black tracking-tight text-on-surface">' + escapeHtml(unitsDisplay) + '</td>'
-    + '<td class="px-1 py-3 text-center text-lg font-black text-on-surface-variant/60">×</td>'
-    + '<td class="px-3 py-3 text-right text-lg font-black tracking-tight text-on-surface">' + escapeHtml(boxesDisplay) + '</td>'
+    + columns.map(renderStockStateValueCell).join("")
     + '</tr></tbody>'
     + '</table>'
+    + '</div>'
     + '<div class="border-t border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-center">'
     + '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Total</div>'
     + '<div class="mt-0.5 text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(totalBoxes + "箱 · " + packText + " · " + totalPieces + "件") + '</div>'
     + (packsHint ? '<div class="mt-1 overflow-hidden whitespace-nowrap text-[10px] text-on-surface-variant">' + packsHint + '</div>' : '')
     + '</div>';
+}
+
+function renderStockStateHeaderCell(column) {
+  if (column.operator) return '<th class="px-1 py-2"></th>';
+  const alignClass = column.align === "right" ? "text-right" : (column.align === "center" ? "text-center" : "");
+  return '<th class="whitespace-nowrap px-3 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant ' + alignClass + '">' + escapeHtml(column.label) + '</th>';
+}
+
+function renderStockStateValueCell(column) {
+  if (column.operator) {
+    return '<td class="whitespace-nowrap px-1 py-3 text-center text-lg font-black text-on-surface-variant/60">' + escapeHtml(column.value || "") + '</td>';
+  }
+  const alignClass = column.align === "right" ? "text-right" : (column.align === "center" ? "text-center" : "");
+  return '<td class="whitespace-nowrap px-3 py-3 text-lg font-black tracking-tight text-on-surface ' + alignClass + '">' + escapeHtml(column.value || "-") + '</td>';
 }
 
 function buildHistoryEntryFromLocalChange(actionType, beforeItem, afterItem, remark) {
@@ -1021,22 +1049,53 @@ function renderColumnLayoutMarkup(columns) {
 }
 
 function renderHistoryCard(entry) {
-  const timeLabel = formatHistoryJournalDateTime(entry.timestampRaw, entry.timestampLabel);
+  const afterTimeLabel = formatHistoryJournalDateTime(entry.timestampRaw, entry.timestampLabel);
+  const beforeTimeLabel = getHistoryBeforeDateTime(entry);
   const beforeText = entry.beforeDisplay || "-";
   const afterText = entry.afterDisplay || "-";
+  const movementText = formatHistoryMovement(entry);
   return ''
     + '<article class="bg-surface-container-lowest px-3 py-2 shadow-ledger" data-history-reference="' + escapeHtml(entry.reference) + '">'
-    + '<div class="grid grid-cols-[5.6rem_minmax(3rem,0.65fr)_minmax(0,1.7fr)_auto] gap-x-2 gap-y-1">'
-    + '<time class="pt-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-on-surface-variant">' + escapeHtml(timeLabel) + '</time>'
+    + '<div class="flex items-start justify-between gap-3">'
     + '<a class="truncate text-[12px] font-bold tracking-tight text-primary" href="#detail/' + encodeURIComponent(entry.reference) + '">' + escapeHtml(entry.reference || "-") + '</a>'
-    + '<div class="min-w-0 truncate text-[11px] font-semibold leading-4 text-on-surface">' + escapeHtml(beforeText) + '</div>'
-    + '<span class="row-span-2 justify-self-end self-start rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
-    + '<div class="text-center text-[11px] font-black leading-4 text-on-surface-variant">→</div>'
-    + '<div></div>'
-    + '<div class="min-w-0 truncate text-[11px] font-black leading-4 text-primary">' + escapeHtml(afterText) + '</div>'
-    + (entry.remark ? '<div class="col-span-4 truncate pt-0.5 text-[10px] leading-4 text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
+    + '<span class="shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getActionBadgeClass(entry.actionType) + '">' + escapeHtml(getActionLabel(entry.actionType)) + '</span>'
+    + '</div>'
+    + '<div class="mt-1 font-mono text-[11px] leading-4 text-on-surface">'
+    + '<div class="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-2">'
+    + '<time class="whitespace-nowrap text-[10px] font-semibold text-on-surface-variant">' + escapeHtml(beforeTimeLabel || "—") + '</time>'
+    + '<div class="min-w-0 truncate font-semibold">' + escapeHtml(beforeText) + '</div>'
+    + '</div>'
+    + '<div class="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-2 text-on-surface-variant">'
+    + '<div class="text-right font-black">→</div>'
+    + '<div class="min-w-0 truncate text-[10px] font-bold uppercase tracking-[0.08em]">' + escapeHtml(movementText) + '</div>'
+    + '</div>'
+    + '<div class="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-2">'
+    + '<time class="whitespace-nowrap text-[10px] font-semibold text-on-surface-variant">' + escapeHtml(afterTimeLabel) + '</time>'
+    + '<div class="min-w-0 truncate font-semibold text-primary">' + escapeHtml(afterText) + '</div>'
+    + '</div>'
+    + (entry.remark ? '<div class="mt-1 truncate text-[10px] leading-4 text-on-surface-variant">' + escapeHtml(entry.remark) + '</div>' : '')
     + '</div>'
     + '</article>';
+}
+
+function getHistoryBeforeDateTime(entry) {
+  if (!entry) return "";
+  return formatHistoryJournalDateTime(
+    entry.beforeTimestampRaw || entry.previousTimestampRaw || entry.beforeTimestamp || entry.previousTimestamp || "",
+    entry.beforeTimestampLabel || entry.previousTimestampLabel || ""
+  );
+}
+
+function formatHistoryMovement(entry) {
+  const actionLabel = getActionLabel(entry && entry.actionType);
+  const before = Number(entry && entry.beforeTotalPieces);
+  const after = Number(entry && entry.afterTotalPieces);
+  if (Number.isFinite(before) && Number.isFinite(after) && before !== after) {
+    const delta = after - before;
+    const sign = delta > 0 ? "+" : "-";
+    return actionLabel + " · " + sign + formatMetricNumber(Math.abs(delta)) + "件";
+  }
+  return actionLabel;
 }
 
 function renderHistoryListMarkup(items) {
@@ -1074,6 +1133,7 @@ function formatHistoryCompactDateTime(timestampRaw, fallback) {
 }
 
 function formatHistoryJournalDateTime(timestampRaw, fallback) {
+  if (!timestampRaw && !fallback) return "";
   const date = new Date(timestampRaw);
   if (!Number.isNaN(date.getTime())) {
     const year = String(date.getFullYear());
