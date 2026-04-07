@@ -515,6 +515,11 @@ function writeCellIfPresent_(sheet, rowIndex, columnIndex, value) {
   sheet.getRange(rowIndex, columnIndex + 1).setValue(value);
 }
 
+function toSheetText_(value) {
+  const text = String(value == null ? "" : value).trim();
+  return text ? "'" + text : "";
+}
+
 function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
   const sheet = getOrCreateHistorySheet_();
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
@@ -522,10 +527,11 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
   const timestamp = new Date();
   const actionType = normalizeHistoryActionType_(mutation.actionType || (mutation.request && mutation.request.localActionType) || "adjustment") || "adjustment";
   const remark = String(mutation.request && mutation.request.remark || "").trim();
+  const referenceText = String(afterItem.reference || "").trim();
   const row = [
     timestamp,
     actionType,
-    String(afterItem.reference || ""),
+    referenceText,
     String(afterItem.id || ""),
     String(beforeItem.stockDisplay || ""),
     String(afterItem.stockDisplay || ""),
@@ -534,13 +540,18 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     Number(stateModelToPieces_(beforeItem) || 0),
     Number(stateModelToPieces_(afterItem) || 0)
   ];
+  if (cols.reference >= 0) {
+    row[cols.reference] = toSheetText_(referenceText);
+  }
   const targetRow = sheet.getLastRow() + 1;
   if (cols.reference >= 0) {
     sheet.getRange(targetRow, cols.reference + 1).setNumberFormat("@");
   }
   sheet.getRange(targetRow, 1, 1, row.length).setValues([row]);
   if (cols.reference >= 0) {
-    sheet.getRange(targetRow, cols.reference + 1).setValue(String(afterItem.reference || ""));
+    sheet.getRange(targetRow, cols.reference + 1)
+      .setNumberFormat("@")
+      .setValue(toSheetText_(referenceText));
   }
 
   return {
@@ -548,7 +559,7 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     timestampRaw: timestamp.toISOString(),
     timestampLabel: formatHistoryTimestamp_(timestamp),
     actionType: actionType,
-    reference: String(afterItem.reference || ""),
+    reference: referenceText,
     rowId: String(afterItem.id || ""),
     beforeDisplay: String(beforeItem.stockDisplay || ""),
     afterDisplay: String(afterItem.stockDisplay || ""),
