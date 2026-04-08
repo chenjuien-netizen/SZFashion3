@@ -236,6 +236,10 @@ function navigateToInventoryContext() {
   navigateTo(route.view, route.ref ? { ref: route.ref } : null);
 }
 
+function isInventoryTabActive() {
+  return state.currentView === "inventory" || state.currentView === "detail";
+}
+
 function navigateTo(view, options) {
   const nextHash = buildHashRoute(view, options && options.ref);
   if (window.location.hash === nextHash) {
@@ -247,12 +251,13 @@ function navigateTo(view, options) {
 
 function handleRouteChange() {
   const route = parseCurrentRoute();
+  const openingDetailFromHistory = route.view === "detail" && state.currentView === "history";
   if (route.view === "detail") {
     state.previousView = state.currentView === "history" ? "history" : "inventory";
   } else {
     state.previousView = route.view;
   }
-  if (route.view === "inventory" || route.view === "detail") {
+  if (route.view === "inventory" || (route.view === "detail" && !openingDetailFromHistory)) {
     rememberInventoryView(route.view, route.ref);
   }
   state.currentView = route.view;
@@ -1158,11 +1163,8 @@ function renderInventoryCard(item) {
   const warehouse = item.warehouse || "-";
   const arrivalMeta = getInventoryArrivalMeta(item);
   const arrivalLine = arrivalMeta.note
-    ? '<div class="mt-0.5 whitespace-normal break-words text-[9px] leading-3 text-on-surface-variant">'
-      + escapeHtml(arrivalMeta.note)
-      + (arrivalMeta.date ? '<span class="block text-[8px] leading-3 text-outline">' + escapeHtml(arrivalMeta.date) + '</span>' : '')
-      + '</div>'
-    : '';
+    ? '<div class="mt-0.5 h-6 overflow-hidden text-[9px] leading-3 text-on-surface-variant">' + escapeHtml(arrivalMeta.note) + '</div>'
+    : '<div class="mt-0.5 h-6"></div>';
   const rightInfoMarkup = ''
     + '<div class="max-w-[48%] min-w-0 text-right">'
     + '<div class="truncate text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml(warehouse) + '</div>'
@@ -1170,7 +1172,7 @@ function renderInventoryCard(item) {
     + '</div>';
 
   return ''
-    + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[4.1rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-item-id="' + escapeHtml(itemId) + '" data-reference="' + escapeHtml(reference) + '" data-stock-display="' + escapeHtml(stockDisplay) + '" data-stock-state="' + escapeHtml(item.stockState) + '">'
+    + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[4.9rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-item-id="' + escapeHtml(itemId) + '" data-reference="' + escapeHtml(reference) + '" data-stock-display="' + escapeHtml(stockDisplay) + '" data-stock-state="' + escapeHtml(item.stockState) + '">'
     + '<button class="inventory-card-main flex min-w-0 flex-1 flex-col justify-between px-2.5 py-2 text-left" type="button" data-action="open-quick-edit" data-item-id="' + escapeHtml(itemId) + '">'
     + '<div class="flex items-start justify-between gap-2">'
     + '<span class="truncate pr-2 text-[12px] font-bold tracking-tight text-on-surface">' + escapeHtml(reference) + '</span>'
@@ -3086,6 +3088,10 @@ function bindInventoryEvents() {
   }
   if (navInventoryButton) {
     navInventoryButton.addEventListener("click", function() {
+      if (isInventoryTabActive()) {
+        navigateTo("inventory");
+        return;
+      }
       navigateToInventoryContext();
     });
   }
