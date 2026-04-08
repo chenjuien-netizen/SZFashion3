@@ -3386,6 +3386,7 @@ function bindInventoryEvents() {
   const inventoryGrid = document.getElementById("inventoryGrid");
   const navInventoryButton = document.getElementById("navInventoryButton");
   const navHistoryButton = document.getElementById("navHistoryButton");
+  const inventoryAddReferencesButton = document.getElementById("inventoryAddReferencesButton");
   if (!searchInput || !inventoryGrid) return;
   searchInput.addEventListener("input", function(event) {
     state.query = String(event.target.value || "").trim();
@@ -3429,6 +3430,11 @@ function bindInventoryEvents() {
       navigateTo("history");
     });
   }
+  if (inventoryAddReferencesButton) {
+    inventoryAddReferencesButton.addEventListener("click", function() {
+      navigateTo("tickets", { ticketView: "add-refs" });
+    });
+  }
   inventoryGrid.addEventListener("click", function(event) {
     const toggle = event.target.closest('[data-action="toggle-arrival-meta"]');
     if (toggle) {
@@ -3446,6 +3452,7 @@ function bindHistoryEvents() {
   const searchInput = document.getElementById("historySearchInput");
   const actionTypeFilter = document.getElementById("historyActionTypeFilter");
   const periodFilter = document.getElementById("historyPeriodFilter");
+  const historyAddReferencesButton = document.getElementById("historyAddReferencesButton");
   if (!searchInput || !actionTypeFilter) return;
   searchInput.addEventListener("input", function(event) {
     state.historyQuery = String(event.target.value || "").trim();
@@ -3461,12 +3468,16 @@ function bindHistoryEvents() {
       renderHistoryPage();
     });
   }
+  if (historyAddReferencesButton) {
+    historyAddReferencesButton.addEventListener("click", function() {
+      navigateTo("tickets", { ticketView: "add-refs" });
+    });
+  }
 }
 
 function bindTicketEvents() {
   const navTicketsButton = document.getElementById("navTicketsButton");
   const ticketNewButton = document.getElementById("ticketNewButton");
-  const ticketAddReferencesButton = document.getElementById("ticketAddReferencesButton");
   const ticketDetailBackButton = document.getElementById("ticketDetailBackButton");
   const ticketAddReferencesBackButton = document.getElementById("ticketAddReferencesBackButton");
   const ticketStatusSelect = document.getElementById("ticketStatusSelect");
@@ -3485,11 +3496,6 @@ function bindTicketEvents() {
   if (ticketNewButton) {
     ticketNewButton.addEventListener("click", function() {
       createNewTicket();
-    });
-  }
-  if (ticketAddReferencesButton) {
-    ticketAddReferencesButton.addEventListener("click", function() {
-      navigateTo("tickets", { ticketView: "add-refs" });
     });
   }
   if (ticketDetailBackButton) {

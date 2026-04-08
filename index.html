@@ -144,9 +144,14 @@
                 <h1 class="text-lg font-extrabold uppercase tracking-tight text-slate-900">SZFASHION</h1>
               </div>
             </div>
-            <button aria-label="Rafraîchir" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="refreshButton" type="button">
-              <span class="material-symbols-outlined">refresh</span>
-            </button>
+            <div class="flex items-center gap-1">
+              <button aria-label="Ajout de références" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="inventoryAddReferencesButton" type="button">
+                <span class="material-symbols-outlined">add_box</span>
+              </button>
+              <button aria-label="Rafraîchir" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="refreshButton" type="button">
+                <span class="material-symbols-outlined">refresh</span>
+              </button>
+            </div>
           </header>
 
           <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-1.5 shadow-ledger">
@@ -220,9 +225,14 @@
                 <h1 class="text-lg font-extrabold uppercase tracking-tight text-slate-900">Historique</h1>
               </div>
             </div>
-            <button aria-label="Rafraîchir" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="historyRefreshButton" type="button">
-              <span class="material-symbols-outlined">refresh</span>
-            </button>
+            <div class="flex items-center gap-1">
+              <button aria-label="Ajout de références" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="historyAddReferencesButton" type="button">
+                <span class="material-symbols-outlined">add_box</span>
+              </button>
+              <button aria-label="Rafraîchir" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="historyRefreshButton" type="button">
+                <span class="material-symbols-outlined">refresh</span>
+              </button>
+            </div>
           </header>
 
           <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">
@@ -356,12 +366,9 @@
         <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface px-4 py-4" id="ticketScroll">
           <div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <section class="border border-outline-variant/20 bg-surface-container-lowest p-4" id="ticketListSection">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Billets</div>
-                  <div class="mt-1 text-[12px] text-on-surface-variant">V1 locale, sans impact stock.</div>
-                </div>
-                <button class="border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="ticketAddReferencesButton" type="button">Ajout de références</button>
+              <div>
+                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Billets</div>
+                <div class="mt-1 text-[12px] text-on-surface-variant">V1 locale, sans impact stock.</div>
               </div>
 
               <div class="mt-3 hidden border border-error/20 bg-error-container/15 px-3 py-2 text-[11px] font-medium text-on-error-container" id="ticketPreparationWarning"></div>
