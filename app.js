@@ -236,8 +236,9 @@ function navigateToInventoryContext() {
   navigateTo(route.view, route.ref ? { ref: route.ref } : null);
 }
 
-function isInventoryTabActive() {
-  return state.currentView === "inventory" || state.currentView === "detail";
+function forceInventoryListView() {
+  rememberInventoryView("inventory", "");
+  navigateTo("inventory");
 }
 
 function navigateTo(view, options) {
@@ -251,13 +252,12 @@ function navigateTo(view, options) {
 
 function handleRouteChange() {
   const route = parseCurrentRoute();
-  const openingDetailFromHistory = route.view === "detail" && state.currentView === "history";
   if (route.view === "detail") {
     state.previousView = state.currentView === "history" ? "history" : "inventory";
   } else {
     state.previousView = route.view;
   }
-  if (route.view === "inventory" || (route.view === "detail" && !openingDetailFromHistory)) {
+  if (route.view === "inventory" || route.view === "detail") {
     rememberInventoryView(route.view, route.ref);
   }
   state.currentView = route.view;
@@ -783,6 +783,17 @@ function getInventoryArrivalMeta(item) {
   };
 }
 
+function splitInventoryArrivalNoteLines(note) {
+  const text = String(note || "").trim();
+  if (!text) return ["", ""];
+  const splitIndex = text.indexOf(" ");
+  if (splitIndex <= 0 || splitIndex >= text.length - 1) return [text, ""];
+  return [
+    text.slice(0, splitIndex).trim(),
+    text.slice(splitIndex + 1).trim()
+  ];
+}
+
 function getItemPackTotal(item) {
   const colisage = Math.max(0, toInt(item && item.colisage));
   if (!(colisage > 0)) return null;
@@ -1162,27 +1173,31 @@ function renderInventoryCard(item) {
   const stockClass = item.stockState === "positive" ? "text-primary" : "text-on-surface-variant";
   const warehouse = item.warehouse || "-";
   const arrivalMeta = getInventoryArrivalMeta(item);
+  const arrivalLines = splitInventoryArrivalNoteLines(arrivalMeta.note);
   const arrivalLine = arrivalMeta.note
-    ? '<div class="mt-0.5 h-6 overflow-hidden text-[9px] leading-3 text-on-surface-variant">' + escapeHtml(arrivalMeta.note) + '</div>'
+    ? '<div class="h-6 overflow-hidden text-[9px] leading-3 text-on-surface-variant">'
+      + '<span class="block truncate">' + escapeHtml(arrivalLines[0]) + '</span>'
+      + (arrivalLines[1] ? '<span class="block truncate">' + escapeHtml(arrivalLines[1]) + '</span>' : '')
+      + '</div>'
     : '<div class="mt-0.5 h-6"></div>';
   const rightInfoMarkup = ''
-    + '<div class="max-w-[48%] min-w-0 text-right">'
+    + '<div class="flex min-h-[3.25rem] w-[6.8rem] shrink-0 flex-col justify-between text-right">'
     + '<div class="truncate text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml(warehouse) + '</div>'
     + arrivalLine
     + '</div>';
 
   return ''
     + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[4.9rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-item-id="' + escapeHtml(itemId) + '" data-reference="' + escapeHtml(reference) + '" data-stock-display="' + escapeHtml(stockDisplay) + '" data-stock-state="' + escapeHtml(item.stockState) + '">'
-    + '<button class="inventory-card-main flex min-w-0 flex-1 flex-col justify-between px-2.5 py-2 text-left" type="button" data-action="open-quick-edit" data-item-id="' + escapeHtml(itemId) + '">'
-    + '<div class="flex items-start justify-between gap-2">'
+    + '<button class="inventory-card-main flex min-w-0 flex-1 items-stretch justify-between gap-2 px-2.5 py-2 text-left" type="button" data-action="open-quick-edit" data-item-id="' + escapeHtml(itemId) + '">'
+    + '<div class="flex min-w-0 flex-1 flex-col justify-between">'
     + '<span class="truncate pr-2 text-[12px] font-bold tracking-tight text-on-surface">' + escapeHtml(reference) + '</span>'
-    + rightInfoMarkup
-    + '</div>'
     + '<div class="mt-1.5 flex items-end justify-between gap-2">'
     + '<div class="min-w-0">'
     + '<span class="block truncate text-[13px] font-medium ' + stockClass + '">' + escapeHtml(stockDisplay) + '</span>'
     + '</div>'
     + '</div>'
+    + '</div>'
+    + rightInfoMarkup
     + '</button>'
     + '<a class="reference-detail-trigger flex w-10 shrink-0 touch-manipulation select-none items-center justify-center border-l border-outline-variant/20 text-outline-variant transition-colors duration-150 hover:bg-surface-container-highest hover:text-on-surface-variant active:bg-surface-container-high" href="#detail/' + encodeURIComponent(reference) + '" aria-label="Ouvrir la fiche de ' + escapeHtml(reference) + '">'
     + '<span class="material-symbols-outlined !text-[16px]">chevron_right</span>'
@@ -3088,11 +3103,11 @@ function bindInventoryEvents() {
   }
   if (navInventoryButton) {
     navInventoryButton.addEventListener("click", function() {
-      if (isInventoryTabActive()) {
-        navigateTo("inventory");
-        return;
-      }
       navigateToInventoryContext();
+    });
+    navInventoryButton.addEventListener("dblclick", function(event) {
+      event.preventDefault();
+      forceInventoryListView();
     });
   }
   if (navHistoryButton) {
