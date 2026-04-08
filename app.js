@@ -17,6 +17,7 @@ const state = {
   inventoryArrivalFilter: "",
   inventoryTailFilter: "",
   inventorySort: "arrival",
+  inventoryArrivalMetaExpanded: false,
   historyQuery: "",
   historyActionType: "",
   historyPeriod: "all",
@@ -1233,7 +1234,7 @@ function renderArrivalColumnMarkup(items) {
     const group = getArrivalGroupMeta(item);
     const groupKey = group.rank + "::" + group.note + "::" + group.sort;
     const separator = groupKey !== lastGroupKey
-      ? '<div class="sticky top-0 z-10 border-y border-outline-variant/20 bg-surface-container-high px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant">' + escapeHtml(formatArrivalGroupLabel(group, item)) + '</div>'
+      ? '<button class="sticky top-0 z-10 w-full border-y border-outline-variant/20 bg-surface-container-high px-3 py-1 text-left text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant" type="button" data-action="toggle-arrival-meta">' + escapeHtml(formatArrivalGroupLabel(group, item)) + '</button>'
       : "";
     lastGroupKey = groupKey;
     return separator + renderInventoryCard(item);
@@ -1242,8 +1243,10 @@ function renderArrivalColumnMarkup(items) {
 
 function formatArrivalGroupLabel(group, item) {
   if (!group || group.rank === 2) return "Sans 到货单";
+  const primaryText = "到货单 " + (group.note || getArrivalNote(item));
+  if (!state.inventoryArrivalMetaExpanded) return primaryText;
   const dateText = group.label || (group.sort > 0 ? formatInventoryShortDate(group.sort) : "date inconnue");
-  return "到货单 " + (group.note || getArrivalNote(item)) + " · " + dateText;
+  return primaryText + " · " + dateText;
 }
 
 function formatInventoryShortDate(value) {
@@ -3116,6 +3119,12 @@ function bindInventoryEvents() {
     });
   }
   inventoryGrid.addEventListener("click", function(event) {
+    const toggle = event.target.closest('[data-action="toggle-arrival-meta"]');
+    if (toggle) {
+      state.inventoryArrivalMetaExpanded = !state.inventoryArrivalMetaExpanded;
+      renderInventoryPage();
+      return;
+    }
     const trigger = event.target.closest('[data-action="open-quick-edit"]');
     if (!trigger) return;
     openQuickEdit(getItemById(trigger.getAttribute("data-item-id")));
