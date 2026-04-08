@@ -86,7 +86,7 @@
   }
 
   function normalizeMutationPayload(payload) {
-    return {
+    const normalized = {
       ok: !!(payload && payload.ok),
       mutationId: payload && payload.mutationId ? String(payload.mutationId) : "",
       item: payload && payload.item ? payload.item : null,
@@ -94,6 +94,12 @@
       generatedAt: payload && typeof payload.generatedAt === "string" ? payload.generatedAt : "",
       source: payload && payload.source ? payload.source : "google_sheets"
     };
+    ["batch", "lines", "ticket", "events", "items"].forEach(function(key) {
+      if (payload && Object.prototype.hasOwnProperty.call(payload, key)) {
+        normalized[key] = payload[key];
+      }
+    });
+    return normalized;
   }
 
   window.createRemoteDataSource = function createRemoteDataSource(config) {
@@ -122,6 +128,22 @@
         return fetchJson(buildUrl(baseUrl, "detail", { reference: reference })).then(function(payload) {
           return normalizeDetailPayload(payload, reference);
         });
+      },
+      fetchReferenceImportBatches: function() {
+        ensureConfigured();
+        return fetchJson(buildUrl(baseUrl, "reference_import_batches"));
+      },
+      fetchReferenceImportBatch: function(batchId) {
+        ensureConfigured();
+        return fetchJson(buildUrl(baseUrl, "reference_import_batch", { batch_id: batchId }));
+      },
+      fetchPickupTickets: function() {
+        ensureConfigured();
+        return fetchJson(buildUrl(baseUrl, "pickup_tickets"));
+      },
+      fetchPickupTicket: function(ticketId) {
+        ensureConfigured();
+        return fetchJson(buildUrl(baseUrl, "pickup_ticket", { ticket_id: ticketId }));
       },
       pushMutation: function(mutation) {
         ensureConfigured();

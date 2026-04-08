@@ -726,8 +726,20 @@ function hydrateItem(rawItem) {
   return Object.assign({}, rawItem, normalized, packMeta, {
     reference: normalizeReference(rawItem.reference),
     stockDisplay: buildStockDisplay(normalized),
-    stockState: computeStockStateFromModel(normalized)
+    stockState: computeStockStateFromModel(normalized),
+    completionStatus: computeReferenceCompletionStatus(rawItem)
   });
+}
+
+function computeReferenceCompletionStatus(item) {
+  const arrivalNote = String(item && item.arrivalNote || "").trim();
+  if (arrivalNote) return "complete";
+  const hasStockInfo = Math.max(0, toInt(item && item.tail)) > 0
+    || Math.max(0, toInt(item && item.unitsPerBox)) > 0
+    || Math.max(0, toInt(item && item.itemBoxes)) > 0
+    || !!sanitizeFractionText(item && item.fractionText)
+    || !!normalizePackNotation(item && item.packNotation, false);
+  return hasStockInfo ? "complete" : "incomplete";
 }
 
 function formatDateLabel(isoText) {
@@ -756,6 +768,7 @@ function getActionLabel(actionType) {
   if (actionType === "entry") return "entrée";
   if (actionType === "exit") return "sortie";
   if (actionType === "adjustment") return "ajustement";
+  if (actionType === "pickup_ticket") return "pickup ticket";
   return actionType || "-";
 }
 

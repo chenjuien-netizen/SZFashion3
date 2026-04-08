@@ -12,7 +12,19 @@ function doGet(e) {
     if (route === "detail") {
       return apiJson_(getDetailPayload_(params.reference || ""));
     }
-    return apiError_("Route introuvable. Utilise route=inventory, route=history ou route=detail.", 404);
+    if (route === "reference_import_batches") {
+      return apiJson_(getReferenceImportBatchesPayload_());
+    }
+    if (route === "reference_import_batch") {
+      return apiJson_(getReferenceImportBatchPayload_(params.batch_id || ""));
+    }
+    if (route === "pickup_tickets") {
+      return apiJson_(getPickupTicketsPayload_());
+    }
+    if (route === "pickup_ticket") {
+      return apiJson_(getPickupTicketPayload_(params.ticket_id || ""));
+    }
+    return apiError_("Route introuvable. Utilise route=inventory, route=history, route=detail, route=reference_import_batches, route=reference_import_batch, route=pickup_tickets ou route=pickup_ticket.", 404);
   } catch (error) {
     return apiError_(error && error.message ? error.message : "Erreur serveur inconnue.", 500);
   }

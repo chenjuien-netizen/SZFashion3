@@ -1,6 +1,11 @@
 const SZFASHION_STOCK_SHEET = "STOCK";
 const SZFASHION_HISTORY_SHEET = "STOCK_HISTORY";
 const SZFASHION_ARRIVALS_SHEET = "ARRIVAGES_DB";
+const SZFASHION_REFERENCE_IMPORT_BATCHES_SHEET = "REFERENCE_IMPORT_BATCHES";
+const SZFASHION_REFERENCE_IMPORT_LINES_SHEET = "REFERENCE_IMPORT_LINES";
+const SZFASHION_PICKUP_TICKETS_SHEET = "PICKUP_TICKETS";
+const SZFASHION_PICKUP_TICKET_LINES_SHEET = "PICKUP_TICKET_LINES";
+const SZFASHION_PICKUP_TICKET_EVENTS_SHEET = "PICKUP_TICKET_EVENTS";
 
 function getInventoryPayload_() {
   const sheet = getRequiredSheet_(SZFASHION_STOCK_SHEET);
@@ -45,6 +50,60 @@ function getDetailPayload_(reference) {
     generatedAt: new Date().toISOString(),
     lastMovementAt: history.length ? String(history[0].timestampRaw || "") : "",
     notFoundInStock: !item,
+    source: "google_sheets"
+  };
+}
+
+function getReferenceImportBatchesPayload_() {
+  const sheet = getOptionalSheet_(SZFASHION_REFERENCE_IMPORT_BATCHES_SHEET);
+  const items = sheet ? readReferenceImportBatches_(sheet) : [];
+  return {
+    items: items,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function getReferenceImportBatchPayload_(batchId) {
+  const normalizedBatchId = String(batchId || "").trim();
+  const batchSheet = getOptionalSheet_(SZFASHION_REFERENCE_IMPORT_BATCHES_SHEET);
+  const lineSheet = getOptionalSheet_(SZFASHION_REFERENCE_IMPORT_LINES_SHEET);
+  const batches = batchSheet ? readReferenceImportBatches_(batchSheet) : [];
+  const batch = batches.find(function(entry) {
+    return String(entry.batchId || "") === normalizedBatchId;
+  }) || null;
+  const lines = lineSheet ? readReferenceImportLines_(lineSheet, normalizedBatchId) : [];
+  return {
+    batch: batch,
+    lines: lines,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function getPickupTicketsPayload_() {
+  const ticketSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKETS_SHEET);
+  const items = ticketSheet ? readPickupTickets_(ticketSheet) : [];
+  return {
+    items: items,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function getPickupTicketPayload_(ticketId) {
+  const normalizedTicketId = String(ticketId || "").trim();
+  const ticketSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKETS_SHEET);
+  const lineSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKET_LINES_SHEET);
+  const eventSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKET_EVENTS_SHEET);
+  const ticket = ticketSheet ? readPickupTickets_(ticketSheet).find(function(entry) {
+    return String(entry.ticketId || "") === normalizedTicketId;
+  }) : null;
+  return {
+    ticket: ticket || null,
+    lines: lineSheet ? readPickupTicketLines_(lineSheet, normalizedTicketId) : [],
+    events: eventSheet ? readPickupTicketEvents_(eventSheet, normalizedTicketId) : [],
+    generatedAt: new Date().toISOString(),
     source: "google_sheets"
   };
 }
@@ -138,7 +197,15 @@ function buildInventoryItem_(row, cols, rowIndex) {
     arrivalNote: arrivalNote,
     arrivalUpdatedAt: "",
     arrivalUpdatedAtLabel: "",
-    arrivalUpdatedAtSort: 0
+    arrivalUpdatedAtSort: 0,
+    completionStatus: computeReferenceCompletionStatus_({
+      arrivalNote: arrivalNote,
+      tail: tail,
+      unitsPerBox: unitsPerBox,
+      itemBoxes: itemBoxes,
+      fractionText: fractionText,
+      packNotation: packNotation
+    })
   };
 }
 
@@ -153,7 +220,10 @@ function enrichInventoryItemsWithArrivalDates_(items, arrivalsByReference) {
       arrivalUpdatedAt: String(arrival.raw || ""),
       arrivalUpdatedAtLabel: String(arrival.label || ""),
       arrivalUpdatedAtSort: Number(arrival.sort || 0),
-      arrivalWarehouse: String(arrival.warehouse || "")
+      arrivalWarehouse: String(arrival.warehouse || ""),
+      completionStatus: computeReferenceCompletionStatus_(Object.assign({}, item, {
+        arrivalNote: String(arrival.arrivalId || item.arrivalNote || "")
+      }))
     });
   });
 }
@@ -265,7 +335,9 @@ function buildHistoryEntry_(displayRow, rawRow, cols) {
     afterTotalPieces: Number(getRowCell_(rawRow, cols.afterTotalPieces) || 0),
     beforeTimestampRaw: historyTimestampRaw_(getRowCell_(rawRow, cols.beforeTimestamp)),
     beforeTimestampLabel: formatHistoryTimestamp_(getRowCell_(rawRow, cols.beforeTimestamp)),
-    movementDisplay: String(getRowCell_(displayRow, cols.movementDisplay) || "").trim()
+    movementDisplay: String(getRowCell_(displayRow, cols.movementDisplay) || "").trim(),
+    businessId: String(getRowCell_(displayRow, cols.businessId) || "").trim(),
+    businessLineId: String(getRowCell_(displayRow, cols.businessLineId) || "").trim()
   };
 }
 
@@ -300,7 +372,9 @@ function resolveHistoryColumns_(headers) {
     beforeTotalPieces: findColumn_(headers, ["before_total_pieces"]),
     afterTotalPieces: findColumn_(headers, ["after_total_pieces"]),
     beforeTimestamp: findColumn_(headers, ["before_timestamp"]),
-    movementDisplay: findColumn_(headers, ["movement_display"])
+    movementDisplay: findColumn_(headers, ["movement_display"]),
+    businessId: findColumn_(headers, ["business_id"]),
+    businessLineId: findColumn_(headers, ["business_line_id"])
   };
 }
 
@@ -631,6 +705,13 @@ function applyMutationPayload_(payload) {
   }
   if (mutation.type === "quick_edit") return applyQuickEditMutation_(mutation);
   if (mutation.type === "product_remark") return applyProductRemarkMutation_(mutation);
+  if (mutation.type === "create_reference_manual") return applyCreateReferenceManualMutation_(mutation);
+  if (mutation.type === "create_reference_import_batch_from_file") return applyCreateReferenceImportBatchFromFileMutation_(mutation);
+  if (mutation.type === "finalize_reference_import_batch") return applyFinalizeReferenceImportBatchMutation_(mutation);
+  if (mutation.type === "create_pickup_ticket") return applyCreatePickupTicketMutation_(mutation);
+  if (mutation.type === "resolve_pickup_ticket_line") return applyResolvePickupTicketLineMutation_(mutation);
+  if (mutation.type === "validate_pickup_ticket") return applyValidatePickupTicketMutation_(mutation);
+  if (mutation.type === "cancel_pickup_ticket") return applyCancelPickupTicketMutation_(mutation);
   throw new Error("Mutation non supportée.");
 }
 
@@ -789,12 +870,15 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
   const cols = resolveHistoryColumns_(headers);
   const timestamp = new Date();
+  const request = mutation && mutation.request ? mutation.request : {};
   const actionType = normalizeHistoryActionType_(mutation.actionType || (mutation.request && mutation.request.localActionType) || "adjustment") || "adjustment";
-  const remark = String(mutation.request && mutation.request.remark || "").trim();
+  const remark = String(request.remark || "").trim();
   const referenceText = String(afterItem.reference || "").trim();
   const beforeTimestampRaw = findLatestHistoryTimestampForReference_(sheet, cols, referenceText);
   const beforeTotalPieces = Number(stateModelToPieces_(beforeItem) || 0);
   const afterTotalPieces = Number(stateModelToPieces_(afterItem) || 0);
+  const businessId = String(request.businessId || "").trim();
+  const businessLineId = String(request.businessLineId || "").trim();
   const movementDisplay = formatMovementDisplayFromPieces_(
     beforeTotalPieces,
     afterTotalPieces,
@@ -818,6 +902,12 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
   }
   if (cols.movementDisplay >= 0) {
     row[cols.movementDisplay] = movementDisplay;
+  }
+  if (cols.businessId >= 0) {
+    row[cols.businessId] = businessId;
+  }
+  if (cols.businessLineId >= 0) {
+    row[cols.businessLineId] = businessLineId;
   }
   if (cols.reference >= 0) {
     row[cols.reference] = "";
@@ -857,7 +947,9 @@ function appendHistoryForMutation_(mutation, beforeItem, afterItem) {
     afterTotalPieces: afterTotalPieces,
     beforeTimestampRaw: beforeTimestampRaw,
     beforeTimestampLabel: beforeTimestampRaw ? formatHistoryTimestamp_(beforeTimestampRaw) : "",
-    movementDisplay: movementDisplay
+    movementDisplay: movementDisplay,
+    businessId: businessId,
+    businessLineId: businessLineId
   };
 }
 
@@ -901,7 +993,9 @@ function ensureHistoryHeaders_(sheet) {
     "before_total_pieces",
     "after_total_pieces",
     "before_timestamp",
-    "movement_display"
+    "movement_display",
+    "business_id",
+    "business_line_id"
   ];
   const lastCol = sheet.getLastColumn();
   const firstRow = lastCol > 0 ? sheet.getRange(1, 1, 1, Math.max(lastCol, headers.length)).getDisplayValues()[0] : [];
@@ -916,4 +1010,1252 @@ function ensureHistoryHeaders_(sheet) {
   if (referenceColumnIndex >= 0) {
     sheet.getRange(1, referenceColumnIndex + 1, Math.max(sheet.getMaxRows(), 1), 1).setNumberFormat("@");
   }
+}
+
+function computeReferenceCompletionStatus_(item) {
+  const arrivalNote = String(item && item.arrivalNote || "").trim();
+  if (arrivalNote) return "complete";
+  const hasStockInfo = Math.max(0, parseLooseInteger_(item && item.tail)) > 0
+    || Math.max(0, parseLooseInteger_(item && item.unitsPerBox)) > 0
+    || Math.max(0, parseLooseInteger_(item && item.itemBoxes)) > 0
+    || !!normalizeFractionText_(item && item.fractionText)
+    || !!normalizePackNotation_(item && item.packNotation);
+  return hasStockInfo ? "complete" : "incomplete";
+}
+
+function getOrCreateSheetWithHeaders_(sheetName, headers) {
+  const existing = getOptionalSheet_(sheetName);
+  if (existing) {
+    ensureSheetHeaders_(existing, headers);
+    return existing;
+  }
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(sheetName);
+  ensureSheetHeaders_(sheet, headers);
+  return sheet;
+}
+
+function ensureSheetHeaders_(sheet, headers) {
+  const list = Array.isArray(headers) ? headers.slice() : [];
+  const lastCol = sheet.getLastColumn();
+  const current = lastCol > 0 ? sheet.getRange(1, 1, 1, Math.max(lastCol, list.length)).getDisplayValues()[0] : [];
+  const normalizedCurrent = current.map(normalizeHeader_);
+  const matches = list.every(function(header, index) {
+    return normalizedCurrent[index] === normalizeHeader_(header);
+  });
+  if (!matches) {
+    sheet.getRange(1, 1, 1, list.length).setValues([list]);
+  }
+}
+
+function getOrCreateReferenceImportBatchesSheet_() {
+  return getOrCreateSheetWithHeaders_(SZFASHION_REFERENCE_IMPORT_BATCHES_SHEET, [
+    "batch_id",
+    "created_at",
+    "created_by",
+    "status",
+    "source_file_name",
+    "source_file_type",
+    "source_file_drive_id",
+    "source_file_url",
+    "source_sheet_name",
+    "mapping_json",
+    "total_rows",
+    "valid_rows",
+    "invalid_rows",
+    "duplicate_rows",
+    "notes"
+  ]);
+}
+
+function getOrCreateReferenceImportLinesSheet_() {
+  return getOrCreateSheetWithHeaders_(SZFASHION_REFERENCE_IMPORT_LINES_SHEET, [
+    "line_id",
+    "batch_id",
+    "line_number",
+    "status",
+    "duplicate_status",
+    "raw_row_json",
+    "mapped_reference",
+    "mapped_warehouse",
+    "mapped_arrival_note",
+    "mapped_remark",
+    "mapped_tail",
+    "mapped_units_per_box",
+    "mapped_boxes",
+    "mapped_sign",
+    "mapped_fraction",
+    "mapped_pack_notation",
+    "validation_errors_json",
+    "resolution_action",
+    "resolved_reference",
+    "created_reference",
+    "created_at",
+    "updated_at"
+  ]);
+}
+
+function getOrCreatePickupTicketsSheet_() {
+  return getOrCreateSheetWithHeaders_(SZFASHION_PICKUP_TICKETS_SHEET, [
+    "ticket_id",
+    "ticket_number",
+    "status",
+    "created_at",
+    "created_by",
+    "updated_at",
+    "validated_at",
+    "validated_by",
+    "title",
+    "request_text_raw",
+    "global_note",
+    "line_count",
+    "resolved_line_count",
+    "blocked_line_count",
+    "version"
+  ]);
+}
+
+function getOrCreatePickupTicketLinesSheet_() {
+  return getOrCreateSheetWithHeaders_(SZFASHION_PICKUP_TICKET_LINES_SHEET, [
+    "line_id",
+    "ticket_id",
+    "line_number",
+    "reference",
+    "status",
+    "request_unit",
+    "request_quantity",
+    "requested_display",
+    "picked_unit",
+    "picked_quantity",
+    "picked_display",
+    "stock_available_pieces_snapshot",
+    "warehouse_help_display",
+    "arrival_note_snapshot",
+    "line_note",
+    "stock_mutation_id",
+    "created_at",
+    "updated_at"
+  ]);
+}
+
+function getOrCreatePickupTicketEventsSheet_() {
+  return getOrCreateSheetWithHeaders_(SZFASHION_PICKUP_TICKET_EVENTS_SHEET, [
+    "event_id",
+    "ticket_id",
+    "line_id",
+    "event_type",
+    "actor",
+    "created_at",
+    "payload_json",
+    "message"
+  ]);
+}
+
+function readSheetObjects_(sheet) {
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return [];
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  const rows = sheet.getRange(2, 1, lastRow - 1, lastCol).getDisplayValues();
+  return rows.map(function(row, index) {
+    const object = { _rowIndex: index + 2 };
+    headers.forEach(function(header, headerIndex) {
+      object[String(header || "").trim()] = getRowCell_(row, headerIndex);
+    });
+    return object;
+  });
+}
+
+function readReferenceImportBatches_(sheet) {
+  return readSheetObjects_(sheet).map(function(row) {
+    return {
+      batchId: String(row.batch_id || "").trim(),
+      createdAt: String(row.created_at || "").trim(),
+      createdBy: String(row.created_by || "").trim(),
+      status: String(row.status || "").trim(),
+      sourceFileName: String(row.source_file_name || "").trim(),
+      sourceFileType: String(row.source_file_type || "").trim(),
+      sourceFileDriveId: String(row.source_file_drive_id || "").trim(),
+      sourceFileUrl: String(row.source_file_url || "").trim(),
+      sourceSheetName: String(row.source_sheet_name || "").trim(),
+      mapping: parseJsonSafely_(row.mapping_json, {}),
+      totals: {
+        totalRows: Number(row.total_rows || 0),
+        validRows: Number(row.valid_rows || 0),
+        invalidRows: Number(row.invalid_rows || 0),
+        duplicateRows: Number(row.duplicate_rows || 0)
+      },
+      notes: String(row.notes || "").trim()
+    };
+  }).sort(function(a, b) {
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+  });
+}
+
+function readReferenceImportLines_(sheet, batchId) {
+  const normalizedBatchId = String(batchId || "").trim();
+  return readSheetObjects_(sheet).filter(function(row) {
+    return !normalizedBatchId || String(row.batch_id || "").trim() === normalizedBatchId;
+  }).map(function(row) {
+    return {
+      lineId: String(row.line_id || "").trim(),
+      batchId: String(row.batch_id || "").trim(),
+      lineNumber: Number(row.line_number || 0),
+      status: String(row.status || "").trim(),
+      duplicateStatus: String(row.duplicate_status || "").trim(),
+      rawRow: parseJsonSafely_(row.raw_row_json, {}),
+      mapped: {
+        reference: String(row.mapped_reference || "").trim(),
+        warehouse: String(row.mapped_warehouse || "").trim(),
+        arrivalNote: String(row.mapped_arrival_note || "").trim(),
+        remark: String(row.mapped_remark || "").trim(),
+        tail: String(row.mapped_tail || "").trim(),
+        unitsPerBox: String(row.mapped_units_per_box || "").trim(),
+        boxes: String(row.mapped_boxes || "").trim(),
+        sign: String(row.mapped_sign || "").trim(),
+        fractionText: String(row.mapped_fraction || "").trim(),
+        packNotation: String(row.mapped_pack_notation || "").trim()
+      },
+      validationErrors: parseJsonSafely_(row.validation_errors_json, []),
+      resolutionAction: String(row.resolution_action || "").trim(),
+      resolvedReference: String(row.resolved_reference || "").trim(),
+      createdReference: String(row.created_reference || "").trim()
+    };
+  }).sort(function(a, b) {
+    return Number(a.lineNumber || 0) - Number(b.lineNumber || 0);
+  });
+}
+
+function readPickupTickets_(sheet) {
+  return readSheetObjects_(sheet).map(function(row) {
+    return {
+      ticketId: String(row.ticket_id || "").trim(),
+      ticketNumber: String(row.ticket_number || "").trim(),
+      status: String(row.status || "").trim(),
+      createdAt: String(row.created_at || "").trim(),
+      createdBy: String(row.created_by || "").trim(),
+      updatedAt: String(row.updated_at || "").trim(),
+      validatedAt: String(row.validated_at || "").trim(),
+      validatedBy: String(row.validated_by || "").trim(),
+      title: String(row.title || "").trim(),
+      requestTextRaw: String(row.request_text_raw || "").trim(),
+      globalNote: String(row.global_note || "").trim(),
+      lineCount: Number(row.line_count || 0),
+      resolvedLineCount: Number(row.resolved_line_count || 0),
+      blockedLineCount: Number(row.blocked_line_count || 0),
+      version: Number(row.version || 0),
+      _rowIndex: row._rowIndex
+    };
+  }).sort(function(a, b) {
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+  });
+}
+
+function readPickupTicketLines_(sheet, ticketId) {
+  const normalizedTicketId = String(ticketId || "").trim();
+  return readSheetObjects_(sheet).filter(function(row) {
+    return !normalizedTicketId || String(row.ticket_id || "").trim() === normalizedTicketId;
+  }).map(function(row) {
+    return {
+      lineId: String(row.line_id || "").trim(),
+      ticketId: String(row.ticket_id || "").trim(),
+      lineNumber: Number(row.line_number || 0),
+      reference: normalizeReference_(row.reference),
+      status: String(row.status || "").trim(),
+      requestUnit: String(row.request_unit || "").trim(),
+      requestQuantity: parseNullableNumber_(row.request_quantity),
+      requestedDisplay: String(row.requested_display || "").trim(),
+      pickedUnit: String(row.picked_unit || "").trim(),
+      pickedQuantity: parseNullableNumber_(row.picked_quantity),
+      pickedDisplay: String(row.picked_display || "").trim(),
+      stockAvailablePiecesSnapshot: parseNullableNumber_(row.stock_available_pieces_snapshot),
+      warehouseHelpDisplay: String(row.warehouse_help_display || "").trim(),
+      arrivalNoteSnapshot: String(row.arrival_note_snapshot || "").trim(),
+      lineNote: String(row.line_note || "").trim(),
+      stockMutationId: String(row.stock_mutation_id || "").trim(),
+      createdAt: String(row.created_at || "").trim(),
+      updatedAt: String(row.updated_at || "").trim(),
+      _rowIndex: row._rowIndex
+    };
+  }).sort(function(a, b) {
+    return Number(a.lineNumber || 0) - Number(b.lineNumber || 0);
+  });
+}
+
+function readPickupTicketEvents_(sheet, ticketId) {
+  const normalizedTicketId = String(ticketId || "").trim();
+  return readSheetObjects_(sheet).filter(function(row) {
+    return !normalizedTicketId || String(row.ticket_id || "").trim() === normalizedTicketId;
+  }).map(function(row) {
+    return {
+      eventId: String(row.event_id || "").trim(),
+      ticketId: String(row.ticket_id || "").trim(),
+      lineId: String(row.line_id || "").trim(),
+      eventType: String(row.event_type || "").trim(),
+      actor: String(row.actor || "").trim(),
+      createdAt: String(row.created_at || "").trim(),
+      payload: parseJsonSafely_(row.payload_json, {}),
+      message: String(row.message || "").trim()
+    };
+  }).sort(function(a, b) {
+    return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+  });
+}
+
+function parseJsonSafely_(value, fallback) {
+  const text = String(value || "").trim();
+  if (!text) return fallback;
+  try {
+    return JSON.parse(text);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function parseNullableNumber_(value) {
+  if (value === null || typeof value === "undefined" || value === "") return null;
+  const numberValue = Number(value);
+  return isFinite(numberValue) ? numberValue : null;
+}
+
+function buildGeneratedId_(prefix) {
+  return String(prefix || "id") + "_" + Utilities.getUuid().replace(/-/g, "").slice(0, 12);
+}
+
+function applyCreateReferenceManualMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) throw new Error("Payload création référence manquant.");
+  const created = createReferenceInStock_(request, {
+    mutationId: String(mutation.id || ""),
+    actionType: "adjustment"
+  });
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    item: created.item,
+    historyEntry: created.historyEntry || null,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function createReferenceInStock_(request, options) {
+  const reference = normalizeReference_(request && request.reference);
+  if (!reference) throw new Error("Référence obligatoire.");
+  if (findInventoryItemByReference_(reference)) throw new Error("Cette référence existe déjà.");
+
+  const sheet = getRequiredSheet_(SZFASHION_STOCK_SHEET);
+  const lastCol = Math.max(1, sheet.getLastColumn());
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  const cols = resolveInventoryColumns_(headers);
+  if (cols.reference < 0) throw new Error("Colonne référence introuvable dans STOCK.");
+
+  const nextRowIndex = sheet.getLastRow() + 1;
+  if (sheet.getMaxColumns() < lastCol) sheet.insertColumnsAfter(sheet.getMaxColumns(), lastCol - sheet.getMaxColumns());
+  sheet.getRange(nextRowIndex, 1, 1, lastCol).clearContent();
+  writeCellIfPresent_(sheet, nextRowIndex, cols.reference, reference);
+  writeCellIfPresent_(sheet, nextRowIndex, cols.sortKey, reference);
+  writeCellIfPresent_(sheet, nextRowIndex, cols.warehouse, String(request.warehouse || "").trim());
+  writeCellIfPresent_(sheet, nextRowIndex, cols.arrivalNote, String(request.arrivalNote || "").trim());
+  writeCellIfPresent_(sheet, nextRowIndex, cols.remark, String(request.remark || "").trim());
+
+  const initialStock = request.initialStock || {};
+  writeCellIfPresent_(sheet, nextRowIndex, cols.tailRaw, Math.max(0, parseLooseInteger_(initialStock.tail)));
+  writeCellIfPresent_(sheet, nextRowIndex, cols.unitsPerBoxRaw, Math.max(0, parseLooseInteger_(initialStock.unitsPerBox)));
+  writeCellIfPresent_(sheet, nextRowIndex, cols.boxesRaw, Math.max(0, parseLooseInteger_(initialStock.boxes)));
+  writeCellIfPresent_(sheet, nextRowIndex, cols.signRaw, normalizeSign_(initialStock.sign));
+  writeCellIfPresent_(sheet, nextRowIndex, cols.fractionRaw, normalizeFractionText_(initialStock.fractionText));
+  writeCellIfPresent_(sheet, nextRowIndex, cols.packNotation, normalizePackNotation_(initialStock.packNotation));
+  writeCellIfPresent_(sheet, nextRowIndex, cols.createdAt, new Date());
+
+  const displayRow = sheet.getRange(nextRowIndex, 1, 1, lastCol).getDisplayValues()[0];
+  const item = buildInventoryItem_(displayRow, cols, nextRowIndex);
+  if (!item) throw new Error("Impossible de relire la référence créée.");
+
+  let historyEntry = null;
+  if (stateModelToPieces_(item) > 0) {
+    historyEntry = appendHistoryForMutation_({
+      actionType: options && options.actionType ? options.actionType : "adjustment",
+      request: {
+        remark: "Création référence",
+        businessId: String(options && options.mutationId || ""),
+        businessLineId: reference
+      }
+    }, buildEmptyStateForItem_(item), item);
+  }
+
+  return { item: item, historyEntry: historyEntry };
+}
+
+function buildEmptyStateForItem_(item) {
+  return {
+    id: String(item && item.id || ""),
+    reference: String(item && item.reference || ""),
+    tail: 0,
+    unitsPerBox: Math.max(0, parseLooseInteger_(item && item.unitsPerBox)),
+    itemBoxes: 0,
+    sign: "",
+    fractionText: "",
+    fractionValue: 0,
+    colisage: Math.max(0, parseLooseInteger_(item && item.colisage)),
+    packNotation: "",
+    stockDisplay: "-",
+    remark: String(item && item.remark || "").trim()
+  };
+}
+
+function applyCreateReferenceImportBatchFromFileMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) throw new Error("Payload import références manquant.");
+  const batchesSheet = getOrCreateReferenceImportBatchesSheet_();
+  const linesSheet = getOrCreateReferenceImportLinesSheet_();
+  const sourceInfo = storeUploadedImportSource_(request);
+  const extracted = extractImportedReferenceRows_(sourceInfo.sheetId, request.sourceSheetName);
+  const mapping = request.mapping || {};
+  const rows = mapImportedReferenceRows_(extracted.headers, extracted.rows, mapping);
+  const batchId = buildGeneratedId_("imp");
+  const createdAt = new Date().toISOString();
+  const duplicateLookup = buildExistingReferenceLookup_();
+  const lineRecords = rows.map(function(row, index) {
+    const mappedReference = normalizeReference_(row.mapped.reference);
+    const errors = [];
+    let status = "valid";
+    let duplicateStatus = "none";
+    if (!mappedReference) {
+      status = "invalid";
+      errors.push("Référence manquante.");
+    } else if (duplicateLookup[mappedReference]) {
+      status = "duplicate";
+      duplicateStatus = "existing_reference";
+      errors.push("Référence déjà existante.");
+    }
+    return {
+      lineId: buildGeneratedId_("impl"),
+      batchId: batchId,
+      lineNumber: index + 2,
+      status: status,
+      duplicateStatus: duplicateStatus,
+      rawRow: row.raw,
+      mapped: row.mapped,
+      validationErrors: errors
+    };
+  });
+
+  const totals = {
+    totalRows: lineRecords.length,
+    validRows: lineRecords.filter(function(line) { return line.status === "valid"; }).length,
+    invalidRows: lineRecords.filter(function(line) { return line.status === "invalid"; }).length,
+    duplicateRows: lineRecords.filter(function(line) { return line.status === "duplicate"; }).length
+  };
+
+  batchesSheet.appendRow([
+    batchId,
+    createdAt,
+    String(request.createdBy || "").trim(),
+    "review",
+    String(request.sourceFileName || "").trim(),
+    String(request.sourceFileType || "").trim(),
+    String(sourceInfo.sourceFileId || "").trim(),
+    String(sourceInfo.sourceFileUrl || "").trim(),
+    String(sourceInfo.sheetName || "").trim(),
+    JSON.stringify(mapping || {}),
+    totals.totalRows,
+    totals.validRows,
+    totals.invalidRows,
+    totals.duplicateRows,
+    ""
+  ]);
+
+  if (lineRecords.length) {
+    linesSheet.getRange(linesSheet.getLastRow() + 1, 1, lineRecords.length, 22).setValues(lineRecords.map(function(line) {
+      return [
+        line.lineId,
+        line.batchId,
+        line.lineNumber,
+        line.status,
+        line.duplicateStatus,
+        JSON.stringify(line.rawRow || {}),
+        String(line.mapped.reference || "").trim(),
+        String(line.mapped.warehouse || "").trim(),
+        String(line.mapped.arrivalNote || "").trim(),
+        String(line.mapped.remark || "").trim(),
+        String(line.mapped.tail || "").trim(),
+        String(line.mapped.unitsPerBox || "").trim(),
+        String(line.mapped.boxes || "").trim(),
+        String(line.mapped.sign || "").trim(),
+        String(line.mapped.fractionText || "").trim(),
+        String(line.mapped.packNotation || "").trim(),
+        JSON.stringify(line.validationErrors || []),
+        "",
+        "",
+        "",
+        createdAt,
+        createdAt
+      ];
+    }));
+  }
+
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    batch: getReferenceImportBatchPayload_(batchId).batch,
+    lines: getReferenceImportBatchPayload_(batchId).lines,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function buildExistingReferenceLookup_() {
+  const sheet = getOptionalSheet_(SZFASHION_STOCK_SHEET);
+  if (!sheet) return {};
+  return readInventoryItems_(sheet).reduce(function(map, item) {
+    map[normalizeReference_(item.reference)] = true;
+    return map;
+  }, {});
+}
+
+function storeUploadedImportSource_(request) {
+  const fileBase64 = String(request.fileBase64 || "").trim();
+  const fileName = String(request.sourceFileName || "import").trim();
+  const fileType = resolveUploadedFileMimeType_(request);
+  if (!fileBase64) throw new Error("Fichier import manquant.");
+
+  const blob = Utilities.newBlob(Utilities.base64Decode(fileBase64), fileType, fileName);
+  const sourceFile = DriveApp.createFile(blob);
+  let convertedFile = null;
+  try {
+    convertedFile = Drive.Files.create({
+      name: fileName.replace(/\.[^.]+$/, "") + " (import)",
+      mimeType: "application/vnd.google-apps.spreadsheet"
+    }, blob, { supportsAllDrives: true });
+  } catch (error) {
+    throw new Error("Impossible de convertir le fichier importé en Google Sheet : " + (error && error.message ? error.message : error));
+  }
+  return {
+    sourceFileId: sourceFile.getId(),
+    sourceFileUrl: sourceFile.getUrl(),
+    sheetId: convertedFile && convertedFile.id ? convertedFile.id : "",
+    sheetName: String(request.sourceSheetName || "").trim()
+  };
+}
+
+function resolveUploadedFileMimeType_(request) {
+  const explicitMime = String(request && request.mimeType || "").trim();
+  if (explicitMime) return explicitMime;
+  const type = String(request && request.sourceFileType || "").trim().toLowerCase();
+  if (type === "xlsx") return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (type === "xls") return "application/vnd.ms-excel";
+  if (type === "ods") return "application/vnd.oasis.opendocument.spreadsheet";
+  return "application/octet-stream";
+}
+
+function extractImportedReferenceRows_(spreadsheetId, preferredSheetName) {
+  if (!spreadsheetId) throw new Error("Fichier converti introuvable.");
+  const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  const sheets = spreadsheet.getSheets();
+  if (!sheets.length) throw new Error("Aucune feuille trouvée dans le document importé.");
+  let sheet = null;
+  const preferred = String(preferredSheetName || "").trim();
+  if (preferred) {
+    sheet = spreadsheet.getSheetByName(preferred);
+  }
+  if (!sheet) sheet = sheets[0];
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 1 || lastCol < 1) throw new Error("Le document importé est vide.");
+  const values = sheet.getRange(1, 1, lastRow, lastCol).getDisplayValues();
+  return {
+    sheetName: sheet.getName(),
+    headers: values[0],
+    rows: values.slice(1)
+  };
+}
+
+function mapImportedReferenceRows_(headers, rows, mapping) {
+  const headerIndexByName = {};
+  (Array.isArray(headers) ? headers : []).forEach(function(header, index) {
+    headerIndexByName[String(header || "").trim()] = index;
+  });
+  function readMappedCell_(row, mappingKey) {
+    const mappedHeader = mapping && mapping[mappingKey] ? String(mapping[mappingKey]).trim() : "";
+    if (!mappedHeader && mappedHeader !== "") return "";
+    const index = Object.prototype.hasOwnProperty.call(headerIndexByName, mappedHeader) ? headerIndexByName[mappedHeader] : -1;
+    return index >= 0 ? String(getRowCell_(row, index) || "").trim() : "";
+  }
+  return (Array.isArray(rows) ? rows : []).map(function(row) {
+    const raw = {};
+    (Array.isArray(headers) ? headers : []).forEach(function(header, index) {
+      raw[String(header || "").trim()] = String(getRowCell_(row, index) || "").trim();
+    });
+    return {
+      raw: raw,
+      mapped: {
+        reference: readMappedCell_(row, "reference"),
+        warehouse: readMappedCell_(row, "warehouse"),
+        arrivalNote: readMappedCell_(row, "arrivalNote"),
+        remark: readMappedCell_(row, "remark"),
+        tail: readMappedCell_(row, "tail"),
+        unitsPerBox: readMappedCell_(row, "unitsPerBox"),
+        boxes: readMappedCell_(row, "boxes"),
+        sign: readMappedCell_(row, "sign"),
+        fractionText: readMappedCell_(row, "fractionText"),
+        packNotation: readMappedCell_(row, "packNotation")
+      }
+    };
+  });
+}
+
+function applyFinalizeReferenceImportBatchMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) throw new Error("Payload finalisation import manquant.");
+  const batchId = String(request.batchId || "").trim();
+  if (!batchId) throw new Error("batchId manquant.");
+  const batchesSheet = getOrCreateReferenceImportBatchesSheet_();
+  const linesSheet = getOrCreateReferenceImportLinesSheet_();
+  const lines = readReferenceImportLines_(linesSheet, batchId);
+  const lineResolutions = {};
+  (Array.isArray(request.lineResolutions) ? request.lineResolutions : []).forEach(function(entry) {
+    if (entry && entry.lineId) lineResolutions[String(entry.lineId)] = entry;
+  });
+  const nowIso = new Date().toISOString();
+  const lineRows = readSheetObjects_(linesSheet);
+  lines.forEach(function(line) {
+    const resolution = lineResolutions[line.lineId] || null;
+    if (!resolution) return;
+    const row = lineRows.find(function(entry) { return String(entry.line_id || "") === line.lineId; });
+    if (!row) return;
+    const rowIndex = row._rowIndex;
+    let nextStatus = line.status;
+    let createdReference = "";
+    if (resolution.action === "create") {
+      const created = createReferenceInStock_({
+        reference: line.mapped.reference,
+        warehouse: line.mapped.warehouse,
+        arrivalNote: line.mapped.arrivalNote,
+        remark: line.mapped.remark,
+        initialStock: {
+          tail: line.mapped.tail,
+          unitsPerBox: line.mapped.unitsPerBox,
+          boxes: line.mapped.boxes,
+          sign: line.mapped.sign,
+          fractionText: line.mapped.fractionText,
+          packNotation: line.mapped.packNotation
+        }
+      }, {
+        mutationId: String(mutation.id || ""),
+        actionType: "adjustment"
+      });
+      createdReference = String(created.item.reference || "").trim();
+      nextStatus = "created";
+    } else if (resolution.action === "ignore") {
+      nextStatus = "ignored";
+    } else if (resolution.action === "link_existing") {
+      nextStatus = "ignored";
+      createdReference = String(resolution.resolvedReference || "").trim();
+    }
+    linesSheet.getRange(rowIndex, 4, 1, 6).setValues([[
+      nextStatus,
+      line.duplicateStatus,
+      JSON.stringify(line.rawRow || {}),
+      String(line.mapped.reference || "").trim(),
+      String(line.mapped.warehouse || "").trim(),
+      String(line.mapped.arrivalNote || "").trim()
+    ]]);
+    linesSheet.getRange(rowIndex, 18, 1, 5).setValues([[
+      String(resolution.action || "").trim(),
+      String(resolution.resolvedReference || "").trim(),
+      createdReference,
+      String(row.created_at || nowIso),
+      nowIso
+    ]]);
+  });
+
+  updateReferenceImportBatchStatus_(batchesSheet, batchId, "finalized");
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    batch: getReferenceImportBatchPayload_(batchId).batch,
+    lines: getReferenceImportBatchPayload_(batchId).lines,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function updateReferenceImportBatchStatus_(sheet, batchId, status) {
+  const rows = readSheetObjects_(sheet);
+  const row = rows.find(function(entry) {
+    return String(entry.batch_id || "") === String(batchId || "");
+  });
+  if (!row) return;
+  sheet.getRange(row._rowIndex, 4).setValue(String(status || "").trim());
+}
+
+function applyCreatePickupTicketMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) throw new Error("Payload création ticket manquant.");
+  const ticketsSheet = getOrCreatePickupTicketsSheet_();
+  const linesSheet = getOrCreatePickupTicketLinesSheet_();
+  const eventsSheet = getOrCreatePickupTicketEventsSheet_();
+  const ticketId = buildGeneratedId_("pt");
+  const ticketNumber = generatePickupTicketNumber_(ticketsSheet);
+  const createdAt = new Date().toISOString();
+  const requestLines = Array.isArray(request.lines) ? request.lines : [];
+
+  ticketsSheet.appendRow([
+    ticketId,
+    ticketNumber,
+    "draft",
+    createdAt,
+    String(request.createdBy || "").trim(),
+    createdAt,
+    "",
+    "",
+    String(request.title || "").trim(),
+    String(request.requestTextRaw || "").trim(),
+    String(request.globalNote || "").trim(),
+    requestLines.length,
+    0,
+    requestLines.length,
+    1
+  ]);
+
+  if (requestLines.length) {
+    linesSheet.getRange(linesSheet.getLastRow() + 1, 1, requestLines.length, 18).setValues(requestLines.map(function(line, index) {
+      const item = findInventoryItemByReference_(normalizeReference_(line.reference));
+      return [
+        buildGeneratedId_("ptl"),
+        ticketId,
+        index + 1,
+        normalizeReference_(line.reference),
+        "to_confirm",
+        String(line.requestUnit || "").trim(),
+        line.requestQuantity == null ? "" : Number(line.requestQuantity || 0),
+        buildTicketQuantityDisplay_(line.requestUnit, line.requestQuantity),
+        "",
+        "",
+        "",
+        item ? stateModelToPieces_(item) : "",
+        buildWarehouseHelpDisplay_(line.reference),
+        getArrivalNoteForReference_(line.reference),
+        "",
+        "",
+        createdAt,
+        createdAt
+      ];
+    }));
+  }
+
+  appendPickupTicketEvent_(eventsSheet, {
+    ticketId: ticketId,
+    lineId: "",
+    eventType: "ticket_created",
+    actor: String(request.createdBy || "").trim(),
+    payload: { requestTextRaw: String(request.requestTextRaw || "").trim() },
+    message: "Ticket créé"
+  });
+
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    ticket: getPickupTicketPayload_(ticketId).ticket,
+    lines: getPickupTicketPayload_(ticketId).lines,
+    events: getPickupTicketPayload_(ticketId).events,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function generatePickupTicketNumber_(sheet) {
+  const timeZone = Session.getScriptTimeZone ? Session.getScriptTimeZone() : "Europe/Paris";
+  const prefix = Utilities.formatDate(new Date(), timeZone || "Europe/Paris", "'PT-'yyyyMMdd-");
+  const existing = readPickupTickets_(sheet).filter(function(ticket) {
+    return String(ticket.ticketNumber || "").indexOf(prefix) === 0;
+  }).length;
+  return prefix + ("000" + String(existing + 1)).slice(-3);
+}
+
+function buildTicketQuantityDisplay_(unit, quantity) {
+  const safeUnit = String(unit || "").trim();
+  const safeQuantity = Number(quantity || 0);
+  if (!(safeQuantity > 0) || !safeUnit) return "";
+  if (safeUnit === "box") return safeQuantity + "箱";
+  if (safeUnit === "pack") return safeQuantity + "包";
+  if (safeUnit === "piece") return safeQuantity + "件";
+  return "";
+}
+
+function buildWarehouseHelpDisplay_(reference) {
+  const normalizedReference = normalizeReference_(reference);
+  if (!normalizedReference) return "";
+  const sheet = getOptionalSheet_(SZFASHION_STOCK_SHEET);
+  if (!sheet) return "";
+  const items = readInventoryItems_(sheet).filter(function(item) {
+    return normalizeReference_(item.reference) === normalizedReference && stateModelToPieces_(item) > 0;
+  });
+  const warehouses = [];
+  items.forEach(function(item) {
+    const warehouse = String(item.warehouse || "").trim();
+    if (warehouse && warehouses.indexOf(warehouse) === -1) warehouses.push(warehouse);
+  });
+  return warehouses.join(" · ");
+}
+
+function getArrivalNoteForReference_(reference) {
+  const item = findInventoryItemByReference_(normalizeReference_(reference));
+  return item ? String(item.arrivalNote || "").trim() : "";
+}
+
+function appendPickupTicketEvent_(sheet, event) {
+  sheet.appendRow([
+    buildGeneratedId_("pte"),
+    String(event.ticketId || "").trim(),
+    String(event.lineId || "").trim(),
+    String(event.eventType || "").trim(),
+    String(event.actor || "").trim(),
+    new Date().toISOString(),
+    JSON.stringify(event.payload || {}),
+    String(event.message || "").trim()
+  ]);
+}
+
+function applyResolvePickupTicketLineMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) throw new Error("Payload ligne ticket manquant.");
+  const ticketId = String(request.ticketId || "").trim();
+  const lineId = String(request.lineId || "").trim();
+  const ticketsSheet = getOrCreatePickupTicketsSheet_();
+  const linesSheet = getOrCreatePickupTicketLinesSheet_();
+  const eventsSheet = getOrCreatePickupTicketEventsSheet_();
+  const ticket = requirePickupTicketById_(ticketsSheet, ticketId);
+  assertTicketVersion_(ticket, request.version);
+  const line = requirePickupTicketLineById_(linesSheet, ticketId, lineId);
+  const normalizedReference = normalizeReference_(line.reference);
+  const stockItem = findInventoryItemByReference_(normalizedReference);
+  const canonical = canonicalizePickupLineResolution_(line, request, stockItem);
+
+  linesSheet.getRange(line._rowIndex, 5, 1, 14).setValues([[
+    canonical.status,
+    String(line.requestUnit || "").trim(),
+    line.requestQuantity == null ? "" : Number(line.requestQuantity || 0),
+    String(line.requestedDisplay || "").trim(),
+    canonical.pickedUnit,
+    canonical.pickedQuantity == null ? "" : Number(canonical.pickedQuantity || 0),
+    canonical.pickedDisplay,
+    stockItem ? stateModelToPieces_(stockItem) : "",
+    buildWarehouseHelpDisplay_(normalizedReference),
+    getArrivalNoteForReference_(normalizedReference),
+    String(request.lineNote || "").trim(),
+    String(line.stockMutationId || "").trim(),
+    String(line.createdAt || ""),
+    new Date().toISOString()
+  ]]);
+
+  updatePickupTicketCounters_(ticketsSheet, linesSheet, ticketId, ticket.version + 1);
+  appendPickupTicketEvent_(eventsSheet, {
+    ticketId: ticketId,
+    lineId: lineId,
+    eventType: canonical.status === "not_found" ? "line_marked_not_found" : (canonical.status === "partial" ? "line_marked_partial" : "line_updated"),
+    actor: String(request.updatedBy || "").trim(),
+    payload: canonical,
+    message: "Ligne mise à jour"
+  });
+
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    ticket: getPickupTicketPayload_(ticketId).ticket,
+    lines: getPickupTicketPayload_(ticketId).lines,
+    events: getPickupTicketPayload_(ticketId).events,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function requirePickupTicketById_(sheet, ticketId) {
+  const ticket = readPickupTickets_(sheet).find(function(entry) {
+    return String(entry.ticketId || "") === String(ticketId || "");
+  });
+  if (!ticket) throw new Error("Ticket introuvable.");
+  return ticket;
+}
+
+function requirePickupTicketLineById_(sheet, ticketId, lineId) {
+  const line = readPickupTicketLines_(sheet, ticketId).find(function(entry) {
+    return String(entry.lineId || "") === String(lineId || "");
+  });
+  if (!line) throw new Error("Ligne ticket introuvable.");
+  return line;
+}
+
+function assertTicketVersion_(ticket, requestedVersion) {
+  const expected = Number(ticket && ticket.version || 0);
+  const received = Number(requestedVersion || 0);
+  if (expected > 0 && received > 0 && expected !== received) {
+    throw new Error("Conflit de version ticket. Recharge le ticket.");
+  }
+}
+
+function canonicalizePickupLineResolution_(line, request, stockItem) {
+  const explicitStatus = String(request.status || "").trim();
+  if (explicitStatus === "cancelled") {
+    return { status: "cancelled", pickedUnit: "", pickedQuantity: null, pickedDisplay: "" };
+  }
+  if (explicitStatus === "not_found") {
+    return { status: "not_found", pickedUnit: "", pickedQuantity: null, pickedDisplay: "" };
+  }
+  const pickedUnit = String(request.pickedUnit || "").trim();
+  const pickedQuantity = parseNullableNumber_(request.pickedQuantity);
+  if (!pickedUnit || !(pickedQuantity > 0)) {
+    throw new Error("Quantité réelle obligatoire pour résoudre la ligne.");
+  }
+  const pickedDisplay = buildTicketQuantityDisplay_(pickedUnit, pickedQuantity);
+  if (!pickedDisplay) throw new Error("Unité ticket non supportée.");
+  if (stockItem) {
+    const availablePieces = stateModelToPieces_(stockItem);
+    const pickedPieces = convertTicketQuantityToPieces_(stockItem, pickedUnit, pickedQuantity);
+    if (pickedPieces > availablePieces) throw new Error("Quantité ticket supérieure au stock disponible.");
+    const requestedPieces = line.requestUnit && line.requestQuantity
+      ? convertTicketQuantityToPieces_(stockItem, line.requestUnit, line.requestQuantity)
+      : 0;
+    const status = requestedPieces > 0 && pickedPieces < requestedPieces ? "partial" : "ready";
+    return { status: status, pickedUnit: pickedUnit, pickedQuantity: pickedQuantity, pickedDisplay: pickedDisplay };
+  }
+  return { status: "ready", pickedUnit: pickedUnit, pickedQuantity: pickedQuantity, pickedDisplay: pickedDisplay };
+}
+
+function updatePickupTicketCounters_(ticketsSheet, linesSheet, ticketId, nextVersion) {
+  const ticket = requirePickupTicketById_(ticketsSheet, ticketId);
+  const lines = readPickupTicketLines_(linesSheet, ticketId);
+  const resolvedLineCount = lines.filter(function(line) {
+    return line.status === "ready" || line.status === "partial" || line.status === "not_found" || line.status === "validated" || line.status === "cancelled";
+  }).length;
+  const blockedLineCount = lines.filter(function(line) {
+    return line.status === "to_confirm";
+  }).length;
+  const nextStatus = ticket.status === "validated" || ticket.status === "cancelled"
+    ? ticket.status
+    : (resolvedLineCount > 0 ? "in_progress" : "draft");
+  ticketsSheet.getRange(ticket._rowIndex, 3, 1, 13).setValues([[
+    nextStatus,
+    String(ticket.createdAt || ""),
+    String(ticket.createdBy || ""),
+    new Date().toISOString(),
+    String(ticket.validatedAt || ""),
+    String(ticket.validatedBy || ""),
+    String(ticket.title || ""),
+    String(ticket.requestTextRaw || ""),
+    String(ticket.globalNote || ""),
+    lines.length,
+    resolvedLineCount,
+    blockedLineCount,
+    Number(nextVersion || 0)
+  ]]);
+}
+
+function applyValidatePickupTicketMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) throw new Error("Payload validation ticket manquant.");
+  const ticketId = String(request.ticketId || "").trim();
+  const ticketsSheet = getOrCreatePickupTicketsSheet_();
+  const linesSheet = getOrCreatePickupTicketLinesSheet_();
+  const eventsSheet = getOrCreatePickupTicketEventsSheet_();
+  const stockSheet = getRequiredSheet_(SZFASHION_STOCK_SHEET);
+  const stockHeaders = stockSheet.getRange(1, 1, 1, stockSheet.getLastColumn()).getDisplayValues()[0];
+  const stockCols = resolveInventoryColumns_(stockHeaders);
+  const ticket = requirePickupTicketById_(ticketsSheet, ticketId);
+  assertTicketVersion_(ticket, request.version);
+  if (ticket.status === "validated" || ticket.status === "cancelled") {
+    throw new Error("Ce ticket est déjà clôturé.");
+  }
+  const lines = readPickupTicketLines_(linesSheet, ticketId);
+  const lineById = {};
+  lines.forEach(function(line) { lineById[line.lineId] = line; });
+  const requestLines = Array.isArray(request.lines) ? request.lines : [];
+  requestLines.forEach(function(requestLine) {
+    if (!requestLine || !requestLine.lineId) return;
+    const line = lineById[String(requestLine.lineId)];
+    if (!line) return;
+    const stockItem = findInventoryItemByReference_(line.reference);
+    const canonical = canonicalizePickupLineResolution_(line, requestLine, stockItem);
+    line.status = canonical.status;
+    line.pickedUnit = canonical.pickedUnit;
+    line.pickedQuantity = canonical.pickedQuantity;
+    line.pickedDisplay = canonical.pickedDisplay;
+  });
+
+  const blockingLine = lines.find(function(line) {
+    return line.status === "to_confirm"
+      || ((line.status === "ready" || line.status === "partial") && (!line.pickedUnit || !(Number(line.pickedQuantity || 0) > 0)));
+  });
+  if (blockingLine) throw new Error("Impossible de valider : une ligne reste à confirmer.");
+
+  lines.forEach(function(line) {
+    if (line.status === "not_found" || line.status === "cancelled") return;
+    const stockRowIndex = findInventoryRowIndexByReference_(stockSheet, stockCols, line.reference);
+    if (stockRowIndex < 2) throw new Error("Référence introuvable dans STOCK : " + line.reference);
+    const beforeRow = stockSheet.getRange(stockRowIndex, 1, 1, stockSheet.getLastColumn()).getDisplayValues()[0];
+    const beforeItem = buildInventoryItem_(beforeRow, stockCols, stockRowIndex);
+    const nextState = convertTicketQuantityToStockMutation_(beforeItem, {
+      unit: line.pickedUnit,
+      quantity: line.pickedQuantity
+    });
+    writeQuickEditToStockRow_(stockSheet, stockCols, stockRowIndex, {
+      tail: nextState.tail,
+      unitsPerBox: nextState.unitsPerBox,
+      itemBoxes: nextState.itemBoxes,
+      sign: nextState.sign,
+      fractionText: nextState.fractionText,
+      packNotation: nextState.packNotation
+    }, beforeItem);
+    const afterRow = stockSheet.getRange(stockRowIndex, 1, 1, stockSheet.getLastColumn()).getDisplayValues()[0];
+    const afterItem = buildInventoryItem_(afterRow, stockCols, stockRowIndex);
+    const historyEntry = appendHistoryForMutation_({
+      actionType: "pickup_ticket",
+      request: {
+        remark: String(line.lineNote || "").trim(),
+        businessId: ticketId,
+        businessLineId: line.lineId
+      }
+    }, beforeItem, afterItem);
+    line.stockMutationId = String(historyEntry && historyEntry.id || "").trim();
+    line.status = "validated";
+    linesSheet.getRange(line._rowIndex, 5, 1, 14).setValues([[
+      line.status,
+      line.requestUnit || "",
+      line.requestQuantity == null ? "" : line.requestQuantity,
+      line.requestedDisplay || "",
+      line.pickedUnit || "",
+      line.pickedQuantity == null ? "" : line.pickedQuantity,
+      line.pickedDisplay || "",
+      line.stockAvailablePiecesSnapshot == null ? "" : line.stockAvailablePiecesSnapshot,
+      line.warehouseHelpDisplay || "",
+      line.arrivalNoteSnapshot || "",
+      line.lineNote || "",
+      line.stockMutationId || "",
+      line.createdAt || "",
+      new Date().toISOString()
+    ]]);
+  });
+
+  ticketsSheet.getRange(ticket._rowIndex, 3, 1, 13).setValues([[
+    "validated",
+    String(ticket.createdAt || ""),
+    String(ticket.createdBy || ""),
+    new Date().toISOString(),
+    new Date().toISOString(),
+    String(request.validatedBy || "").trim(),
+    String(ticket.title || ""),
+    String(ticket.requestTextRaw || ""),
+    String(ticket.globalNote || ""),
+    lines.length,
+    lines.length,
+    0,
+    Number(ticket.version || 0) + 1
+  ]]);
+  appendPickupTicketEvent_(eventsSheet, {
+    ticketId: ticketId,
+    lineId: "",
+    eventType: "ticket_validated",
+    actor: String(request.validatedBy || "").trim(),
+    payload: { lines: lines.map(function(line) { return { lineId: line.lineId, status: line.status, pickedDisplay: line.pickedDisplay }; }) },
+    message: "Ticket validé"
+  });
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    ticket: getPickupTicketPayload_(ticketId).ticket,
+    lines: getPickupTicketPayload_(ticketId).lines,
+    events: getPickupTicketPayload_(ticketId).events,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function applyCancelPickupTicketMutation_(mutation) {
+  const request = mutation && mutation.request ? mutation.request : null;
+  if (!request) throw new Error("Payload annulation ticket manquant.");
+  const ticketId = String(request.ticketId || "").trim();
+  const ticketsSheet = getOrCreatePickupTicketsSheet_();
+  const eventsSheet = getOrCreatePickupTicketEventsSheet_();
+  const ticket = requirePickupTicketById_(ticketsSheet, ticketId);
+  if (ticket.status === "validated") throw new Error("Impossible d'annuler un ticket déjà validé.");
+  ticketsSheet.getRange(ticket._rowIndex, 3).setValue("cancelled");
+  ticketsSheet.getRange(ticket._rowIndex, 6).setValue(new Date().toISOString());
+  appendPickupTicketEvent_(eventsSheet, {
+    ticketId: ticketId,
+    lineId: "",
+    eventType: "ticket_cancelled",
+    actor: String(request.cancelledBy || "").trim(),
+    payload: {},
+    message: "Ticket annulé"
+  });
+  return {
+    ok: true,
+    mutationId: String(mutation.id || ""),
+    ticket: getPickupTicketPayload_(ticketId).ticket,
+    lines: getPickupTicketPayload_(ticketId).lines,
+    events: getPickupTicketPayload_(ticketId).events,
+    generatedAt: new Date().toISOString(),
+    source: "google_sheets"
+  };
+}
+
+function findInventoryRowIndexByReference_(sheet, cols, reference) {
+  const expectedReference = normalizeReference_(reference);
+  if (!expectedReference) return -1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+  const references = sheet.getRange(2, cols.reference + 1, lastRow - 1, 1).getDisplayValues();
+  for (let index = 0; index < references.length; index++) {
+    if (normalizeReference_(references[index][0]) === expectedReference) return index + 2;
+  }
+  return -1;
+}
+
+function convertTicketQuantityToPieces_(referenceItem, unit, quantity) {
+  const safeUnit = String(unit || "").trim();
+  const safeQuantity = Number(quantity || 0);
+  if (!(safeQuantity > 0)) throw new Error("Quantité ticket invalide.");
+  if (safeUnit === "piece") return Math.round(safeQuantity);
+  if (safeUnit === "box") {
+    const unitsPerBox = Math.max(0, parseLooseInteger_(referenceItem && referenceItem.unitsPerBox));
+    if (!(unitsPerBox > 0)) throw new Error("Impossible de convertir en 箱 sans 件/箱.");
+    return Math.round(safeQuantity * unitsPerBox);
+  }
+  if (safeUnit === "pack") {
+    const packSize = Math.max(0, parseLooseInteger_(referenceItem && referenceItem.colisage));
+    if (!(packSize > 0)) throw new Error("Impossible de convertir en 包 sans Colisage.");
+    return Math.round(safeQuantity * packSize);
+  }
+  throw new Error("Unité ticket non supportée.");
+}
+
+function convertTicketQuantityToStockMutation_(referenceItem, ticketQuantity) {
+  const item = referenceItem || {};
+  const beforePieces = stateModelToPieces_(item);
+  const removePieces = convertTicketQuantityToPieces_(item, ticketQuantity && ticketQuantity.unit, ticketQuantity && ticketQuantity.quantity);
+  if (removePieces > beforePieces) throw new Error("Quantité ticket supérieure au stock disponible.");
+  const afterPieces = beforePieces - removePieces;
+  return buildStateFromPiecesServer_(afterPieces, {
+    unitsPerBox: item.unitsPerBox,
+    colisage: item.colisage,
+    remark: item.remark,
+    reconstructionMode: String(ticketQuantity && ticketQuantity.unit || "").trim() === "pack" ? "packs" : ""
+  });
+}
+
+function normalizeStateModelServer_(stateInput) {
+  const state = {
+    tail: Math.max(0, parseLooseInteger_(stateInput && stateInput.tail)),
+    unitsPerBox: Math.max(0, parseLooseInteger_(stateInput && stateInput.unitsPerBox)),
+    itemBoxes: Math.max(0, parseLooseInteger_(stateInput && stateInput.itemBoxes)),
+    sign: normalizeSign_(stateInput && stateInput.sign),
+    fractionText: normalizeFractionText_(stateInput && stateInput.fractionText),
+    fractionValue: parseFractionValue_(stateInput && (stateInput.fractionValue || stateInput.fractionText)),
+    colisage: Math.max(0, parseLooseInteger_(stateInput && stateInput.colisage)),
+    packNotation: normalizePackNotation_(stateInput && stateInput.packNotation),
+    remark: String(stateInput && stateInput.remark || "").trim()
+  };
+  if (!(state.fractionValue > 0)) {
+    state.fractionValue = 0;
+    state.fractionText = "";
+    state.sign = "";
+  } else if (!state.sign) {
+    state.sign = state.itemBoxes > 0 ? "+" : "×";
+  }
+  if (!state.fractionText && state.fractionValue > 0) {
+    state.fractionText = fractionTextFromPiecesServer_(Math.round(state.fractionValue * state.unitsPerBox), state.unitsPerBox);
+  }
+  if (state.sign === "×" && state.itemBoxes <= 0) state.itemBoxes = 1;
+  if (state.sign === "+" && state.itemBoxes <= 0) {
+    state.sign = "×";
+    state.itemBoxes = 1;
+  }
+  return state;
+}
+
+function reduceFractionServer_(num, den) {
+  function gcd_(left, right) {
+    return right ? gcd_(right, left % right) : left;
+  }
+  const safeNum = Math.max(0, parseLooseInteger_(num));
+  const safeDen = Math.max(1, parseLooseInteger_(den));
+  const divisor = gcd_(safeNum, safeDen);
+  return { num: safeNum / divisor, den: safeDen / divisor };
+}
+
+function fractionTextFromPiecesServer_(pieces, unitsPerBox) {
+  const safePieces = Math.max(0, parseLooseInteger_(pieces));
+  const safeUnits = Math.max(0, parseLooseInteger_(unitsPerBox));
+  if (!(safePieces > 0) || !(safeUnits > 0)) return "";
+  const reduced = reduceFractionServer_(safePieces, safeUnits);
+  return reduced.num + "/" + reduced.den;
+}
+
+function buildSimpleStateFromPiecesServer_(totalPiecesInput, options) {
+  const totalPieces = Math.max(0, Number(totalPiecesInput || 0));
+  const unitsPerBox = Math.max(0, parseLooseInteger_(options && options.unitsPerBox));
+  const colisage = Math.max(0, parseLooseInteger_(options && options.colisage));
+  const remark = String(options && options.remark || "").trim();
+  if (!(unitsPerBox > 0)) throw new Error("Conversion ticket impossible sans 件/箱.");
+  const wholeBoxes = Math.floor(totalPieces / unitsPerBox);
+  const remainderPieces = Math.max(0, totalPieces - (wholeBoxes * unitsPerBox));
+  if (!(remainderPieces > 0)) {
+    return normalizeStateModelServer_({
+      tail: 0,
+      unitsPerBox: unitsPerBox,
+      itemBoxes: wholeBoxes,
+      sign: "",
+      fractionText: "",
+      fractionValue: 0,
+      colisage: colisage,
+      packNotation: "",
+      remark: remark
+    });
+  }
+  return normalizeStateModelServer_({
+    tail: 0,
+    unitsPerBox: unitsPerBox,
+    itemBoxes: wholeBoxes > 0 ? wholeBoxes : 1,
+    sign: wholeBoxes > 0 ? "+" : "×",
+    fractionText: fractionTextFromPiecesServer_(remainderPieces, unitsPerBox),
+    fractionValue: remainderPieces / unitsPerBox,
+    colisage: colisage,
+    packNotation: "",
+    remark: remark
+  });
+}
+
+function buildPackFriendlyStateFromPiecesServer_(totalPiecesInput, options) {
+  const totalPieces = Math.max(0, Number(totalPiecesInput || 0));
+  const unitsPerBox = Math.max(0, parseLooseInteger_(options && options.unitsPerBox));
+  const colisage = Math.max(0, parseLooseInteger_(options && options.colisage));
+  const remark = String(options && options.remark || "").trim();
+  if (!(unitsPerBox > 0)) throw new Error("Conversion ticket impossible sans 件/箱.");
+  const wholeBoxes = Math.floor(totalPieces / unitsPerBox);
+  const remainderPieces = Math.max(0, totalPieces - (wholeBoxes * unitsPerBox));
+  if (!(remainderPieces > 0)) return buildSimpleStateFromPiecesServer_(totalPieces, options);
+  const packsPerBox = colisage > 0 && unitsPerBox % colisage === 0 ? unitsPerBox / colisage : 0;
+  if (packsPerBox > 0 && remainderPieces % colisage === 0) {
+    const packCount = remainderPieces / colisage;
+    return normalizeStateModelServer_({
+      tail: 0,
+      unitsPerBox: unitsPerBox,
+      itemBoxes: wholeBoxes > 0 ? wholeBoxes : 1,
+      sign: wholeBoxes > 0 ? "+" : "×",
+      fractionText: packCount + "/" + packsPerBox,
+      fractionValue: packCount / packsPerBox,
+      colisage: colisage,
+      packNotation: "",
+      remark: remark
+    });
+  }
+  return buildSimpleStateFromPiecesServer_(totalPieces, options);
+}
+
+function buildStateFromPiecesServer_(totalPiecesInput, options) {
+  const reconstructionMode = String(options && options.reconstructionMode || "").trim();
+  return reconstructionMode === "packs"
+    ? buildPackFriendlyStateFromPiecesServer_(totalPiecesInput, options)
+    : buildSimpleStateFromPiecesServer_(totalPiecesInput, options);
 }
