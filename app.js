@@ -1176,29 +1176,29 @@ function renderInventoryCard(item) {
   const arrivalMeta = getInventoryArrivalMeta(item);
   const arrivalLines = splitInventoryArrivalNoteLines(arrivalMeta.note);
   const arrivalLine = arrivalMeta.note
-    ? '<div class="h-6 overflow-hidden text-[9px] leading-3 text-on-surface-variant">'
+    ? '<div class="h-6 overflow-hidden text-right text-[9px] leading-3 text-on-surface-variant">'
       + '<span class="block truncate">' + escapeHtml(arrivalLines[0]) + '</span>'
       + (arrivalLines[1] ? '<span class="block truncate">' + escapeHtml(arrivalLines[1]) + '</span>' : '')
       + '</div>'
-    : '<div class="mt-0.5 h-6"></div>';
-  const rightInfoMarkup = ''
-    + '<div class="flex min-h-[3.25rem] w-[6.8rem] shrink-0 flex-col justify-between text-right">'
-    + '<div class="truncate text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml(warehouse) + '</div>'
-    + arrivalLine
-    + '</div>';
+    : '<div class="h-6"></div>';
 
   return ''
-    + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[4.9rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-item-id="' + escapeHtml(itemId) + '" data-reference="' + escapeHtml(reference) + '" data-stock-display="' + escapeHtml(stockDisplay) + '" data-stock-state="' + escapeHtml(item.stockState) + '">'
-    + '<button class="inventory-card-main flex min-w-0 flex-1 items-stretch justify-between gap-2 px-2.5 py-2 text-left" type="button" data-action="open-quick-edit" data-item-id="' + escapeHtml(itemId) + '">'
-    + '<div class="flex min-w-0 flex-1 flex-col justify-between">'
-    + '<span class="truncate pr-2 text-[12px] font-bold tracking-tight text-on-surface">' + escapeHtml(reference) + '</span>'
-    + '<div class="mt-1.5 flex items-end justify-between gap-2">'
-    + '<div class="min-w-0">'
+    + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[5.1rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-item-id="' + escapeHtml(itemId) + '" data-reference="' + escapeHtml(reference) + '" data-stock-display="' + escapeHtml(stockDisplay) + '" data-stock-state="' + escapeHtml(item.stockState) + '">'
+    + '<button class="inventory-card-main flex min-w-0 flex-1 flex-col justify-between px-2.5 py-2 text-left" type="button" data-action="open-quick-edit" data-item-id="' + escapeHtml(itemId) + '">'
+    + '<div class="flex items-start justify-between gap-2">'
+    + '<span class="min-w-0 flex-1 truncate pr-2 text-[12px] font-bold tracking-tight text-on-surface">' + escapeHtml(reference) + '</span>'
+    + '<div class="w-[6.8rem] shrink-0 text-right">'
+    + '<div class="truncate text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml(warehouse) + '</div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="mt-1 min-w-0 pr-1">'
     + '<span class="block truncate text-[13px] font-medium ' + stockClass + '">' + escapeHtml(stockDisplay) + '</span>'
     + '</div>'
+    + '<div class="mt-1 flex justify-end">'
+    + '<div class="w-[6.8rem] shrink-0">'
+    + arrivalLine
     + '</div>'
     + '</div>'
-    + rightInfoMarkup
     + '</button>'
     + '<a class="reference-detail-trigger flex w-10 shrink-0 touch-manipulation select-none items-center justify-center border-l border-outline-variant/20 text-outline-variant transition-colors duration-150 hover:bg-surface-container-highest hover:text-on-surface-variant active:bg-surface-container-high" href="#detail/' + encodeURIComponent(reference) + '" aria-label="Ouvrir la fiche de ' + escapeHtml(reference) + '">'
     + '<span class="material-symbols-outlined !text-[16px]">chevron_right</span>'
