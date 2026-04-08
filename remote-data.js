@@ -91,6 +91,24 @@
       mutationId: payload && payload.mutationId ? String(payload.mutationId) : "",
       item: payload && payload.item ? payload.item : null,
       historyEntry: payload && payload.historyEntry ? payload.historyEntry : null,
+      ticket: payload && payload.ticket ? payload.ticket : null,
+      historyEntries: Array.isArray(payload && payload.historyEntries) ? payload.historyEntries : [],
+      generatedAt: payload && typeof payload.generatedAt === "string" ? payload.generatedAt : "",
+      source: payload && payload.source ? payload.source : "google_sheets"
+    };
+  }
+
+  function normalizeTicketsPayload(payload) {
+    return {
+      tickets: Array.isArray(payload && payload.tickets) ? payload.tickets : [],
+      generatedAt: payload && typeof payload.generatedAt === "string" ? payload.generatedAt : "",
+      source: payload && payload.source ? payload.source : "google_sheets"
+    };
+  }
+
+  function normalizeTicketDetailPayload(payload) {
+    return {
+      ticket: payload && payload.ticket ? payload.ticket : null,
       generatedAt: payload && typeof payload.generatedAt === "string" ? payload.generatedAt : "",
       source: payload && payload.source ? payload.source : "google_sheets"
     };
@@ -117,6 +135,14 @@
         ensureConfigured();
         return fetchJson(buildUrl(baseUrl, "history")).then(normalizeHistoryPayload);
       },
+      fetchTickets: function() {
+        ensureConfigured();
+        return fetchJson(buildUrl(baseUrl, "tickets")).then(normalizeTicketsPayload);
+      },
+      fetchTicketDetail: function(ticketId) {
+        ensureConfigured();
+        return fetchJson(buildUrl(baseUrl, "ticket_detail", { ticketId: ticketId })).then(normalizeTicketDetailPayload);
+      },
       fetchDetail: function(reference) {
         ensureConfigured();
         return fetchJson(buildUrl(baseUrl, "detail", { reference: reference })).then(function(payload) {
@@ -125,7 +151,8 @@
       },
       pushMutation: function(mutation) {
         ensureConfigured();
-        return postJson(buildUrl(baseUrl, "mutate"), { mutation: mutation }).then(normalizeMutationPayload);
+        const route = mutation && mutation.type === "ticket_validate" ? "ticket_validate" : "mutate";
+        return postJson(buildUrl(baseUrl, route), { mutation: mutation }).then(normalizeMutationPayload);
       }
     };
   };

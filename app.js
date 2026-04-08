@@ -75,20 +75,24 @@ function refreshRemoteSnapshot(options) {
 
   remoteRefreshPromise = Promise.all([
     remoteDataSource.fetchInventory(),
-    remoteDataSource.fetchHistory()
+    remoteDataSource.fetchHistory(),
+    remoteDataSource.fetchTickets ? remoteDataSource.fetchTickets() : Promise.resolve({ tickets: [], generatedAt: "" })
   ]).then(function(results) {
     const inventoryPayload = results[0];
     const historyPayload = results[1];
+    const ticketsPayload = results[2];
     const pendingCount = state.pendingMutations.length;
     const snapshotResult = dataSource.mergeRemoteSnapshot({
       items: inventoryPayload.items,
       historyItems: historyPayload.items,
+      tickets: ticketsPayload && Array.isArray(ticketsPayload.tickets) ? ticketsPayload.tickets : [],
       syncStatus: "idle",
-      lastSyncAt: inventoryPayload.generatedAt || historyPayload.generatedAt || new Date().toISOString(),
+      lastSyncAt: inventoryPayload.generatedAt || historyPayload.generatedAt || (ticketsPayload && ticketsPayload.generatedAt) || new Date().toISOString(),
       dataSource: pendingCount ? "remote-with-pending" : "remote-cache"
     });
     state.items = Array.isArray(snapshotResult.items) ? snapshotResult.items : state.items;
     state.historyItems = Array.isArray(snapshotResult.historyItems) ? snapshotResult.historyItems : state.historyItems;
+    state.tickets = Array.isArray(snapshotResult.tickets) ? snapshotResult.tickets : state.tickets;
     applyDataMeta(snapshotResult.meta);
     renderAll();
     return true;
@@ -166,16 +170,18 @@ function syncPendingMutations(options) {
     }
 
     return remoteDataSource.pushMutation(mutation).then(function(result) {
-      const committed = dataSource.commitSyncedMutation({
-        mutationId: mutation.id,
-        item: result.item,
-        historyEntry: result.historyEntry,
-        syncStatus: "idle",
-        lastSyncAt: result.generatedAt || new Date().toISOString(),
-        dataSource: state.pendingMutations.length > 1 ? "remote-with-pending" : "remote-cache"
-      });
+    const committed = dataSource.commitSyncedMutation({
+      mutationId: mutation.id,
+      item: result.item,
+      historyEntry: result.historyEntry,
+      ticket: result.ticket,
+      syncStatus: "idle",
+      lastSyncAt: result.generatedAt || new Date().toISOString(),
+      dataSource: state.pendingMutations.length > 1 ? "remote-with-pending" : "remote-cache"
+    });
       state.items = Array.isArray(committed.items) ? committed.items : state.items;
       state.historyItems = Array.isArray(committed.historyItems) ? committed.historyItems : state.historyItems;
+      state.tickets = Array.isArray(committed.tickets) ? committed.tickets : state.tickets;
       applyDataMeta(committed.meta);
       renderAll();
       return refreshRemoteSnapshot({ silent: true }).then(syncNext);
@@ -1040,6 +1046,10 @@ function formatTicketStatusLabel(status) {
   return String(status || "pending").replace(/_/g, " ");
 }
 
+function formatTicketLineStatusLabel(status) {
+  return String(status || "pending").replace(/_/g, " ");
+}
+
 function getTicketStatusBadgeClass(status) {
   if (status === "in_preparation") return "bg-primary-container text-on-primary-container";
   if (status === "prepared") return "bg-secondary-container text-on-secondary-container";
@@ -1079,6 +1089,16 @@ function getTicketRequestedSummary(ticket) {
   return formatRequestedQuantity(totals.boxes, totals.packs);
 }
 
+function sumTicketLineQuantity(ticket, boxesKey, packsKey) {
+  const lines = Array.isArray(ticket && ticket.lines) ? ticket.lines : [];
+  const totals = lines.reduce(function(acc, line) {
+    acc.boxes += Math.max(0, Math.trunc(Number(line && line[boxesKey]) || 0));
+    acc.packs += Math.max(0, Math.trunc(Number(line && line[packsKey]) || 0));
+    return acc;
+  }, { boxes: 0, packs: 0 });
+  return formatRequestedQuantity(totals.boxes, totals.packs);
+}
+
 function getTicketSortWeight(status) {
   if (status === "in_preparation") return 0;
   if (status === "prepared") return 1;
@@ -1110,6 +1130,13 @@ function renderTicketCard(ticket) {
             '<span class="text-outline-variant/50">/</span>',
             '<span>', escapeHtml(getTicketRequestedSummary(ticket)), '</span>',
           '</div>',
+          '<div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-on-surface-variant">',
+            '<span>D ', escapeHtml(getTicketRequestedSummary(ticket)), '</span>',
+            '<span class="text-outline-variant/50">/</span>',
+            '<span>P ', escapeHtml(sumTicketLineQuantity(ticket, "preparedBoxes", "preparedPacks")), '</span>',
+            '<span class="text-outline-variant/50">/</span>',
+            '<span>V ', escapeHtml(sumTicketLineQuantity(ticket, "validatedBoxes", "validatedPacks")), '</span>',
+          '</div>',
           note ? '<div class="mt-1 truncate text-[11px] leading-4 text-on-surface-variant">' + escapeHtml(note) + '</div>' : '',
         '</div>',
         '<span class="shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getTicketStatusBadgeClass(ticket.status) + '">' + escapeHtml(formatTicketStatusLabel(ticket.status)) + '</span>',
@@ -1121,23 +1148,23 @@ function renderTicketCard(ticket) {
 function renderTicketLine(line) {
   return [
     '<article class="border border-outline-variant/20 bg-surface-container-low px-3 py-3" data-ticket-line-id="', escapeHtml(line.id), '">',
-      '<div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_5.5rem_5.5rem_auto] sm:items-end">',
+      '<div class="grid gap-3">',
         '<label class="block min-w-0">',
           '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Référence</div>',
           '<input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-reference" data-line-id="', escapeHtml(line.id), '" type="text" value="', escapeHtml(line.reference || ""), '" />',
         '</label>',
-        '<label class="block">',
-          '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱</div>',
-          '<input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-boxes" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.requestedBoxes) || 0)))), '" />',
-        '</label>',
-        '<label class="block">',
-          '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">包</div>',
-          '<input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-packs" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.requestedPacks) || 0)))), '" />',
-        '</label>',
-        '<div class="flex items-center justify-between gap-2 sm:block">',
-          '<div class="text-[11px] font-black tracking-tight text-primary">', escapeHtml(formatRequestedQuantity(line.requestedBoxes, line.requestedPacks)), '</div>',
-          '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container-high" data-action="delete-ticket-line" data-line-id="', escapeHtml(line.id), '" type="button">Supprimer</button>',
+        '<div class="grid gap-3 sm:grid-cols-[repeat(6,minmax(0,1fr))_9rem_auto] sm:items-end">',
+          '<label class="block"><div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Demandé 箱</div><input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-boxes" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.requestedBoxes) || 0)))), '" /></label>',
+          '<label class="block"><div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Demandé 包</div><input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-packs" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.requestedPacks) || 0)))), '" /></label>',
+          '<label class="block"><div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Préparé 箱</div><input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-prepared-boxes" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.preparedBoxes) || 0)))), '" /></label>',
+          '<label class="block"><div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Préparé 包</div><input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-prepared-packs" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.preparedPacks) || 0)))), '" /></label>',
+          '<label class="block"><div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Validé 箱</div><input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-validated-boxes" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.validatedBoxes) || 0)))), '" /></label>',
+          '<label class="block"><div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Validé 包</div><input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-validated-packs" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.validatedPacks) || 0)))), '" /></label>',
+          '<label class="block"><div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Statut ligne</div><select class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface" data-action="ticket-line-status" data-line-id="', escapeHtml(line.id), '"><option value="pending"', line.lineStatus === "pending" ? ' selected' : '', '>pending</option><option value="found"', line.lineStatus === "found" ? ' selected' : '', '>found</option><option value="partial"', line.lineStatus === "partial" ? ' selected' : '', '>partial</option><option value="missing"', line.lineStatus === "missing" ? ' selected' : '', '>missing</option><option value="cancelled"', line.lineStatus === "cancelled" ? ' selected' : '', '>cancelled</option></select></label>',
+          '<div class="flex items-end justify-between gap-2 sm:block"><button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container-high" data-action="delete-ticket-line" data-line-id="', escapeHtml(line.id), '" type="button">Supprimer</button></div>',
         '</div>',
+        '<label class="block"><div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Note ligne</div><textarea class="mt-1 min-h-[4rem] w-full resize-none border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] leading-5 text-on-surface" data-action="ticket-line-note" data-line-id="', escapeHtml(line.id), '">', escapeHtml(String(line.note || "")), '</textarea></label>',
+        '<div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant"><span>D ', escapeHtml(formatRequestedQuantity(line.requestedBoxes, line.requestedPacks)), '</span><span>P ', escapeHtml(formatRequestedQuantity(line.preparedBoxes, line.preparedPacks)), '</span><span>V ', escapeHtml(formatRequestedQuantity(line.validatedBoxes, line.validatedPacks)), '</span><span class="text-on-surface">', escapeHtml(formatTicketStatusLabel(line.lineStatus)), '</span></div>',
       '</div>',
     '</article>'
   ].join("");
@@ -3231,6 +3258,7 @@ function renderTicketsPage() {
   const ticketDetailHeading = document.getElementById("ticketDetailHeading");
   const ticketDetailMeta = document.getElementById("ticketDetailMeta");
   const ticketStatusSelect = document.getElementById("ticketStatusSelect");
+  const ticketValidateButton = document.getElementById("ticketValidateButton");
   const ticketTitleInput = document.getElementById("ticketTitleInput");
   const ticketNoteInput = document.getElementById("ticketNoteInput");
   const ticketLinesList = document.getElementById("ticketLinesList");
@@ -3273,9 +3301,15 @@ function renderTicketsPage() {
 
   if (ticketDetailHeading) ticketDetailHeading.textContent = String(ticket.title || "").trim() || "Billet sans titre";
   if (ticketDetailMeta) {
-    ticketDetailMeta.textContent = formatTicketStatusLabel(ticket.status) + " / " + formatTicketUpdatedAt(ticket.updatedAt || ticket.createdAt);
+    const syncLabel = ticket.syncState && ticket.syncState !== "synced" ? " / sync..." : "";
+    ticketDetailMeta.textContent = formatTicketStatusLabel(ticket.status) + " / " + formatTicketUpdatedAt(ticket.updatedAt || ticket.createdAt) + syncLabel;
   }
-  if (ticketStatusSelect) ticketStatusSelect.value = ["pending", "in_preparation", "prepared"].indexOf(ticket.status) >= 0 ? ticket.status : "pending";
+  if (ticketStatusSelect) ticketStatusSelect.value = ticket.status || "pending";
+  if (ticketValidateButton) {
+    const canValidate = ticket.status !== "validated" && ticket.status !== "cancelled";
+    ticketValidateButton.disabled = !canValidate;
+    ticketValidateButton.classList.toggle("opacity-50", !canValidate);
+  }
   if (ticketTitleInput) ticketTitleInput.value = ticket.title || "";
   if (ticketNoteInput) ticketNoteInput.value = ticket.note || "";
   if (ticketLinesList) ticketLinesList.innerHTML = (Array.isArray(ticket.lines) ? ticket.lines : []).map(renderTicketLine).join("");
@@ -3328,6 +3362,12 @@ function updateTicketLine(ticketId, lineId, patch) {
 function deleteTicketLine(ticketId, lineId) {
   if (!ticketId || !lineId) return;
   applyTicketMutation(dataSource.deleteTicketLine(ticketId, lineId));
+}
+
+function validateCurrentTicket() {
+  if (!state.ticketId) return;
+  const result = applyTicketMutation(dataSource.validateTicket(state.ticketId, new Date().toISOString()));
+  if (result) renderAll();
 }
 
 function renderAll() {
@@ -3481,6 +3521,7 @@ function bindTicketEvents() {
   const ticketDetailBackButton = document.getElementById("ticketDetailBackButton");
   const ticketAddReferencesBackButton = document.getElementById("ticketAddReferencesBackButton");
   const ticketStatusSelect = document.getElementById("ticketStatusSelect");
+  const ticketValidateButton = document.getElementById("ticketValidateButton");
   const ticketTitleInput = document.getElementById("ticketTitleInput");
   const ticketNoteInput = document.getElementById("ticketNoteInput");
   const ticketAddLineButton = document.getElementById("ticketAddLineButton");
@@ -3511,7 +3552,17 @@ function bindTicketEvents() {
   if (ticketStatusSelect) {
     ticketStatusSelect.addEventListener("change", function(event) {
       if (!state.ticketId) return;
-      applyTicketMutation(dataSource.changeTicketStatus(state.ticketId, String(event.target.value || "pending")));
+      const nextStatus = String(event.target.value || "pending");
+      if (nextStatus === "validated") {
+        validateCurrentTicket();
+        return;
+      }
+      applyTicketMutation(dataSource.changeTicketStatus(state.ticketId, nextStatus));
+    });
+  }
+  if (ticketValidateButton) {
+    ticketValidateButton.addEventListener("click", function() {
+      validateCurrentTicket();
     });
   }
   if (ticketTitleInput) {
@@ -3547,7 +3598,7 @@ function bindTicketEvents() {
     });
     ticketLinesList.addEventListener("change", function(event) {
       const target = event.target;
-      if (!(target instanceof HTMLInputElement)) return;
+      if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement) && !(target instanceof HTMLSelectElement)) return;
       const lineId = target.getAttribute("data-line-id");
       const action = target.getAttribute("data-action");
       if (!lineId || !action) return;
@@ -3561,6 +3612,30 @@ function bindTicketEvents() {
       }
       if (action === "ticket-line-packs") {
         updateTicketLine(state.ticketId, lineId, { requestedPacks: Math.max(0, Math.trunc(Number(String(target.value || "").replace(/[^\d]/g, "")) || 0)) });
+        return;
+      }
+      if (action === "ticket-line-prepared-boxes") {
+        updateTicketLine(state.ticketId, lineId, { preparedBoxes: Math.max(0, Math.trunc(Number(String(target.value || "").replace(/[^\d]/g, "")) || 0)) });
+        return;
+      }
+      if (action === "ticket-line-prepared-packs") {
+        updateTicketLine(state.ticketId, lineId, { preparedPacks: Math.max(0, Math.trunc(Number(String(target.value || "").replace(/[^\d]/g, "")) || 0)) });
+        return;
+      }
+      if (action === "ticket-line-validated-boxes") {
+        updateTicketLine(state.ticketId, lineId, { validatedBoxes: Math.max(0, Math.trunc(Number(String(target.value || "").replace(/[^\d]/g, "")) || 0)) });
+        return;
+      }
+      if (action === "ticket-line-validated-packs") {
+        updateTicketLine(state.ticketId, lineId, { validatedPacks: Math.max(0, Math.trunc(Number(String(target.value || "").replace(/[^\d]/g, "")) || 0)) });
+        return;
+      }
+      if (action === "ticket-line-status") {
+        updateTicketLine(state.ticketId, lineId, { lineStatus: String(target.value || "pending") });
+        return;
+      }
+      if (action === "ticket-line-note") {
+        updateTicketLine(state.ticketId, lineId, { note: String(target.value || "") });
       }
     });
   }
