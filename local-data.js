@@ -16,6 +16,7 @@
       return {
         items: [],
         historyItems: [],
+        tickets: [],
         pendingMutations: [],
         syncStatus: "idle",
         lastSyncAt: "",
@@ -136,6 +137,7 @@
       const payload = {
         items: Array.isArray(snapshot.items) ? snapshot.items : [],
         historyItems: Array.isArray(snapshot.historyItems) ? snapshot.historyItems : [],
+        tickets: Array.isArray(snapshot.tickets) ? snapshot.tickets : [],
         pendingMutations: Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations : [],
         syncStatus: snapshot.syncStatus || "idle",
         lastSyncAt: typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : "",
@@ -157,6 +159,7 @@
         return {
           items: items,
           historyItems: historyItems,
+          tickets: Array.isArray(parsed.tickets) ? parsed.tickets.slice() : [],
           pendingMutations: Array.isArray(parsed.pendingMutations) ? parsed.pendingMutations.slice() : [],
           syncStatus: parsed.syncStatus || "idle",
           lastSyncAt: typeof parsed.lastSyncAt === "string" ? parsed.lastSyncAt : "",
@@ -184,6 +187,212 @@
       return {
         items: snapshot.historyItems.slice(),
         meta: getMeta(snapshot)
+      };
+    }
+
+    function normalizeTicketLine(line) {
+      const nextLine = line || {};
+      return {
+        id: String(nextLine.id || ""),
+        reference: String(nextLine.reference || "").trim(),
+        requestedBoxes: Math.max(0, Math.trunc(Number(nextLine.requestedBoxes) || 0)),
+        requestedPacks: Math.max(0, Math.trunc(Number(nextLine.requestedPacks) || 0))
+      };
+    }
+
+    function normalizeTicket(ticket) {
+      const nextTicket = ticket || {};
+      return {
+        id: String(nextTicket.id || ""),
+        createdAt: typeof nextTicket.createdAt === "string" ? nextTicket.createdAt : "",
+        updatedAt: typeof nextTicket.updatedAt === "string" ? nextTicket.updatedAt : "",
+        status: String(nextTicket.status || "pending"),
+        title: String(nextTicket.title || ""),
+        note: String(nextTicket.note || ""),
+        lines: Array.isArray(nextTicket.lines) ? nextTicket.lines.map(normalizeTicketLine) : []
+      };
+    }
+
+    function cloneTickets(list) {
+      return Array.isArray(list) ? list.map(normalizeTicket) : [];
+    }
+
+    function buildTicketId() {
+      return "ticket_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    }
+
+    function buildTicketLineId() {
+      return "line_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    }
+
+    function touchTicket(ticket, patch) {
+      return normalizeTicket(Object.assign({}, ticket, patch, {
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
+    function replaceTicketInList(tickets, nextTicket) {
+      const list = cloneTickets(tickets);
+      const index = list.findIndex(function(entry) {
+        return entry.id === nextTicket.id;
+      });
+      if (index >= 0) {
+        list[index] = normalizeTicket(nextTicket);
+      } else {
+        list.unshift(normalizeTicket(nextTicket));
+      }
+      return list;
+    }
+
+    function loadTickets() {
+      const snapshot = readSnapshot();
+      return {
+        tickets: cloneTickets(snapshot.tickets),
+        meta: getMeta(snapshot)
+      };
+    }
+
+    function loadTicket(id) {
+      const snapshot = readSnapshot();
+      const ticket = cloneTickets(snapshot.tickets).find(function(entry) {
+        return entry.id === String(id || "");
+      }) || null;
+      return {
+        ticket: ticket,
+        meta: getMeta(snapshot)
+      };
+    }
+
+    function createTicket() {
+      const snapshot = readSnapshot();
+      const now = new Date().toISOString();
+      const nextTicket = normalizeTicket({
+        id: buildTicketId(),
+        createdAt: now,
+        updatedAt: now,
+        status: "pending",
+        title: "",
+        note: "",
+        lines: []
+      });
+      const nextSnapshot = Object.assign({}, snapshot, {
+        tickets: [nextTicket].concat(cloneTickets(snapshot.tickets))
+      });
+      writeSnapshot(nextSnapshot);
+      return {
+        ticket: nextTicket,
+        tickets: cloneTickets(nextSnapshot.tickets),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function updateTicketMeta(id, patch) {
+      const snapshot = readSnapshot();
+      const ticket = cloneTickets(snapshot.tickets).find(function(entry) {
+        return entry.id === String(id || "");
+      }) || null;
+      if (!ticket) throw new Error("Billet introuvable.");
+      const nextTicket = touchTicket(ticket, {
+        title: Object.prototype.hasOwnProperty.call(patch || {}, "title") ? String(patch.title || "") : ticket.title,
+        note: Object.prototype.hasOwnProperty.call(patch || {}, "note") ? String(patch.note || "") : ticket.note
+      });
+      const nextSnapshot = Object.assign({}, snapshot, {
+        tickets: replaceTicketInList(snapshot.tickets, nextTicket)
+      });
+      writeSnapshot(nextSnapshot);
+      return {
+        ticket: nextTicket,
+        tickets: cloneTickets(nextSnapshot.tickets),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function changeTicketStatus(id, status) {
+      const snapshot = readSnapshot();
+      const ticket = cloneTickets(snapshot.tickets).find(function(entry) {
+        return entry.id === String(id || "");
+      }) || null;
+      if (!ticket) throw new Error("Billet introuvable.");
+      const nextTicket = touchTicket(ticket, {
+        status: String(status || "pending")
+      });
+      const nextSnapshot = Object.assign({}, snapshot, {
+        tickets: replaceTicketInList(snapshot.tickets, nextTicket)
+      });
+      writeSnapshot(nextSnapshot);
+      return {
+        ticket: nextTicket,
+        tickets: cloneTickets(nextSnapshot.tickets),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function addTicketLine(ticketId, line) {
+      const snapshot = readSnapshot();
+      const ticket = cloneTickets(snapshot.tickets).find(function(entry) {
+        return entry.id === String(ticketId || "");
+      }) || null;
+      if (!ticket) throw new Error("Billet introuvable.");
+      const nextLine = normalizeTicketLine(Object.assign({}, line, {
+        id: buildTicketLineId()
+      }));
+      const nextTicket = touchTicket(ticket, {
+        lines: ticket.lines.concat(nextLine)
+      });
+      const nextSnapshot = Object.assign({}, snapshot, {
+        tickets: replaceTicketInList(snapshot.tickets, nextTicket)
+      });
+      writeSnapshot(nextSnapshot);
+      return {
+        ticket: nextTicket,
+        tickets: cloneTickets(nextSnapshot.tickets),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function updateTicketLine(ticketId, lineId, patch) {
+      const snapshot = readSnapshot();
+      const ticket = cloneTickets(snapshot.tickets).find(function(entry) {
+        return entry.id === String(ticketId || "");
+      }) || null;
+      if (!ticket) throw new Error("Billet introuvable.");
+      const nextLines = ticket.lines.map(function(entry) {
+        if (entry.id !== String(lineId || "")) return entry;
+        return normalizeTicketLine(Object.assign({}, entry, patch || {}));
+      });
+      const nextTicket = touchTicket(ticket, {
+        lines: nextLines
+      });
+      const nextSnapshot = Object.assign({}, snapshot, {
+        tickets: replaceTicketInList(snapshot.tickets, nextTicket)
+      });
+      writeSnapshot(nextSnapshot);
+      return {
+        ticket: nextTicket,
+        tickets: cloneTickets(nextSnapshot.tickets),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function deleteTicketLine(ticketId, lineId) {
+      const snapshot = readSnapshot();
+      const ticket = cloneTickets(snapshot.tickets).find(function(entry) {
+        return entry.id === String(ticketId || "");
+      }) || null;
+      if (!ticket) throw new Error("Billet introuvable.");
+      const nextTicket = touchTicket(ticket, {
+        lines: ticket.lines.filter(function(entry) {
+          return entry.id !== String(lineId || "");
+        })
+      });
+      const nextSnapshot = Object.assign({}, snapshot, {
+        tickets: replaceTicketInList(snapshot.tickets, nextTicket)
+      });
+      writeSnapshot(nextSnapshot);
+      return {
+        ticket: nextTicket,
+        tickets: cloneTickets(nextSnapshot.tickets),
+        meta: getMeta(nextSnapshot)
       };
     }
 
@@ -310,6 +519,7 @@
       const nextSnapshot = {
         items: replayedSnapshot.items,
         historyItems: replayedSnapshot.historyItems,
+        tickets: cloneTickets(snapshot.tickets),
         pendingMutations: Array.isArray(payload.pendingMutations) ? payload.pendingMutations.slice() : nextPendingMutations,
         syncStatus: payload.syncStatus || snapshot.syncStatus || "idle",
         lastSyncAt: typeof payload.lastSyncAt === "string" ? payload.lastSyncAt : (typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : ""),
@@ -346,6 +556,7 @@
       const nextSnapshot = {
         items: nextItems,
         historyItems: nextHistoryItems,
+        tickets: cloneTickets(snapshot.tickets),
         pendingMutations: nextPendingMutations,
         syncStatus: nextPayload.syncStatus || "idle",
         lastSyncAt: typeof nextPayload.lastSyncAt === "string" ? nextPayload.lastSyncAt : snapshot.lastSyncAt || "",
@@ -363,9 +574,17 @@
     return {
       loadInventory: loadInventory,
       loadHistory: loadHistory,
+      loadTickets: loadTickets,
+      loadTicket: loadTicket,
       loadDetail: loadDetail,
       saveQuickEdit: saveQuickEdit,
       saveProductRemark: saveProductRemark,
+      createTicket: createTicket,
+      updateTicketMeta: updateTicketMeta,
+      changeTicketStatus: changeTicketStatus,
+      addTicketLine: addTicketLine,
+      updateTicketLine: updateTicketLine,
+      deleteTicketLine: deleteTicketLine,
       mergeRemoteSnapshot: mergeRemoteSnapshot,
       commitSyncedMutation: commitSyncedMutation,
       getMeta: function() {

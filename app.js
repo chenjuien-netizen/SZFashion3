@@ -8,6 +8,7 @@ let hasLocalWritesThisSession = false;
 const state = {
   items: [],
   historyItems: [],
+  tickets: [],
   pendingMutations: [],
   syncStatus: "idle",
   lastSyncAt: "",
@@ -26,6 +27,8 @@ const state = {
   previousView: "inventory",
   lastInventoryView: { view: "inventory", ref: "" },
   detailReference: "",
+  ticketView: "list",
+  ticketId: "",
   quickEditOpen: false,
   quickEditTab: "quick-exit",
   quickEditItemId: "",
@@ -205,6 +208,11 @@ function parseCurrentRoute() {
   }
   if (hash === "inventory") return { view: "inventory", ref: "" };
   if (hash === "history") return { view: "history", ref: "" };
+  if (hash === "tickets") return { view: "tickets", ticketView: "list", ticketId: "" };
+  if (hash === "tickets-add-refs") return { view: "tickets", ticketView: "add-refs", ticketId: "" };
+  if (hash.indexOf("tickets/") === 0) {
+    return { view: "tickets", ticketView: "detail", ticketId: decodeURIComponent(hash.slice("tickets/".length)) };
+  }
   if (hash.indexOf("detail/") === 0) {
     return { view: "detail", ref: normalizeReference(decodeURIComponent(hash.slice("detail/".length))) };
   }
@@ -213,6 +221,13 @@ function parseCurrentRoute() {
 
 function buildHashRoute(view, ref) {
   if (view === "history") return "#history";
+  if (view === "tickets") {
+    if (ref && typeof ref === "object") {
+      if (ref.ticketView === "detail" && ref.ticketId) return "#tickets/" + encodeURIComponent(String(ref.ticketId));
+      if (ref.ticketView === "add-refs") return "#tickets-add-refs";
+    }
+    return "#tickets";
+  }
   if (view === "detail" && ref) return "#detail/" + encodeURIComponent(normalizeReference(ref));
   return "#inventory";
 }
@@ -243,7 +258,7 @@ function forceInventoryListView() {
 }
 
 function navigateTo(view, options) {
-  const nextHash = buildHashRoute(view, options && options.ref);
+  const nextHash = buildHashRoute(view, options && (Object.prototype.hasOwnProperty.call(options, "ref") ? options.ref : options));
   if (window.location.hash === nextHash) {
     handleRouteChange();
     return;
@@ -263,6 +278,8 @@ function handleRouteChange() {
   }
   state.currentView = route.view;
   state.detailReference = route.ref;
+  state.ticketView = route.ticketView || (route.view === "tickets" ? "list" : state.ticketView);
+  state.ticketId = route.ticketId || "";
   syncActiveShell();
   renderAll();
   if (route.view === "detail" && route.ref) {
@@ -1010,6 +1027,120 @@ function getHistoryForReference(reference) {
     .sort(function(a, b) {
       return new Date(b.timestampRaw) - new Date(a.timestampRaw);
     });
+}
+
+function getTicketById(id) {
+  return state.tickets.find(function(ticket) {
+    return ticket.id === String(id || "");
+  }) || null;
+}
+
+function formatTicketStatusLabel(status) {
+  if (status === "in_preparation") return "in preparation";
+  return String(status || "pending").replace(/_/g, " ");
+}
+
+function getTicketStatusBadgeClass(status) {
+  if (status === "in_preparation") return "bg-primary-container text-on-primary-container";
+  if (status === "prepared") return "bg-secondary-container text-on-secondary-container";
+  if (status === "validated") return "bg-surface-container-high text-on-surface";
+  if (status === "cancelled") return "bg-error-container/25 text-on-error-container";
+  return "bg-surface-container-high text-on-surface-variant";
+}
+
+function formatTicketUpdatedAt(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value || "").trim() || "-";
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).slice(-2);
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return day + "/" + month + "/" + year + " " + hour + ":" + minute;
+}
+
+function formatRequestedQuantity(boxes, packs) {
+  const safeBoxes = Math.max(0, Math.trunc(Number(boxes) || 0));
+  const safePacks = Math.max(0, Math.trunc(Number(packs) || 0));
+  if (safeBoxes > 0 && safePacks > 0) return safeBoxes + "箱 " + safePacks + "包";
+  if (safeBoxes > 0) return safeBoxes + "箱";
+  if (safePacks > 0) return safePacks + "包";
+  return "0";
+}
+
+function getTicketRequestedSummary(ticket) {
+  const lines = Array.isArray(ticket && ticket.lines) ? ticket.lines : [];
+  const totals = lines.reduce(function(acc, line) {
+    acc.boxes += Math.max(0, Math.trunc(Number(line && line.requestedBoxes) || 0));
+    acc.packs += Math.max(0, Math.trunc(Number(line && line.requestedPacks) || 0));
+    return acc;
+  }, { boxes: 0, packs: 0 });
+  return formatRequestedQuantity(totals.boxes, totals.packs);
+}
+
+function getTicketSortWeight(status) {
+  if (status === "in_preparation") return 0;
+  if (status === "prepared") return 1;
+  if (status === "pending") return 2;
+  return 3;
+}
+
+function sortTicketsForDisplay(tickets) {
+  return (Array.isArray(tickets) ? tickets.slice() : []).sort(function(a, b) {
+    const weightDiff = getTicketSortWeight(a.status) - getTicketSortWeight(b.status);
+    if (weightDiff !== 0) return weightDiff;
+    return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+  });
+}
+
+function renderTicketCard(ticket) {
+  const lineCount = Array.isArray(ticket.lines) ? ticket.lines.length : 0;
+  const title = String(ticket.title || "").trim() || "Billet sans titre";
+  const note = String(ticket.note || "").trim();
+  return [
+    '<article class="border border-outline-variant/20 bg-surface-container-low px-3 py-3 shadow-ledger" data-ticket-id="', escapeHtml(ticket.id), '">',
+      '<button class="flex w-full items-start justify-between gap-3 text-left" type="button" data-action="open-ticket" data-ticket-id="', escapeHtml(ticket.id), '">',
+        '<div class="min-w-0">',
+          '<div class="truncate text-[13px] font-black tracking-tight text-on-surface">', escapeHtml(title), '</div>',
+          '<div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">',
+            '<span>', escapeHtml(formatTicketUpdatedAt(ticket.updatedAt || ticket.createdAt)), '</span>',
+            '<span class="text-outline-variant/50">/</span>',
+            '<span>', lineCount, ' ligne', lineCount > 1 ? 's' : '', '</span>',
+            '<span class="text-outline-variant/50">/</span>',
+            '<span>', escapeHtml(getTicketRequestedSummary(ticket)), '</span>',
+          '</div>',
+          note ? '<div class="mt-1 truncate text-[11px] leading-4 text-on-surface-variant">' + escapeHtml(note) + '</div>' : '',
+        '</div>',
+        '<span class="shrink-0 rounded px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.12em] ' + getTicketStatusBadgeClass(ticket.status) + '">' + escapeHtml(formatTicketStatusLabel(ticket.status)) + '</span>',
+      '</button>',
+    '</article>'
+  ].join("");
+}
+
+function renderTicketLine(line) {
+  return [
+    '<article class="border border-outline-variant/20 bg-surface-container-low px-3 py-3" data-ticket-line-id="', escapeHtml(line.id), '">',
+      '<div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_5.5rem_5.5rem_auto] sm:items-end">',
+        '<label class="block min-w-0">',
+          '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Référence</div>',
+          '<input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-reference" data-line-id="', escapeHtml(line.id), '" type="text" value="', escapeHtml(line.reference || ""), '" />',
+        '</label>',
+        '<label class="block">',
+          '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱</div>',
+          '<input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-boxes" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.requestedBoxes) || 0)))), '" />',
+        '</label>',
+        '<label class="block">',
+          '<div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">包</div>',
+          '<input autocomplete="off" class="mt-1 w-full border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-[12px] font-medium text-on-surface" data-action="ticket-line-packs" data-line-id="', escapeHtml(line.id), '" inputmode="numeric" type="text" value="', escapeHtml(String(Math.max(0, Math.trunc(Number(line.requestedPacks) || 0)))), '" />',
+        '</label>',
+        '<div class="flex items-center justify-between gap-2 sm:block">',
+          '<div class="text-[11px] font-black tracking-tight text-primary">', escapeHtml(formatRequestedQuantity(line.requestedBoxes, line.requestedPacks)), '</div>',
+          '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container-high" data-action="delete-ticket-line" data-line-id="', escapeHtml(line.id), '" type="button">Supprimer</button>',
+        '</div>',
+      '</div>',
+    '</article>'
+  ].join("");
 }
 
 function sortItems(items, sortMode) {
@@ -3088,10 +3219,122 @@ function renderDetailPage() {
   detailHistoryEmpty.classList.toggle("hidden", itemHistory.length > 0);
 }
 
+function renderTicketsPage() {
+  const ticketListSection = document.getElementById("ticketListSection");
+  const ticketDetailSection = document.getElementById("ticketDetailSection");
+  const ticketAddReferencesSection = document.getElementById("ticketAddReferencesSection");
+  const ticketPreparationWarning = document.getElementById("ticketPreparationWarning");
+  const ticketActiveList = document.getElementById("ticketActiveList");
+  const ticketClosedList = document.getElementById("ticketClosedList");
+  const ticketActiveEmpty = document.getElementById("ticketActiveEmpty");
+  const ticketClosedEmpty = document.getElementById("ticketClosedEmpty");
+  const ticketDetailHeading = document.getElementById("ticketDetailHeading");
+  const ticketDetailMeta = document.getElementById("ticketDetailMeta");
+  const ticketStatusSelect = document.getElementById("ticketStatusSelect");
+  const ticketTitleInput = document.getElementById("ticketTitleInput");
+  const ticketNoteInput = document.getElementById("ticketNoteInput");
+  const ticketLinesList = document.getElementById("ticketLinesList");
+  const ticketLinesEmpty = document.getElementById("ticketLinesEmpty");
+
+  if (!ticketListSection || !ticketDetailSection || !ticketAddReferencesSection) return;
+
+  const ticketView = state.ticketView || "list";
+  ticketListSection.classList.toggle("hidden", ticketView !== "list");
+  ticketDetailSection.classList.toggle("hidden", ticketView !== "detail");
+  ticketAddReferencesSection.classList.toggle("hidden", ticketView !== "add-refs");
+
+  const activeStatuses = ["pending", "in_preparation", "prepared"];
+  const closedStatuses = ["validated", "cancelled"];
+  const activeTickets = sortTicketsForDisplay(state.tickets.filter(function(ticket) {
+    return activeStatuses.indexOf(ticket.status) >= 0;
+  }));
+  const closedTickets = sortTicketsForDisplay(state.tickets.filter(function(ticket) {
+    return closedStatuses.indexOf(ticket.status) >= 0;
+  }));
+  const inPreparationCount = activeTickets.filter(function(ticket) {
+    return ticket.status === "in_preparation";
+  }).length;
+
+  ticketActiveList.innerHTML = activeTickets.map(renderTicketCard).join("");
+  ticketClosedList.innerHTML = closedTickets.map(renderTicketCard).join("");
+  ticketActiveEmpty.classList.toggle("hidden", activeTickets.length > 0);
+  ticketClosedEmpty.classList.toggle("hidden", closedTickets.length > 0);
+  if (ticketPreparationWarning) {
+    ticketPreparationWarning.textContent = inPreparationCount > 1 ? inPreparationCount + " billets en préparation" : "";
+    ticketPreparationWarning.classList.toggle("hidden", inPreparationCount <= 1);
+  }
+
+  if (ticketView !== "detail") return;
+  const ticket = getTicketById(state.ticketId);
+  if (!ticket) {
+    navigateTo("tickets");
+    return;
+  }
+
+  if (ticketDetailHeading) ticketDetailHeading.textContent = String(ticket.title || "").trim() || "Billet sans titre";
+  if (ticketDetailMeta) {
+    ticketDetailMeta.textContent = formatTicketStatusLabel(ticket.status) + " / " + formatTicketUpdatedAt(ticket.updatedAt || ticket.createdAt);
+  }
+  if (ticketStatusSelect) ticketStatusSelect.value = ["pending", "in_preparation", "prepared"].indexOf(ticket.status) >= 0 ? ticket.status : "pending";
+  if (ticketTitleInput) ticketTitleInput.value = ticket.title || "";
+  if (ticketNoteInput) ticketNoteInput.value = ticket.note || "";
+  if (ticketLinesList) ticketLinesList.innerHTML = (Array.isArray(ticket.lines) ? ticket.lines : []).map(renderTicketLine).join("");
+  if (ticketLinesEmpty) ticketLinesEmpty.classList.toggle("hidden", Array.isArray(ticket.lines) && ticket.lines.length > 0);
+}
+
+function applyTicketMutation(result) {
+  if (!result) return null;
+  if (Array.isArray(result.tickets)) state.tickets = result.tickets.slice();
+  if (result.meta) applyDataMeta(result.meta);
+  renderTicketsPage();
+  return result.ticket || null;
+}
+
+function createNewTicket() {
+  const created = applyTicketMutation(dataSource.createTicket());
+  if (created) {
+    navigateTo("tickets", { ticketView: "detail", ticketId: created.id });
+  }
+}
+
+function openTicketDetail(ticketId) {
+  navigateTo("tickets", { ticketView: "detail", ticketId: ticketId });
+}
+
+function updateTicketMetaFromForm(ticketId) {
+  const titleInput = document.getElementById("ticketTitleInput");
+  const noteInput = document.getElementById("ticketNoteInput");
+  if (!ticketId || !titleInput || !noteInput) return;
+  applyTicketMutation(dataSource.updateTicketMeta(ticketId, {
+    title: titleInput.value,
+    note: noteInput.value
+  }));
+}
+
+function addTicketLine(ticketId) {
+  if (!ticketId) return;
+  applyTicketMutation(dataSource.addTicketLine(ticketId, {
+    reference: "",
+    requestedBoxes: 0,
+    requestedPacks: 0
+  }));
+}
+
+function updateTicketLine(ticketId, lineId, patch) {
+  if (!ticketId || !lineId) return;
+  applyTicketMutation(dataSource.updateTicketLine(ticketId, lineId, patch));
+}
+
+function deleteTicketLine(ticketId, lineId) {
+  if (!ticketId || !lineId) return;
+  applyTicketMutation(dataSource.deleteTicketLine(ticketId, lineId));
+}
+
 function renderAll() {
   renderInventoryPage();
   renderHistoryPage();
   renderDetailPage();
+  renderTicketsPage();
   if (state.quickEditOpen) renderQuickEdit();
 }
 
@@ -3099,13 +3342,16 @@ function syncActiveShell() {
   const inventoryShell = document.getElementById("inventoryAppShell");
   const historyShell = document.getElementById("historyAppShell");
   const detailShell = document.getElementById("detailAppShell");
+  const ticketShell = document.getElementById("ticketAppShell");
   const navInventoryButton = document.getElementById("navInventoryButton");
   const navHistoryButton = document.getElementById("navHistoryButton");
+  const navTicketsButton = document.getElementById("navTicketsButton");
   const view = state.currentView || "inventory";
 
   if (inventoryShell) inventoryShell.classList.toggle("hidden", view !== "inventory");
   if (historyShell) historyShell.classList.toggle("hidden", view !== "history");
   if (detailShell) detailShell.classList.toggle("hidden", view !== "detail");
+  if (ticketShell) ticketShell.classList.toggle("hidden", view !== "tickets");
 
   if (navInventoryButton) {
     const active = view === "inventory" || view === "detail";
@@ -3116,6 +3362,11 @@ function syncActiveShell() {
     const active = view === "history";
     navHistoryButton.className = "flex flex-1 flex-col items-center justify-center px-2 py-1 " + (active ? "bg-slate-200 text-slate-900" : "text-slate-400");
     navHistoryButton.setAttribute("aria-current", active ? "page" : "false");
+  }
+  if (navTicketsButton) {
+    const active = view === "tickets";
+    navTicketsButton.className = "flex flex-1 flex-col items-center justify-center px-2 py-1 " + (active ? "bg-slate-200 text-slate-900" : "text-slate-400");
+    navTicketsButton.setAttribute("aria-current", active ? "page" : "false");
   }
 }
 
@@ -3212,6 +3463,103 @@ function bindHistoryEvents() {
   }
 }
 
+function bindTicketEvents() {
+  const navTicketsButton = document.getElementById("navTicketsButton");
+  const ticketNewButton = document.getElementById("ticketNewButton");
+  const ticketAddReferencesButton = document.getElementById("ticketAddReferencesButton");
+  const ticketDetailBackButton = document.getElementById("ticketDetailBackButton");
+  const ticketAddReferencesBackButton = document.getElementById("ticketAddReferencesBackButton");
+  const ticketStatusSelect = document.getElementById("ticketStatusSelect");
+  const ticketTitleInput = document.getElementById("ticketTitleInput");
+  const ticketNoteInput = document.getElementById("ticketNoteInput");
+  const ticketAddLineButton = document.getElementById("ticketAddLineButton");
+  const ticketActiveList = document.getElementById("ticketActiveList");
+  const ticketClosedList = document.getElementById("ticketClosedList");
+  const ticketLinesList = document.getElementById("ticketLinesList");
+
+  if (navTicketsButton) {
+    navTicketsButton.addEventListener("click", function() {
+      navigateTo("tickets");
+    });
+  }
+  if (ticketNewButton) {
+    ticketNewButton.addEventListener("click", function() {
+      createNewTicket();
+    });
+  }
+  if (ticketAddReferencesButton) {
+    ticketAddReferencesButton.addEventListener("click", function() {
+      navigateTo("tickets", { ticketView: "add-refs" });
+    });
+  }
+  if (ticketDetailBackButton) {
+    ticketDetailBackButton.addEventListener("click", function() {
+      navigateTo("tickets");
+    });
+  }
+  if (ticketAddReferencesBackButton) {
+    ticketAddReferencesBackButton.addEventListener("click", function() {
+      navigateTo("tickets");
+    });
+  }
+  if (ticketStatusSelect) {
+    ticketStatusSelect.addEventListener("change", function(event) {
+      if (!state.ticketId) return;
+      applyTicketMutation(dataSource.changeTicketStatus(state.ticketId, String(event.target.value || "pending")));
+    });
+  }
+  if (ticketTitleInput) {
+    ticketTitleInput.addEventListener("change", function() {
+      updateTicketMetaFromForm(state.ticketId);
+    });
+  }
+  if (ticketNoteInput) {
+    ticketNoteInput.addEventListener("change", function() {
+      updateTicketMetaFromForm(state.ticketId);
+    });
+  }
+  if (ticketAddLineButton) {
+    ticketAddLineButton.addEventListener("click", function() {
+      addTicketLine(state.ticketId);
+    });
+  }
+
+  [ticketActiveList, ticketClosedList].forEach(function(container) {
+    if (!container) return;
+    container.addEventListener("click", function(event) {
+      const trigger = event.target.closest('[data-action="open-ticket"]');
+      if (!trigger) return;
+      openTicketDetail(trigger.getAttribute("data-ticket-id"));
+    });
+  });
+
+  if (ticketLinesList) {
+    ticketLinesList.addEventListener("click", function(event) {
+      const trigger = event.target.closest('[data-action="delete-ticket-line"]');
+      if (!trigger) return;
+      deleteTicketLine(state.ticketId, trigger.getAttribute("data-line-id"));
+    });
+    ticketLinesList.addEventListener("change", function(event) {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      const lineId = target.getAttribute("data-line-id");
+      const action = target.getAttribute("data-action");
+      if (!lineId || !action) return;
+      if (action === "ticket-line-reference") {
+        updateTicketLine(state.ticketId, lineId, { reference: String(target.value || "").trim() });
+        return;
+      }
+      if (action === "ticket-line-boxes") {
+        updateTicketLine(state.ticketId, lineId, { requestedBoxes: Math.max(0, Math.trunc(Number(String(target.value || "").replace(/[^\d]/g, "")) || 0)) });
+        return;
+      }
+      if (action === "ticket-line-packs") {
+        updateTicketLine(state.ticketId, lineId, { requestedPacks: Math.max(0, Math.trunc(Number(String(target.value || "").replace(/[^\d]/g, "")) || 0)) });
+      }
+    });
+  }
+}
+
 function bindDetailEvents() {
   const detailBackButton = document.getElementById("detailBackButton");
   const detailQuickEditButton = document.getElementById("detailQuickEditButton");
@@ -3256,18 +3604,23 @@ function initApp() {
   remoteDataSource = window.createRemoteDataSource ? window.createRemoteDataSource() : null;
   const inventoryResult = dataSource.loadInventory();
   const historyResult = dataSource.loadHistory();
+  const ticketsResult = dataSource.loadTickets();
   state.items = Array.isArray(inventoryResult.items) ? inventoryResult.items : [];
   state.historyItems = Array.isArray(historyResult.items) ? historyResult.items : [];
+  state.tickets = Array.isArray(ticketsResult.tickets) ? ticketsResult.tickets : [];
   applyDataMeta(inventoryResult.meta);
   state.columnCount = getColumnCount();
   const route = parseCurrentRoute();
   state.currentView = route.view;
   state.previousView = route.view === "detail" ? "inventory" : route.view;
   state.detailReference = route.ref;
+  state.ticketView = route.ticketView || (route.view === "tickets" ? "list" : "list");
+  state.ticketId = route.ticketId || "";
   rememberInventoryView(route.view, route.ref);
   bindInventoryEvents();
   bindHistoryEvents();
   bindDetailEvents();
+  bindTicketEvents();
   bindQuickEditEvents();
   syncActiveShell();
   renderAll();
