@@ -160,10 +160,21 @@
                 <option value="positive">En stock</option>
                 <option value="zero">Rupture</option>
               </select>
+              <select class="border-outline-variant/30 bg-surface-container-lowest py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface" id="inventoryArrivalFilter">
+                <option value="">Tous 到货单</option>
+                <option value="with">Avec 到货单</option>
+                <option value="without">Sans 到货单</option>
+              </select>
+              <select class="border-outline-variant/30 bg-surface-container-lowest py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface" id="inventoryTailFilter">
+                <option value="">Tous 尾箱</option>
+                <option value="with">Avec 尾箱</option>
+                <option value="without">Sans 尾箱</option>
+              </select>
               <select class="border-outline-variant/30 bg-surface-container-lowest py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface" id="inventorySortSelect">
                 <option value="arrival">到货单 récent</option>
-                <option value="reference">Tri réf</option>
-                <option value="warehouse">Tri entrepôt</option>
+                <option value="reference">货号 A-Z</option>
+                <option value="warehouse">仓库</option>
+                <option value="stock">Stock décroissant</option>
               </select>
             </div>
           </section>

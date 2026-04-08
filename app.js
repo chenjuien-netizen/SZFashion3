@@ -14,6 +14,8 @@ const state = {
   dataSource: "local",
   query: "",
   inventoryStockFilter: "",
+  inventoryArrivalFilter: "",
+  inventoryTailFilter: "",
   inventorySort: "arrival",
   historyQuery: "",
   historyActionType: "",
@@ -21,6 +23,7 @@ const state = {
   columnCount: 2,
   currentView: "inventory",
   previousView: "inventory",
+  lastInventoryView: { view: "inventory", ref: "" },
   detailReference: "",
   quickEditOpen: false,
   quickEditTab: "quick-exit",
@@ -213,6 +216,26 @@ function buildHashRoute(view, ref) {
   return "#inventory";
 }
 
+function rememberInventoryView(view, ref) {
+  if (view === "detail" && ref) {
+    state.lastInventoryView = { view: "detail", ref: normalizeReference(ref) };
+    return;
+  }
+  state.lastInventoryView = { view: "inventory", ref: "" };
+}
+
+function getLastInventoryRoute() {
+  if (state.lastInventoryView && state.lastInventoryView.view === "detail" && state.lastInventoryView.ref) {
+    return { view: "detail", ref: state.lastInventoryView.ref };
+  }
+  return { view: "inventory", ref: "" };
+}
+
+function navigateToInventoryContext() {
+  const route = getLastInventoryRoute();
+  navigateTo(route.view, route.ref ? { ref: route.ref } : null);
+}
+
 function navigateTo(view, options) {
   const nextHash = buildHashRoute(view, options && options.ref);
   if (window.location.hash === nextHash) {
@@ -228,6 +251,9 @@ function handleRouteChange() {
     state.previousView = state.currentView === "history" ? "history" : "inventory";
   } else {
     state.previousView = route.view;
+  }
+  if (route.view === "inventory" || route.view === "detail") {
+    rememberInventoryView(route.view, route.ref);
   }
   state.currentView = route.view;
   state.detailReference = route.ref;
@@ -744,6 +770,14 @@ function getArrivalNote(item) {
   ).trim() || "-";
 }
 
+function getInventoryArrivalMeta(item) {
+  const note = getArrivalNote(item);
+  return {
+    note: note !== "-" ? note : "",
+    date: String(item && item.arrivalUpdatedAtLabel || "").trim()
+  };
+}
+
 function getItemPackTotal(item) {
   const colisage = Math.max(0, toInt(item && item.colisage));
   if (!(colisage > 0)) return null;
@@ -753,7 +787,7 @@ function getItemPackTotal(item) {
 function renderDetailStockStateMarkup(item) {
   if (!item) return "";
   const tailValue = toInt(item.tail);
-  const tailDisplay = toInt(item.tail) > 0 ? "(" + toInt(item.tail) + "p)" : "-";
+  const tailDisplay = tailValue > 0 ? "(" + tailValue + "p)" : "";
   const unitsDisplay = toInt(item.unitsPerBox) > 0 ? toInt(item.unitsPerBox) + "p" : "-";
   const boxesDisplay = toInt(item.itemBoxes) > 0 ? String(toInt(item.itemBoxes)) : "-";
   const fractionDisplay = item.fractionText ? String(item.fractionText).trim() : "";
@@ -766,13 +800,14 @@ function renderDetailStockStateMarkup(item) {
   const packText = totalPacks === null ? "-包" : formatMetricNumber(totalPacks) + "包";
   const packsPerBox = computePacksPerBox(item.unitsPerBox, item.colisage);
   const packsHint = buildQuickExitPacksHintMarkup(item.colisage, packsPerBox);
-  const columns = [
-    { label: "尾箱", value: tailDisplay, align: "left" },
-    { label: "", value: tailValue > 0 ? "+" : "", operator: true },
-    { label: "件/箱", value: unitsDisplay, align: "center" },
-    { label: "", value: "×", operator: true },
-    { label: "箱数", value: boxesDisplay, align: "right" }
-  ];
+  const columns = [];
+  if (tailValue > 0) {
+    columns.push({ label: "尾箱", value: tailDisplay, align: "left" });
+    columns.push({ label: "", value: "+", operator: true });
+  }
+  columns.push({ label: "件/箱", value: unitsDisplay, align: "center" });
+  columns.push({ label: "", value: "×", operator: true });
+  columns.push({ label: "箱数", value: boxesDisplay, align: "right" });
   if (fractionDisplay) {
     columns.push({ label: "", value: fractionSign, operator: true });
     columns.push({ label: "分数", value: fractionDisplay, align: "center" });
@@ -914,6 +949,10 @@ function sortItems(items, sortMode) {
       const warehouseCompare = String(a.warehouse || "").localeCompare(String(b.warehouse || ""));
       if (warehouseCompare !== 0) return warehouseCompare;
     }
+    if (sortMode === "stock") {
+      const stockDiff = stateModelToPieces(b) - stateModelToPieces(a);
+      if (stockDiff !== 0) return stockDiff;
+    }
     const leftSortKey = String(a && a.sortKey ? a.sortKey : "").trim();
     const rightSortKey = String(b && b.sortKey ? b.sortKey : "").trim();
     if (leftSortKey && rightSortKey && leftSortKey !== rightSortKey) return leftSortKey.localeCompare(rightSortKey);
@@ -928,8 +967,12 @@ function filterInventoryItems(query) {
   const filtered = state.items.filter(function(item) {
     if (state.inventoryStockFilter === "positive" && item.stockState !== "positive") return false;
     if (state.inventoryStockFilter === "zero" && item.stockState !== "zero") return false;
+    if (state.inventoryArrivalFilter === "with" && getArrivalNote(item) === "-") return false;
+    if (state.inventoryArrivalFilter === "without" && getArrivalNote(item) !== "-") return false;
+    if (state.inventoryTailFilter === "with" && !(toInt(item.tail) > 0)) return false;
+    if (state.inventoryTailFilter === "without" && toInt(item.tail) > 0) return false;
     if (!normalizedQuery) return true;
-    const haystack = normalizeText([item.reference, item.warehouse, item.stockDisplay, item.remark].join(" "));
+    const haystack = normalizeText([item.reference, item.warehouse, item.stockDisplay, item.remark, getArrivalNote(item)].join(" "));
     return haystack.indexOf(normalizedQuery) !== -1;
   });
   return sortItems(filtered, state.inventorySort);
@@ -1113,13 +1156,25 @@ function renderInventoryCard(item) {
   const accentClass = item.stockState === "positive" ? "border-emerald-400/50" : "border-rose-400/50";
   const stockClass = item.stockState === "positive" ? "text-primary" : "text-on-surface-variant";
   const warehouse = item.warehouse || "-";
+  const arrivalMeta = getInventoryArrivalMeta(item);
+  const arrivalLine = arrivalMeta.note
+    ? '<div class="mt-0.5 whitespace-normal break-words text-[9px] leading-3 text-on-surface-variant">'
+      + escapeHtml(arrivalMeta.note)
+      + (arrivalMeta.date ? '<span class="block text-[8px] leading-3 text-outline">' + escapeHtml(arrivalMeta.date) + '</span>' : '')
+      + '</div>'
+    : '';
+  const rightInfoMarkup = ''
+    + '<div class="max-w-[48%] min-w-0 text-right">'
+    + '<div class="truncate text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml(warehouse) + '</div>'
+    + arrivalLine
+    + '</div>';
 
   return ''
     + '<article class="inventory-card bg-surface-container-lowest relative border-l-4 ' + accentClass + ' flex min-h-[4.1rem] items-stretch transition-colors duration-150 hover:bg-surface-container select-none" data-item-id="' + escapeHtml(itemId) + '" data-reference="' + escapeHtml(reference) + '" data-stock-display="' + escapeHtml(stockDisplay) + '" data-stock-state="' + escapeHtml(item.stockState) + '">'
     + '<button class="inventory-card-main flex min-w-0 flex-1 flex-col justify-between px-2.5 py-2 text-left" type="button" data-action="open-quick-edit" data-item-id="' + escapeHtml(itemId) + '">'
     + '<div class="flex items-start justify-between gap-2">'
     + '<span class="truncate pr-2 text-[12px] font-bold tracking-tight text-on-surface">' + escapeHtml(reference) + '</span>'
-    + '<span class="max-w-[45%] truncate text-right text-[9px] font-bold uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml(warehouse) + '</span>'
+    + rightInfoMarkup
     + '</div>'
     + '<div class="mt-1.5 flex items-end justify-between gap-2">'
     + '<div class="min-w-0">'
@@ -2818,6 +2873,8 @@ function bindQuickEditEvents() {
 function renderInventoryPage() {
   const searchInput = document.getElementById("searchInput");
   const stockFilter = document.getElementById("inventoryStockFilter");
+  const arrivalFilter = document.getElementById("inventoryArrivalFilter");
+  const tailFilter = document.getElementById("inventoryTailFilter");
   const sortSelect = document.getElementById("inventorySortSelect");
   const networkStatus = document.getElementById("networkStatus");
   const refreshButton = document.getElementById("refreshButton");
@@ -2832,9 +2889,12 @@ function renderInventoryPage() {
 
   searchInput.value = state.query;
   if (stockFilter) stockFilter.value = state.inventoryStockFilter;
+  if (arrivalFilter) arrivalFilter.value = state.inventoryArrivalFilter;
+  if (tailFilter) tailFilter.value = state.inventoryTailFilter;
   if (sortSelect) sortSelect.value = state.inventorySort;
   const items = filterInventoryItems(state.query);
   const summary = getInventorySummary(items);
+  const hasInventoryFilters = !!(state.query || state.inventoryStockFilter || state.inventoryArrivalFilter || state.inventoryTailFilter);
   inventoryGrid.innerHTML = renderInventoryListMarkup(items);
   emptyState.classList.toggle("hidden", items.length > 0);
   summaryRefs.textContent = summary.visibleCount + " " + (summary.visibleCount === 1 ? "ref" : "refs");
@@ -2844,7 +2904,7 @@ function renderInventoryPage() {
     + (summary.hasPackData ? formatMetricNumber(summary.totalPacks) + "包 " : "")
     + formatMetricNumber(summary.totalPieces) + "件";
   if (networkStatus) networkStatus.textContent = navigator.onLine ? "En ligne" : "Hors ligne";
-  summaryStatus.textContent = getSyncStatusLabel(state.query ? "Recherche" : "Pret");
+  summaryStatus.textContent = getSyncStatusLabel(hasInventoryFilters ? "Filtré" : "Pret");
   if (refreshButton && !refreshButton.dataset.bound) {
     refreshButton.dataset.bound = "true";
     refreshButton.addEventListener("click", function() {
@@ -2989,6 +3049,8 @@ function syncColumnLayout(force) {
 function bindInventoryEvents() {
   const searchInput = document.getElementById("searchInput");
   const stockFilter = document.getElementById("inventoryStockFilter");
+  const arrivalFilter = document.getElementById("inventoryArrivalFilter");
+  const tailFilter = document.getElementById("inventoryTailFilter");
   const sortSelect = document.getElementById("inventorySortSelect");
   const inventoryGrid = document.getElementById("inventoryGrid");
   const navInventoryButton = document.getElementById("navInventoryButton");
@@ -3004,6 +3066,18 @@ function bindInventoryEvents() {
       renderInventoryPage();
     });
   }
+  if (arrivalFilter) {
+    arrivalFilter.addEventListener("change", function(event) {
+      state.inventoryArrivalFilter = String(event.target.value || "").trim();
+      renderInventoryPage();
+    });
+  }
+  if (tailFilter) {
+    tailFilter.addEventListener("change", function(event) {
+      state.inventoryTailFilter = String(event.target.value || "").trim();
+      renderInventoryPage();
+    });
+  }
   if (sortSelect) {
     sortSelect.addEventListener("change", function(event) {
       state.inventorySort = String(event.target.value || "reference").trim() || "reference";
@@ -3012,7 +3086,7 @@ function bindInventoryEvents() {
   }
   if (navInventoryButton) {
     navInventoryButton.addEventListener("click", function() {
-      navigateTo("inventory");
+      navigateToInventoryContext();
     });
   }
   if (navHistoryButton) {
@@ -3100,6 +3174,7 @@ function initApp() {
   state.currentView = route.view;
   state.previousView = route.view === "detail" ? "inventory" : route.view;
   state.detailReference = route.ref;
+  rememberInventoryView(route.view, route.ref);
   bindInventoryEvents();
   bindHistoryEvents();
   bindDetailEvents();
