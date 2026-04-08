@@ -26,6 +26,12 @@ const state = {
   previousView: "inventory",
   lastInventoryView: { view: "inventory", ref: "" },
   detailReference: "",
+  referenceImportBatches: [],
+  referenceImportBatch: null,
+  pickupTickets: [],
+  pickupTicket: null,
+  pickupTicketData: null,
+  ticketReferenceDrafts: [],
   quickEditOpen: false,
   quickEditTab: "quick-exit",
   quickEditItemId: "",
@@ -205,14 +211,24 @@ function parseCurrentRoute() {
   }
   if (hash === "inventory") return { view: "inventory", ref: "" };
   if (hash === "history") return { view: "history", ref: "" };
+  if (hash === "imports") return { view: "imports", ref: "" };
+  if (hash === "tickets") return { view: "tickets", ref: "" };
   if (hash.indexOf("detail/") === 0) {
     return { view: "detail", ref: normalizeReference(decodeURIComponent(hash.slice("detail/".length))) };
+  }
+  if (hash.indexOf("import/") === 0) {
+    return { view: "imports", ref: String(decodeURIComponent(hash.slice("import/".length))) };
+  }
+  if (hash.indexOf("ticket/") === 0) {
+    return { view: "tickets", ref: String(decodeURIComponent(hash.slice("ticket/".length))) };
   }
   return { view: "inventory", ref: "" };
 }
 
 function buildHashRoute(view, ref) {
   if (view === "history") return "#history";
+  if (view === "imports") return ref ? ("#import/" + encodeURIComponent(String(ref))) : "#imports";
+  if (view === "tickets") return ref ? ("#ticket/" + encodeURIComponent(String(ref))) : "#tickets";
   if (view === "detail" && ref) return "#detail/" + encodeURIComponent(normalizeReference(ref));
   return "#inventory";
 }
@@ -255,6 +271,8 @@ function handleRouteChange() {
   const route = parseCurrentRoute();
   if (route.view === "detail") {
     state.previousView = state.currentView === "history" ? "history" : "inventory";
+  } else if (route.view === "imports" || route.view === "tickets") {
+    state.previousView = "inventory";
   } else {
     state.previousView = route.view;
   }
@@ -262,11 +280,23 @@ function handleRouteChange() {
     rememberInventoryView(route.view, route.ref);
   }
   state.currentView = route.view;
-  state.detailReference = route.ref;
+  state.detailReference = route.view === "detail" ? route.ref : state.detailReference;
+  if (route.view === "imports") {
+    state.referenceImportBatch = route.ref || null;
+  }
+  if (route.view === "tickets") {
+    state.pickupTicket = route.ref || null;
+  }
   syncActiveShell();
   renderAll();
   if (route.view === "detail" && route.ref) {
     refreshRemoteDetail(route.ref, { silent: true });
+  }
+  if (route.view === "imports") {
+    loadReferenceImportData(route.ref);
+  }
+  if (route.view === "tickets") {
+    loadPickupTicketData(route.ref);
   }
 }
 
@@ -3101,10 +3131,110 @@ function renderDetailPage() {
   detailHistoryEmpty.classList.toggle("hidden", itemHistory.length > 0);
 }
 
+function renderReferenceImportsPage() {
+  const status = document.getElementById("referenceImportsStatus");
+  const content = document.getElementById("referenceImportsContent");
+  if (!content) return;
+  const batches = Array.isArray(state.referenceImportBatches) ? state.referenceImportBatches : [];
+  const selectedBatchId = state.referenceImportBatch ? String(state.referenceImportBatch) : "";
+  const selectedBatch = selectedBatchId
+    ? batches.find(function(batch) { return String(batch.batchId || "") === selectedBatchId; }) || null
+    : null;
+  if (status) status.textContent = selectedBatch ? ("Batch " + (selectedBatch.batchId || "")) : "Import Excel / ODS";
+  let markup = "";
+  if (selectedBatch && selectedBatch.lines) {
+    markup += '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3">'
+      + '<div class="flex items-start justify-between gap-3">'
+      + '<div class="min-w-0">'
+      + '<div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Batch</div>'
+      + '<div class="mt-1 truncate text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(selectedBatch.batchId || "-") + '</div>'
+      + '<div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml((selectedBatch.sourceFileName || "-") + " · " + (selectedBatch.status || "-")) + '</div>'
+      + '</div>'
+      + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" data-action="back-to-import-batches" type="button">Retour liste</button>'
+      + '</div>'
+      + '</section>';
+    if (selectedBatch.lines.length) {
+      markup += selectedBatch.lines.map(function(line) {
+        const errors = Array.isArray(line.validationErrors) ? line.validationErrors.join(" · ") : "";
+        const actionButtons = line.status === "duplicate"
+          ? '<div class="mt-2 flex flex-wrap gap-2"><button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="finalize-import-line" data-line-id="' + escapeHtml(line.lineId) + '" data-line-resolution="ignore" type="button">Ignorer</button><button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="finalize-import-line" data-line-id="' + escapeHtml(line.lineId) + '" data-line-resolution="link_existing" type="button">Lier</button></div>'
+          : (line.status === "valid" ? '<div class="mt-2"><button class="bg-surface-tint px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-primary" data-action="finalize-import-line" data-line-id="' + escapeHtml(line.lineId) + '" data-line-resolution="create" type="button">Créer</button></div>' : '');
+        return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+          + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="truncate text-[12px] font-bold tracking-tight text-on-surface">' + escapeHtml(line.mapped && line.mapped.reference || "-") + '</div><div class="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(line.status || "-") + '</div></div><div class="shrink-0 text-right text-[10px] text-on-surface-variant">' + escapeHtml(line.mapped && line.mapped.arrivalNote || "") + '</div></div>'
+          + '<div class="mt-2 text-[11px] text-on-surface-variant">' + escapeHtml((line.mapped && line.mapped.warehouse || "-") + (errors ? (" · " + errors) : "")) + '</div>'
+          + actionButtons
+          + '</article>';
+      }).join("");
+    } else {
+      markup += '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Aucune ligne importée.</div>';
+    }
+  } else if (batches.length) {
+    markup = batches.map(function(batch) {
+      const totals = batch.totals || {};
+      return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+        + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><button class="truncate text-left text-[12px] font-bold tracking-tight text-primary" data-action="open-import-batch" data-batch-id="' + escapeHtml(batch.batchId || "") + '" type="button">' + escapeHtml(batch.sourceFileName || batch.batchId || "-") + '</button><div class="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(batch.status || "-") + '</div></div><div class="shrink-0 text-right text-[10px] text-on-surface-variant">' + escapeHtml(formatDateLabel(batch.createdAt)) + '</div></div>'
+        + '<div class="mt-2 text-[11px] text-on-surface-variant">' + escapeHtml("Lignes " + (totals.totalRows || 0) + " · Valides " + (totals.validRows || 0) + " · Doublons " + (totals.duplicateRows || 0)) + '</div>'
+        + '</article>';
+    }).join("");
+  } else {
+    markup = '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Aucun batch import pour le moment.</div>';
+  }
+  content.innerHTML = markup;
+}
+
+function renderPickupTicketsPage() {
+  const status = document.getElementById("pickupTicketsStatus");
+  const content = document.getElementById("pickupTicketsContent");
+  if (!content) return;
+  const tickets = Array.isArray(state.pickupTickets) ? state.pickupTickets : [];
+  const selectedTicketId = state.pickupTicket ? String(state.pickupTicket) : "";
+  const selectedTicket = selectedTicketId && state.pickupTicketData && state.pickupTicketData.ticket
+    && String(state.pickupTicketData.ticket.ticketId || "") === selectedTicketId ? state.pickupTicketData : null;
+  if (status) status.textContent = selectedTicket ? ("Ticket " + (selectedTicket.ticket.ticketNumber || selectedTicketId)) : "Sorties entrepôt";
+  let markup = "";
+  if (selectedTicket && selectedTicket.ticket) {
+    const ticket = selectedTicket.ticket;
+    const lines = Array.isArray(selectedTicket.lines) ? selectedTicket.lines : [];
+    const events = Array.isArray(selectedTicket.events) ? selectedTicket.events : [];
+    markup += '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3">'
+      + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="truncate text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(ticket.ticketNumber || "-") + '</div><div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml((ticket.status || "-") + " · " + formatDateLabel(ticket.createdAt)) + '</div></div><div class="flex shrink-0 gap-2"><button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="back-to-tickets" type="button">Retour liste</button><button class="bg-surface-tint px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-primary" data-action="validate-ticket" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" type="button">Valider</button></div></div>'
+      + '<div class="mt-2 whitespace-pre-wrap text-[11px] text-on-surface-variant">' + escapeHtml(ticket.requestTextRaw || "") + '</div>'
+      + '</section>';
+    markup += lines.map(function(line) {
+      return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+        + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="truncate text-[12px] font-bold tracking-tight text-primary">' + escapeHtml(line.reference || "-") + '</div><div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml((line.requestedDisplay || "À confirmer") + (line.warehouseHelpDisplay ? (" · " + line.warehouseHelpDisplay) : "")) + '</div></div><div class="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(line.status || "-") + '</div></div>'
+        + '<div class="mt-2 flex flex-wrap gap-2">'
+        + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="resolve-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" data-line-status="ready" type="button">Renseigner</button>'
+        + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="resolve-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" data-line-status="not_found" type="button">Introuvable</button>'
+        + '</div>'
+        + (line.pickedDisplay ? '<div class="mt-2 text-[11px] font-semibold text-on-surface">' + escapeHtml("Pris : " + line.pickedDisplay) + '</div>' : '')
+        + (line.lineNote ? '<div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml(line.lineNote) + '</div>' : '')
+        + '</article>';
+    }).join("");
+    markup += '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3"><div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Historique ticket</div>'
+      + (events.length ? '<div class="mt-2 flex flex-col gap-2">' + events.map(function(event) {
+        return '<div class="text-[11px] text-on-surface-variant">' + escapeHtml(formatDateLabel(event.createdAt) + " · " + (event.eventType || "-") + (event.message ? (" · " + event.message) : "")) + '</div>';
+      }).join("") + '</div>' : '<div class="mt-2 text-[11px] text-on-surface-variant">Aucun événement.</div>')
+      + '</section>';
+  } else if (tickets.length) {
+    markup = tickets.map(function(ticket) {
+      return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+        + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><button class="truncate text-left text-[12px] font-bold tracking-tight text-primary" data-action="open-ticket" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" type="button">' + escapeHtml(ticket.ticketNumber || "-") + '</button><div class="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(ticket.status || "-") + '</div></div><div class="shrink-0 text-right text-[10px] text-on-surface-variant">' + escapeHtml(formatDateLabel(ticket.createdAt)) + '</div></div>'
+        + '<div class="mt-2 text-[11px] text-on-surface-variant">' + escapeHtml((ticket.title || "Sans titre") + " · " + ticket.lineCount + " lignes") + '</div>'
+        + '</article>';
+    }).join("");
+  } else {
+    markup = '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Aucun ticket sortie pour le moment.</div>';
+  }
+  content.innerHTML = markup;
+}
+
 function renderAll() {
   renderInventoryPage();
   renderHistoryPage();
   renderDetailPage();
+  renderReferenceImportsPage();
+  renderPickupTicketsPage();
   if (state.quickEditOpen) renderQuickEdit();
 }
 
@@ -3112,6 +3242,8 @@ function syncActiveShell() {
   const inventoryShell = document.getElementById("inventoryAppShell");
   const historyShell = document.getElementById("historyAppShell");
   const detailShell = document.getElementById("detailAppShell");
+  const referenceImportsShell = document.getElementById("referenceImportsAppShell");
+  const pickupTicketsShell = document.getElementById("pickupTicketsAppShell");
   const navInventoryButton = document.getElementById("navInventoryButton");
   const navHistoryButton = document.getElementById("navHistoryButton");
   const view = state.currentView || "inventory";
@@ -3119,6 +3251,8 @@ function syncActiveShell() {
   if (inventoryShell) inventoryShell.classList.toggle("hidden", view !== "inventory");
   if (historyShell) historyShell.classList.toggle("hidden", view !== "history");
   if (detailShell) detailShell.classList.toggle("hidden", view !== "detail");
+  if (referenceImportsShell) referenceImportsShell.classList.toggle("hidden", view !== "imports");
+  if (pickupTicketsShell) pickupTicketsShell.classList.toggle("hidden", view !== "tickets");
 
   if (navInventoryButton) {
     const active = view === "inventory" || view === "detail";
@@ -3148,6 +3282,8 @@ function bindInventoryEvents() {
   const inventoryGrid = document.getElementById("inventoryGrid");
   const navInventoryButton = document.getElementById("navInventoryButton");
   const navHistoryButton = document.getElementById("navHistoryButton");
+  const openReferenceImportsButton = document.getElementById("openReferenceImportsButton");
+  const openPickupTicketsButton = document.getElementById("openPickupTicketsButton");
   if (!searchInput || !inventoryGrid) return;
   searchInput.addEventListener("input", function(event) {
     state.query = String(event.target.value || "").trim();
@@ -3189,6 +3325,16 @@ function bindInventoryEvents() {
   if (navHistoryButton) {
     navHistoryButton.addEventListener("click", function() {
       navigateTo("history");
+    });
+  }
+  if (openReferenceImportsButton) {
+    openReferenceImportsButton.addEventListener("click", function() {
+      navigateTo("imports");
+    });
+  }
+  if (openPickupTicketsButton) {
+    openPickupTicketsButton.addEventListener("click", function() {
+      navigateTo("tickets");
     });
   }
   inventoryGrid.addEventListener("click", function(event) {
@@ -3251,6 +3397,390 @@ function bindDetailEvents() {
   }
 }
 
+function bindReferenceImportsEvents() {
+  const backButton = document.getElementById("referenceImportsBackButton");
+  const refreshButton = document.getElementById("referenceImportsRefreshButton");
+  const uploadButton = document.getElementById("referenceImportUploadButton");
+  const content = document.getElementById("referenceImportsContent");
+  if (backButton) {
+    backButton.addEventListener("click", function() {
+      navigateTo("inventory");
+    });
+  }
+  if (refreshButton) {
+    refreshButton.addEventListener("click", function() {
+      loadReferenceImportData(state.referenceImportBatch);
+    });
+  }
+  if (uploadButton) {
+    uploadButton.addEventListener("click", function() {
+      createReferenceImportBatchFromForm();
+    });
+  }
+  if (content) {
+    content.addEventListener("click", function(event) {
+      const batchTrigger = event.target.closest('[data-action="open-import-batch"]');
+      if (batchTrigger) {
+        navigateTo("imports", { ref: batchTrigger.getAttribute("data-batch-id") });
+        return;
+      }
+      const backTrigger = event.target.closest('[data-action="back-to-import-batches"]');
+      if (backTrigger) {
+        navigateTo("imports");
+        return;
+      }
+      const finalizeTrigger = event.target.closest('[data-action="finalize-import-line"]');
+      if (finalizeTrigger) {
+        handleFinalizeImportLine(
+          finalizeTrigger.getAttribute("data-line-id"),
+          finalizeTrigger.getAttribute("data-line-resolution")
+        );
+      }
+    });
+  }
+}
+
+function bindPickupTicketsEvents() {
+  const backButton = document.getElementById("pickupTicketsBackButton");
+  const refreshButton = document.getElementById("pickupTicketsRefreshButton");
+  const createButton = document.getElementById("pickupTicketCreateButton");
+  const content = document.getElementById("pickupTicketsContent");
+  if (backButton) {
+    backButton.addEventListener("click", function() {
+      navigateTo("inventory");
+    });
+  }
+  if (refreshButton) {
+    refreshButton.addEventListener("click", function() {
+      loadPickupTicketData(state.pickupTicket);
+    });
+  }
+  if (createButton) {
+    createButton.addEventListener("click", function() {
+      createPickupTicketFromForm();
+    });
+  }
+  if (content) {
+    content.addEventListener("click", function(event) {
+      const openTrigger = event.target.closest('[data-action="open-ticket"]');
+      if (openTrigger) {
+        navigateTo("tickets", { ref: openTrigger.getAttribute("data-ticket-id") });
+        return;
+      }
+      const backTrigger = event.target.closest('[data-action="back-to-tickets"]');
+      if (backTrigger) {
+        navigateTo("tickets");
+        return;
+      }
+      const resolveTrigger = event.target.closest('[data-action="resolve-ticket-line"]');
+      if (resolveTrigger) {
+        handleResolveTicketLine(
+          resolveTrigger.getAttribute("data-ticket-id"),
+          resolveTrigger.getAttribute("data-line-id"),
+          resolveTrigger.getAttribute("data-line-status")
+        );
+        return;
+      }
+      const validateTrigger = event.target.closest('[data-action="validate-ticket"]');
+      if (validateTrigger) {
+        handleValidateTicket(validateTrigger.getAttribute("data-ticket-id"));
+      }
+    });
+  }
+}
+
+function loadReferenceImportData(batchId) {
+  if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) {
+    state.referenceImportBatches = [];
+    if (batchId) state.referenceImportBatch = batchId;
+    renderReferenceImportsPage();
+    return Promise.resolve(false);
+  }
+  return remoteDataSource.fetchReferenceImportBatches().then(function(payload) {
+    state.referenceImportBatches = Array.isArray(payload && payload.items) ? payload.items : [];
+    renderReferenceImportsPage();
+    if (batchId) {
+      return remoteDataSource.fetchReferenceImportBatch(batchId).then(function(batchPayload) {
+        const selectedBatch = batchPayload && batchPayload.batch ? Object.assign({}, batchPayload.batch, {
+          lines: Array.isArray(batchPayload.lines) ? batchPayload.lines : []
+        }) : null;
+        state.referenceImportBatch = batchId;
+        if (selectedBatch) {
+          let replaced = false;
+          state.referenceImportBatches = state.referenceImportBatches.map(function(entry) {
+            if (String(entry.batchId || "") === String(batchId)) replaced = true;
+            return String(entry.batchId || "") === String(batchId) ? selectedBatch : entry;
+          });
+          if (!replaced) state.referenceImportBatches.unshift(selectedBatch);
+        }
+        renderReferenceImportsPage();
+        return true;
+      });
+    }
+    state.referenceImportBatch = null;
+    renderReferenceImportsPage();
+    return true;
+  }).catch(function(error) {
+    console.warn("Reference imports fetch failed", error);
+    renderReferenceImportsPage();
+    return false;
+  });
+}
+
+function loadPickupTicketData(ticketId) {
+  if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) {
+    state.pickupTickets = [];
+    state.pickupTicketData = null;
+    renderPickupTicketsPage();
+    return Promise.resolve(false);
+  }
+  return remoteDataSource.fetchPickupTickets().then(function(payload) {
+    state.pickupTickets = Array.isArray(payload && payload.items) ? payload.items : [];
+    renderPickupTicketsPage();
+    if (ticketId) {
+      return remoteDataSource.fetchPickupTicket(ticketId).then(function(ticketPayload) {
+        state.pickupTicket = ticketId;
+        state.pickupTicketData = {
+          ticket: ticketPayload && ticketPayload.ticket ? ticketPayload.ticket : null,
+          lines: Array.isArray(ticketPayload && ticketPayload.lines) ? ticketPayload.lines : [],
+          events: Array.isArray(ticketPayload && ticketPayload.events) ? ticketPayload.events : []
+        };
+        renderPickupTicketsPage();
+        return true;
+      });
+    }
+    state.pickupTicket = null;
+    state.pickupTicketData = null;
+    renderPickupTicketsPage();
+    return true;
+  }).catch(function(error) {
+    console.warn("Pickup tickets fetch failed", error);
+    renderPickupTicketsPage();
+    return false;
+  });
+}
+
+function getReferenceImportMappingFromForm() {
+  function value(id) {
+    const element = document.getElementById(id);
+    return element ? String(element.value || "").trim() : "";
+  }
+  return {
+    reference: value("referenceImportMappingReference"),
+    warehouse: value("referenceImportMappingWarehouse"),
+    arrivalNote: value("referenceImportMappingArrival"),
+    remark: value("referenceImportMappingRemark"),
+    tail: value("referenceImportMappingTail"),
+    unitsPerBox: value("referenceImportMappingUnits"),
+    boxes: value("referenceImportMappingBoxes"),
+    packNotation: value("referenceImportMappingPackNotation")
+  };
+}
+
+function readFileAsBase64(file) {
+  return new Promise(function(resolve, reject) {
+    const reader = new FileReader();
+    reader.onload = function() {
+      const result = String(reader.result || "");
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = function() {
+      reject(reader.error || new Error("Lecture fichier impossible."));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function createReferenceImportBatchFromForm() {
+  const input = document.getElementById("referenceImportFileInput");
+  const sheetNameInput = document.getElementById("referenceImportSheetNameInput");
+  const file = input && input.files && input.files[0] ? input.files[0] : null;
+  if (!file) {
+    window.alert("Sélectionne un fichier Excel / ODS.");
+    return;
+  }
+  readFileAsBase64(file).then(function(fileBase64) {
+    return pushOnlineMutation({
+      type: "create_reference_import_batch_from_file",
+      request: {
+        sourceFileName: file.name,
+        sourceFileType: file.name.split(".").pop().toLowerCase(),
+        mimeType: file.type || "",
+        fileBase64: fileBase64,
+        sourceSheetName: sheetNameInput ? String(sheetNameInput.value || "").trim() : "",
+        mapping: getReferenceImportMappingFromForm(),
+        createdBy: "webapp"
+      }
+    });
+  }).then(function(result) {
+    if (!result || !result.batch) return;
+    state.referenceImportBatch = result.batch.batchId;
+    return loadReferenceImportData(result.batch.batchId);
+  }).catch(function(error) {
+    window.alert(error && error.message ? error.message : "Import impossible.");
+  });
+}
+
+function handleFinalizeImportLine(lineId, resolution) {
+  const batchId = state.referenceImportBatch ? String(state.referenceImportBatch) : "";
+  if (!batchId || !lineId) return;
+  let resolvedReference = "";
+  if (resolution === "link_existing") {
+    resolvedReference = window.prompt("Référence existante à lier", "") || "";
+    if (!resolvedReference) return;
+  }
+  pushOnlineMutation({
+    type: "finalize_reference_import_batch",
+    request: {
+      batchId: batchId,
+      lineResolutions: [{
+        lineId: lineId,
+        action: resolution,
+        resolvedReference: normalizeReference(resolvedReference)
+      }],
+      createdBy: "webapp"
+    }
+  }).then(function() {
+    return loadReferenceImportData(batchId);
+  }).catch(function(error) {
+    window.alert(error && error.message ? error.message : "Finalisation import impossible.");
+  });
+}
+
+function parsePickupTicketTextLines(text) {
+  return String(text || "").split(/\r?\n/).map(function(rawLine) {
+    const line = String(rawLine || "").trim();
+    if (!line) return null;
+    const match = line.match(/^([^\s]+)(?:\s+(\d+)(箱|包|件))?$/);
+    if (!match) return { reference: normalizeReference(line), requestUnit: "", requestQuantity: null };
+    const reference = normalizeReference(match[1]);
+    const quantity = match[2] ? Number(match[2]) : null;
+    const unit = match[3] === "箱" ? "box" : (match[3] === "包" ? "pack" : (match[3] === "件" ? "piece" : ""));
+    return { reference: reference, requestUnit: quantity && unit ? unit : "", requestQuantity: quantity };
+  }).filter(Boolean);
+}
+
+function createPickupTicketFromForm() {
+  const titleInput = document.getElementById("pickupTicketTitleInput");
+  const requestTextInput = document.getElementById("pickupTicketRequestTextInput");
+  const globalNoteInput = document.getElementById("pickupTicketGlobalNoteInput");
+  const requestTextRaw = requestTextInput ? String(requestTextInput.value || "").trim() : "";
+  const lines = parsePickupTicketTextLines(requestTextRaw);
+  if (!lines.length) {
+    window.alert("Saisis au moins une ligne de ticket.");
+    return;
+  }
+  pushOnlineMutation({
+    type: "create_pickup_ticket",
+    request: {
+      title: titleInput ? String(titleInput.value || "").trim() : "",
+      requestTextRaw: requestTextRaw,
+      globalNote: globalNoteInput ? String(globalNoteInput.value || "").trim() : "",
+      createdBy: "webapp",
+      lines: lines
+    }
+  }).then(function(result) {
+    if (!result || !result.ticket) return;
+    navigateTo("tickets", { ref: result.ticket.ticketId });
+  }).catch(function(error) {
+    window.alert(error && error.message ? error.message : "Création ticket impossible.");
+  });
+}
+
+function handleResolveTicketLine(ticketId, lineId, suggestedStatus) {
+  if (!ticketId || !lineId) return;
+  if (suggestedStatus === "not_found") {
+    pushOnlineMutation({
+      type: "resolve_pickup_ticket_line",
+      request: {
+        ticketId: ticketId,
+        lineId: lineId,
+        status: "not_found",
+        updatedBy: "webapp",
+        version: state.pickupTicketData && state.pickupTicketData.ticket ? state.pickupTicketData.ticket.version : 0
+      }
+    }).then(function() {
+      return loadPickupTicketData(ticketId);
+    }).catch(function(error) {
+      window.alert(error && error.message ? error.message : "Mise à jour ligne impossible.");
+    });
+    return;
+  }
+  const pickedText = window.prompt("Quantité réellement prise (ex: 2箱, 5包, 12件)", "");
+  if (pickedText === null) return;
+  const parsed = parsePickupTicketTextLines("TMP " + pickedText)[0];
+  if (!parsed || !parsed.requestUnit || !(parsed.requestQuantity > 0)) {
+    window.alert("Format attendu : 2箱, 5包 ou 12件.");
+    return;
+  }
+  const lineNote = window.prompt("Note ligne (optionnel)", "") || "";
+  pushOnlineMutation({
+    type: "resolve_pickup_ticket_line",
+    request: {
+      ticketId: ticketId,
+      lineId: lineId,
+      status: "ready",
+      pickedUnit: parsed.requestUnit,
+      pickedQuantity: parsed.requestQuantity,
+      lineNote: lineNote,
+      updatedBy: "webapp",
+      version: state.pickupTicketData && state.pickupTicketData.ticket ? state.pickupTicketData.ticket.version : 0
+    }
+  }).then(function() {
+    return loadPickupTicketData(ticketId);
+  }).catch(function(error) {
+    window.alert(error && error.message ? error.message : "Mise à jour ligne impossible.");
+  });
+}
+
+function handleValidateTicket(ticketId) {
+  if (!ticketId || !state.pickupTicketData || !state.pickupTicketData.lines) return;
+  const readyLines = state.pickupTicketData.lines.filter(function(line) {
+    return (line.status === "ready" || line.status === "partial") && line.pickedUnit && Number(line.pickedQuantity || 0) > 0;
+  }).map(function(line) {
+    return {
+      lineId: line.lineId,
+      reference: line.reference,
+      pickedUnit: line.pickedUnit,
+      pickedQuantity: line.pickedQuantity
+    };
+  });
+  pushOnlineMutation({
+    type: "validate_pickup_ticket",
+    request: {
+      ticketId: ticketId,
+      validatedBy: "webapp",
+      version: state.pickupTicketData && state.pickupTicketData.ticket ? state.pickupTicketData.ticket.version : 0,
+      lines: readyLines
+    }
+  }).then(function() {
+    return Promise.all([
+      loadPickupTicketData(ticketId),
+      refreshRemoteSnapshot({ silent: true })
+    ]);
+  }).catch(function(error) {
+    window.alert(error && error.message ? error.message : "Validation ticket impossible.");
+  });
+}
+
+function pushOnlineMutation(mutation) {
+  if (!remoteDataSource || !remoteDataSource.pushMutation || !navigator.onLine) {
+    return Promise.reject(new Error("Cette action nécessite une connexion serveur."));
+  }
+  state.syncStatus = "refreshing";
+  renderAll();
+  return remoteDataSource.pushMutation(mutation).then(function(result) {
+    state.syncStatus = "idle";
+    renderAll();
+    return result;
+  }).catch(function(error) {
+    state.syncStatus = navigator.onLine ? "error" : "offline";
+    renderAll();
+    throw error;
+  });
+}
+
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   navigator.serviceWorker.register("./service-worker.js").catch(function(error) {
@@ -3276,11 +3806,15 @@ function initApp() {
   const route = parseCurrentRoute();
   state.currentView = route.view;
   state.previousView = route.view === "detail" ? "inventory" : route.view;
-  state.detailReference = route.ref;
+  state.detailReference = route.view === "detail" ? route.ref : "";
+  state.referenceImportBatch = route.view === "imports" ? route.ref : null;
+  state.pickupTicket = route.view === "tickets" ? route.ref : null;
   rememberInventoryView(route.view, route.ref);
   bindInventoryEvents();
   bindHistoryEvents();
   bindDetailEvents();
+  bindReferenceImportsEvents();
+  bindPickupTicketsEvents();
   bindQuickEditEvents();
   syncActiveShell();
   renderAll();
@@ -3293,6 +3827,12 @@ function initApp() {
   });
   if (state.currentView === "detail" && state.detailReference) {
     refreshRemoteDetail(state.detailReference, { silent: true });
+  }
+  if (state.currentView === "imports") {
+    loadReferenceImportData(state.referenceImportBatch);
+  }
+  if (state.currentView === "tickets") {
+    loadPickupTicketData(state.pickupTicket);
   }
 
   let resizeTimer = 0;
@@ -3312,6 +3852,12 @@ function initApp() {
     }).then(function() {
       if (state.currentView === "detail" && state.detailReference) {
         return refreshRemoteDetail(state.detailReference, { silent: true });
+      }
+      if (state.currentView === "imports") {
+        return loadReferenceImportData(state.referenceImportBatch);
+      }
+      if (state.currentView === "tickets") {
+        return loadPickupTicketData(state.pickupTicket);
       }
       return false;
     });

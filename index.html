@@ -150,6 +150,10 @@
           </header>
 
           <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-1.5 shadow-ledger">
+            <div class="mb-1.5 flex items-center gap-2">
+              <button class="border border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="openReferenceImportsButton" type="button">Import refs</button>
+              <button class="border border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="openPickupTicketsButton" type="button">Tickets sortie</button>
+            </div>
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
               <input autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" id="searchInput" placeholder="RECHERCHE RÉFÉRENCE / STOCK..." type="search" />
@@ -338,6 +342,75 @@
               </div>
             </section>
           </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="fixed inset-x-0 top-0 bottom-16 hidden overflow-hidden bg-background" id="referenceImportsAppShell">
+      <main class="flex h-full min-h-0 flex-col overflow-hidden">
+        <div class="sticky top-0 z-40 shrink-0 bg-background">
+          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
+            <div class="flex min-w-0 items-center gap-3">
+              <button aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="referenceImportsBackButton" type="button">
+                <span class="material-symbols-outlined">arrow_back</span>
+              </button>
+              <div class="min-w-0">
+                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">Import références</h1>
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="referenceImportsStatus">Import Excel / ODS</p>
+              </div>
+            </div>
+            <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="referenceImportsRefreshButton" type="button">Rafraîchir</button>
+          </header>
+          <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">
+            <div class="grid gap-2">
+              <input class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="referenceImportFileInput" type="file" accept=".xlsx,.xls,.ods" />
+              <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="referenceImportSheetNameInput" placeholder="Nom de feuille (optionnel)" type="text" />
+              <div class="grid grid-cols-2 gap-2">
+                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingReference" placeholder="Colonne Réf" type="text" value="货号" />
+                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingWarehouse" placeholder="Colonne Entrepôt" type="text" value="仓库" />
+                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingArrival" placeholder="Colonne 到货单" type="text" value="到货单" />
+                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingRemark" placeholder="Colonne Remarque" type="text" value="放位/提醒" />
+                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingTail" placeholder="Colonne 尾箱" type="text" value="尾箱" />
+                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingUnits" placeholder="Colonne 件/箱" type="text" value="件/箱" />
+                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingBoxes" placeholder="Colonne 箱数" type="text" value="箱数" />
+                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingPackNotation" placeholder="Colonne 包 notation" type="text" value="Notation paquets" />
+              </div>
+              <button class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="referenceImportUploadButton" type="button">Créer brouillon import</button>
+            </div>
+          </section>
+        </div>
+        <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-outline-variant/20" id="referenceImportsScroll">
+          <div class="flex flex-col gap-3 px-3 py-3" id="referenceImportsContent"></div>
+        </section>
+      </main>
+    </div>
+
+    <div class="fixed inset-x-0 top-0 bottom-16 hidden overflow-hidden bg-background" id="pickupTicketsAppShell">
+      <main class="flex h-full min-h-0 flex-col overflow-hidden">
+        <div class="sticky top-0 z-40 shrink-0 bg-background">
+          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
+            <div class="flex min-w-0 items-center gap-3">
+              <button aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="pickupTicketsBackButton" type="button">
+                <span class="material-symbols-outlined">arrow_back</span>
+              </button>
+              <div class="min-w-0">
+                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">Tickets sortie</h1>
+                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="pickupTicketsStatus">Sorties entrepôt</p>
+              </div>
+            </div>
+            <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="pickupTicketsRefreshButton" type="button">Rafraîchir</button>
+          </header>
+          <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">
+            <div class="grid gap-2">
+              <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketTitleInput" placeholder="Titre ticket (optionnel)" type="text" />
+              <textarea class="min-h-[5.5rem] border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketRequestTextInput" placeholder="FL259-8 2箱&#10;FL536-5 5包&#10;CM291"></textarea>
+              <textarea class="min-h-[3.5rem] border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketGlobalNoteInput" placeholder="Note globale (optionnelle)"></textarea>
+              <button class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="pickupTicketCreateButton" type="button">Créer ticket</button>
+            </div>
+          </section>
+        </div>
+        <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-outline-variant/20" id="pickupTicketsScroll">
+          <div class="flex flex-col gap-3 px-3 py-3" id="pickupTicketsContent"></div>
         </section>
       </main>
     </div>

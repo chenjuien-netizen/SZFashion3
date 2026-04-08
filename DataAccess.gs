@@ -1670,7 +1670,11 @@ function applyFinalizeReferenceImportBatchMutation_(mutation) {
     ]]);
   });
 
-  updateReferenceImportBatchStatus_(batchesSheet, batchId, "finalized");
+  const refreshedLines = readReferenceImportLines_(linesSheet, batchId);
+  const hasPendingLines = refreshedLines.some(function(line) {
+    return line.status === "valid" || line.status === "duplicate";
+  });
+  updateReferenceImportBatchStatus_(batchesSheet, batchId, hasPendingLines ? "review" : "finalized");
   return {
     ok: true,
     mutationId: String(mutation.id || ""),
