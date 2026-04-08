@@ -534,6 +534,32 @@ function reduceMovementFraction_(num, den) {
   };
 }
 
+function buildFractionPackMovementParts_(totalPieces, unitsPerBox, packSize) {
+  const total = Math.max(0, Math.round(Number(totalPieces || 0)));
+  const units = Math.max(0, parseLooseInteger_(unitsPerBox));
+  const colisage = Math.max(0, parseLooseInteger_(packSize));
+  if (!(total > 0) || !(units > 0) || !(colisage > 0)) return null;
+
+  const candidateDenominators = [2, 3, 4, 5, 6, 8, 10, 12];
+  for (let i = 0; i < candidateDenominators.length; i++) {
+    const den = candidateDenominators[i];
+    for (let num = 1; num < den; num++) {
+      const fractionPieces = (units * num) / den;
+      if (Math.floor(fractionPieces) !== fractionPieces) continue;
+      if (fractionPieces > total) continue;
+      const remaining = total - fractionPieces;
+      if (remaining < 0 || remaining % colisage !== 0) continue;
+      const packs = remaining / colisage;
+      if (packs <= 0) continue;
+      return {
+        fractionText: num + "/" + den + "箱",
+        packsText: packs + "包"
+      };
+    }
+  }
+  return null;
+}
+
 function formatMovementDisplayFromPieces_(beforePieces, afterPieces, unitsPerBox, colisage) {
   const before = Math.round(Number(beforePieces || 0));
   const after = Math.round(Number(afterPieces || 0));
@@ -555,6 +581,12 @@ function formatMovementDisplayFromPieces_(beforePieces, afterPieces, unitsPerBox
       const packs = remainder / packSize;
       if (packs > 0) parts.push(packs + "包");
       return parts.length ? sign + parts.join(" ") : "";
+    }
+    const fractionPackParts = buildFractionPackMovementParts_(remainder, units, packSize);
+    if (fractionPackParts) {
+      parts.push(fractionPackParts.fractionText);
+      parts.push(fractionPackParts.packsText);
+      return sign + parts.join(" ");
     }
     const fraction = reduceMovementFraction_(remainder, units);
     if (fraction.num > 0 && fraction.den <= 12) {

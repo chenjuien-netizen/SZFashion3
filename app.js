@@ -801,6 +801,60 @@ function getItemPackTotal(item) {
   return Math.max(0, Math.floor(stateModelToPieces(item || {}) / colisage));
 }
 
+function getItemDisplayBoxTotal(item) {
+  const tail = Math.max(0, toInt(item && item.tail));
+  const unitsPerBox = Math.max(0, toInt(item && item.unitsPerBox));
+  const itemBoxes = Math.max(0, toInt(item && item.itemBoxes));
+  const sign = normalizeSign(item && item.sign);
+  const fractionValue = parsePositiveNumber(item && item.fractionValue) || parseFractionValue(item && item.fractionText);
+  let total = tail > 0 ? 1 : 0;
+
+  if (unitsPerBox > 0) {
+    if (sign === "+") {
+      total += itemBoxes + (fractionValue > 0 ? 1 : 0);
+    } else if (sign === "×") {
+      if (itemBoxes > 1) {
+        total += itemBoxes;
+      } else if (itemBoxes > 0 || fractionValue > 0) {
+        total += 1;
+      }
+    } else {
+      total += itemBoxes;
+      if (fractionValue > 0) total += 1;
+    }
+  } else if (fractionValue > 0) {
+    total += 1;
+  }
+
+  return Math.max(0, total);
+}
+
+function buildFractionPackMovementParts(totalPieces, unitsPerBox, packSize) {
+  const total = Math.max(0, Math.round(Number(totalPieces || 0)));
+  const units = Math.max(0, toInt(unitsPerBox));
+  const colisage = Math.max(0, toInt(packSize));
+  if (!(total > 0) || !(units > 0) || !(colisage > 0)) return null;
+
+  const candidateDenominators = [2, 3, 4, 5, 6, 8, 10, 12];
+  for (let i = 0; i < candidateDenominators.length; i++) {
+    const den = candidateDenominators[i];
+    for (let num = 1; num < den; num++) {
+      const fractionPieces = (units * num) / den;
+      if (!Number.isInteger(fractionPieces)) continue;
+      if (fractionPieces > total) continue;
+      const remaining = total - fractionPieces;
+      if (remaining < 0 || remaining % colisage !== 0) continue;
+      const packs = remaining / colisage;
+      if (packs <= 0) continue;
+      return {
+        fractionText: num + "/" + den + "箱",
+        packsText: packs + "包"
+      };
+    }
+  }
+  return null;
+}
+
 function renderDetailStockStateMarkup(item) {
   if (!item) return "";
   const tailValue = toInt(item.tail);
@@ -812,7 +866,7 @@ function renderDetailStockStateMarkup(item) {
   const packMeta = parsePackNotation(getMainPackNotationFromState(item));
   const packDisplay = packMeta.count > 0 ? String(packMeta.count) + "包" : "";
   const totalPieces = formatMetricNumber(stateModelToPieces(item));
-  const totalBoxes = toInt(item.itemBoxes);
+  const totalBoxes = getItemDisplayBoxTotal(item);
   const totalPacks = getItemPackTotal(item);
   const packText = totalPacks === null ? "-包" : formatMetricNumber(totalPacks) + "包";
   const packsPerBox = computePacksPerBox(item.unitsPerBox, item.colisage);
@@ -886,6 +940,12 @@ function formatMovementDisplayFromPieces(beforePieces, afterPieces, unitsPerBox,
       const packs = remainder / packSize;
       if (packs > 0) parts.push(packs + "包");
       return parts.length ? sign + parts.join(" ") : "";
+    }
+    const fractionPackParts = buildFractionPackMovementParts(remainder, units, packSize);
+    if (fractionPackParts) {
+      parts.push(fractionPackParts.fractionText);
+      parts.push(fractionPackParts.packsText);
+      return sign + parts.join(" ");
     }
     const fraction = reduceFraction(remainder, units);
     if (fraction.num > 0 && fraction.den <= 12) {
