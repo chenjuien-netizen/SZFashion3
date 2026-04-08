@@ -3246,6 +3246,7 @@ function syncActiveShell() {
   const pickupTicketsShell = document.getElementById("pickupTicketsAppShell");
   const navInventoryButton = document.getElementById("navInventoryButton");
   const navHistoryButton = document.getElementById("navHistoryButton");
+  const navTicketsButton = document.getElementById("navTicketsButton");
   const view = state.currentView || "inventory";
 
   if (inventoryShell) inventoryShell.classList.toggle("hidden", view !== "inventory");
@@ -3263,6 +3264,11 @@ function syncActiveShell() {
     const active = view === "history";
     navHistoryButton.className = "flex flex-1 flex-col items-center justify-center px-2 py-1 " + (active ? "bg-slate-200 text-slate-900" : "text-slate-400");
     navHistoryButton.setAttribute("aria-current", active ? "page" : "false");
+  }
+  if (navTicketsButton) {
+    const active = view === "tickets";
+    navTicketsButton.className = "flex flex-1 flex-col items-center justify-center px-2 py-1 " + (active ? "bg-slate-200 text-slate-900" : "text-slate-400");
+    navTicketsButton.setAttribute("aria-current", active ? "page" : "false");
   }
 }
 
@@ -3282,8 +3288,8 @@ function bindInventoryEvents() {
   const inventoryGrid = document.getElementById("inventoryGrid");
   const navInventoryButton = document.getElementById("navInventoryButton");
   const navHistoryButton = document.getElementById("navHistoryButton");
+  const navTicketsButton = document.getElementById("navTicketsButton");
   const openReferenceImportsButton = document.getElementById("openReferenceImportsButton");
-  const openPickupTicketsButton = document.getElementById("openPickupTicketsButton");
   if (!searchInput || !inventoryGrid) return;
   searchInput.addEventListener("input", function(event) {
     state.query = String(event.target.value || "").trim();
@@ -3327,14 +3333,18 @@ function bindInventoryEvents() {
       navigateTo("history");
     });
   }
+  if (navTicketsButton) {
+    navTicketsButton.addEventListener("click", function() {
+      if (state.currentView === "tickets" && state.pickupTicket) {
+        navigateTo("tickets");
+        return;
+      }
+      navigateTo("tickets");
+    });
+  }
   if (openReferenceImportsButton) {
     openReferenceImportsButton.addEventListener("click", function() {
       navigateTo("imports");
-    });
-  }
-  if (openPickupTicketsButton) {
-    openPickupTicketsButton.addEventListener("click", function() {
-      navigateTo("tickets");
     });
   }
   inventoryGrid.addEventListener("click", function(event) {
