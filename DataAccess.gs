@@ -91,21 +91,90 @@ function getPickupTicketsPayload_() {
   };
 }
 
+function getPickupTicketsBootstrapPayload_() {
+  const generatedAt = new Date().toISOString();
+  const ticketSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKETS_SHEET);
+  const lineSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKET_LINES_SHEET);
+  const eventSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKET_EVENTS_SHEET);
+  const items = ticketSheet ? readPickupTickets_(ticketSheet) : [];
+  const inventoryByReference = buildInventoryLookupByReference_();
+  const lines = lineSheet ? enrichPickupTicketLinesWithStock_(readPickupTicketLines_(lineSheet, ""), inventoryByReference) : [];
+  const events = eventSheet ? readPickupTicketEvents_(eventSheet, "") : [];
+  const linesByTicketId = {};
+  const eventsByTicketId = {};
+  lines.forEach(function(line) {
+    const ticketId = String(line.ticketId || "").trim();
+    if (!ticketId) return;
+    if (!linesByTicketId[ticketId]) linesByTicketId[ticketId] = [];
+    linesByTicketId[ticketId].push(line);
+  });
+  events.forEach(function(event) {
+    const ticketId = String(event.ticketId || "").trim();
+    if (!ticketId) return;
+    if (!eventsByTicketId[ticketId]) eventsByTicketId[ticketId] = [];
+    eventsByTicketId[ticketId].push(event);
+  });
+  const detailsById = {};
+  items.forEach(function(ticket) {
+    const ticketId = String(ticket.ticketId || "").trim();
+    if (!ticketId) return;
+    detailsById[ticketId] = {
+      ticket: ticket,
+      lines: Array.isArray(linesByTicketId[ticketId]) ? linesByTicketId[ticketId] : [],
+      events: Array.isArray(eventsByTicketId[ticketId]) ? eventsByTicketId[ticketId] : []
+    };
+  });
+  return {
+    items: items,
+    detailsById: detailsById,
+    generatedAt: generatedAt,
+    source: "google_sheets"
+  };
+}
+
 function getPickupTicketPayload_(ticketId) {
   const normalizedTicketId = String(ticketId || "").trim();
   const ticketSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKETS_SHEET);
   const lineSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKET_LINES_SHEET);
   const eventSheet = getOptionalSheet_(SZFASHION_PICKUP_TICKET_EVENTS_SHEET);
+  const inventoryByReference = buildInventoryLookupByReference_();
   const ticket = ticketSheet ? readPickupTickets_(ticketSheet).find(function(entry) {
     return String(entry.ticketId || "") === normalizedTicketId;
   }) : null;
   return {
     ticket: ticket || null,
-    lines: lineSheet ? readPickupTicketLines_(lineSheet, normalizedTicketId) : [],
+    lines: lineSheet ? enrichPickupTicketLinesWithStock_(readPickupTicketLines_(lineSheet, normalizedTicketId), inventoryByReference) : [],
     events: eventSheet ? readPickupTicketEvents_(eventSheet, normalizedTicketId) : [],
     generatedAt: new Date().toISOString(),
     source: "google_sheets"
   };
+}
+
+function buildInventoryLookupByReference_() {
+  const sheet = getOptionalSheet_(SZFASHION_STOCK_SHEET);
+  if (!sheet) return {};
+  const items = enrichInventoryItemsWithArrivalDates_(readInventoryItems_(sheet), readArrivalsUpdatedAtLookup_());
+  const lookup = {};
+  items.forEach(function(item) {
+    const reference = normalizeReference_(item && item.reference);
+    if (!reference) return;
+    lookup[reference] = item;
+  });
+  return lookup;
+}
+
+function enrichPickupTicketLinesWithStock_(lines, inventoryByReference) {
+  const lookup = inventoryByReference || {};
+  return (Array.isArray(lines) ? lines : []).map(function(line) {
+    const reference = normalizeReference_(line && line.reference);
+    const item = reference ? lookup[reference] : null;
+    return Object.assign({}, line, {
+      stockAvailablePiecesSnapshot: line && line.stockAvailablePiecesSnapshot != null
+        ? line.stockAvailablePiecesSnapshot
+        : (item ? stateModelToPieces_(item) : null),
+      stockAvailableDisplaySnapshot: item ? String(item.stockDisplay || "").trim() : ""
+    });
+  });
 }
 
 function findInventoryItemByReference_(reference) {

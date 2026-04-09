@@ -422,6 +422,15 @@
         nextPickupTickets = payload.pickupTickets.slice();
       }
 
+      if (payload.pickupTicketDetails && typeof payload.pickupTicketDetails === "object") {
+        nextPickupTicketDetails = {};
+        Object.keys(payload.pickupTicketDetails).forEach(function(ticketId) {
+          const detail = payload.pickupTicketDetails[ticketId];
+          if (!detail || !detail.ticket) return;
+          nextPickupTicketDetails[String(ticketId)] = clonePickupTicketDetail(detail);
+        });
+      }
+
       if (payload.pickupTicket && payload.pickupTicket.ticket) {
         nextPickupTicketDetails = upsertPickupTicketDetail(nextPickupTicketDetails, payload.pickupTicket.ticket.ticketId, payload.pickupTicket);
         nextPickupTickets = replacePickupTicketInList(nextPickupTickets, payload.pickupTicket.ticket, payload.pickupTicket.ticket.ticketId);
@@ -651,6 +660,33 @@
       };
     }
 
+    function savePickupTicketsBootstrap(payload) {
+      const snapshot = readSnapshot();
+      const safePayload = payload || {};
+      const nextDetails = {};
+      const rawDetails = safePayload.detailsById && typeof safePayload.detailsById === "object" ? safePayload.detailsById : {};
+      Object.keys(rawDetails).forEach(function(ticketId) {
+        const detail = rawDetails[ticketId];
+        if (!detail || !detail.ticket) return;
+        nextDetails[String(ticketId)] = clonePickupTicketDetail(detail);
+      });
+      const nextSnapshot = {
+        items: snapshot.items.slice(),
+        historyItems: snapshot.historyItems.slice(),
+        pickupTickets: Array.isArray(safePayload.items) ? safePayload.items.slice() : snapshot.pickupTickets.slice(),
+        pickupTicketDetails: nextDetails,
+        pendingMutations: snapshot.pendingMutations.slice(),
+        syncStatus: snapshot.syncStatus,
+        lastSyncAt: typeof safePayload.generatedAt === "string" ? safePayload.generatedAt : snapshot.lastSyncAt,
+        dataSource: snapshot.dataSource
+      };
+      writeSnapshot(nextSnapshot);
+      return {
+        items: nextSnapshot.pickupTickets.slice(),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
     return {
       loadInventory: loadInventory,
       loadHistory: loadHistory,
@@ -663,6 +699,7 @@
       replaceOptimisticPickupTicket: replaceOptimisticPickupTicket,
       discardOptimisticPickupTicket: discardOptimisticPickupTicket,
       saveOptimisticPickupTicketDetail: saveOptimisticPickupTicketDetail,
+      savePickupTicketsBootstrap: savePickupTicketsBootstrap,
       mergeRemoteSnapshot: mergeRemoteSnapshot,
       commitSyncedMutation: commitSyncedMutation,
       getMeta: function() {

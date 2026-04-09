@@ -199,6 +199,41 @@ function refreshRemotePickupTickets(options) {
   return remotePickupTicketsRefreshPromise;
 }
 
+function refreshRemotePickupTicketsBootstrap(options) {
+  if (!isRemoteReadAllowed(options) || !remoteDataSource.fetchPickupTicketsBootstrap) {
+    if (navigator.onLine === false) state.syncStatus = "offline";
+    return Promise.resolve(false);
+  }
+  if (remotePickupTicketsRefreshPromise) return remotePickupTicketsRefreshPromise;
+
+  remotePickupTicketsRefreshPromise = remoteDataSource.fetchPickupTicketsBootstrap().then(function(payload) {
+    if (dataSource && dataSource.savePickupTicketsBootstrap) {
+      dataSource.savePickupTicketsBootstrap(payload);
+      applyLocalPickupTicketsState(state.pickupTicket);
+    } else {
+      mergeRemotePickupTicketsList(payload && payload.items, payload && payload.generatedAt);
+      if (payload && payload.detailsById) {
+        Object.keys(payload.detailsById).forEach(function(ticketId) {
+          mergeRemotePickupTicketDetail(payload.detailsById[ticketId], payload.generatedAt);
+        });
+      }
+    }
+    if (!options || !options.silent) renderPickupTicketsPage();
+    return true;
+  }).catch(function(error) {
+    console.warn("Pickup tickets bootstrap refresh failed", error);
+    if (!options || !options.silent) {
+      state.syncStatus = navigator.onLine ? "error" : "offline";
+      renderAll();
+    }
+    return false;
+  }).finally(function() {
+    remotePickupTicketsRefreshPromise = null;
+  });
+
+  return remotePickupTicketsRefreshPromise;
+}
+
 function refreshRemotePickupTicket(ticketId, options) {
   const normalizedTicketId = String(ticketId || "").trim();
   if (!normalizedTicketId || isOptimisticPickupTicketId(normalizedTicketId)) return Promise.resolve(false);
@@ -444,6 +479,17 @@ function mergeRemotePickupTicketDetail(payload, generatedAt) {
     events: Array.isArray(payload.events) ? payload.events : []
   };
   seedPickupTicketLineDrafts();
+}
+
+function getPickupLineAvailableStockDisplay(line) {
+  const snapshotDisplay = String(line && line.stockAvailableDisplaySnapshot || "").trim();
+  if (snapshotDisplay) return snapshotDisplay;
+  const reference = normalizeReference(line && line.reference);
+  if (!reference) return "";
+  const item = (Array.isArray(state.items) ? state.items : []).find(function(entry) {
+    return normalizeReference(entry && entry.reference) === reference;
+  });
+  return item && item.stockDisplay ? String(item.stockDisplay) : "";
 }
 
 function navigateTo(view, options) {
@@ -3530,10 +3576,11 @@ function renderPickupTicketListCard(ticket) {
       + previewLines.map(function(line) {
         const requested = buildRequestedDisplayFromDraftLine(line) || String(line.requestedDisplay || "") || "À confirmer";
         const status = String(line.status || "").trim();
+        const availableStock = getPickupLineAvailableStockDisplay(line);
         const resolution = status === "not_found"
           ? "introuvable"
           : (line.pickedDisplay ? (requested + " -> " + line.pickedDisplay) : requested);
-        return '<div class="flex items-center justify-between gap-3 text-[11px] text-on-surface-variant"><span class="truncate">' + escapeHtml(line.reference || "-") + '</span><span class="shrink-0">' + escapeHtml(resolution) + '</span></div>';
+        return '<div class="flex items-center justify-between gap-3 text-[11px] text-on-surface-variant"><span class="truncate">' + escapeHtml(line.reference || "-") + (availableStock ? (' · ' + escapeHtml(availableStock)) : '') + '</span><span class="shrink-0">' + escapeHtml(resolution) + '</span></div>';
       }).join("")
       + '</div>' : '')
     + '</article>';
@@ -3630,7 +3677,7 @@ function renderPickupTicketDetailView(selectedTicket) {
       + '<div class="min-w-0">'
       + '<div class="truncate text-[12px] font-bold tracking-tight text-primary">' + escapeHtml(line.reference || "-") + '</div>'
       + '<div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-on-surface-variant">'
-      + (line.warehouseHelpDisplay ? ('<span class="font-semibold text-on-surface-variant">' + escapeHtml(line.warehouseHelpDisplay) + '</span>') : '')
+      + ((line.warehouseHelpDisplay || getPickupLineAvailableStockDisplay(line)) ? ('<span class="font-semibold text-on-surface-variant">' + escapeHtml([String(line.warehouseHelpDisplay || "").trim(), getPickupLineAvailableStockDisplay(line)].filter(Boolean).join(" · ")) + '</span>') : '')
       + '<span>' + escapeHtml(line.requestedDisplay || "À confirmer") + '</span>'
       + (line.pickedDisplay ? '<span class="font-semibold text-on-surface">' + escapeHtml("→ " + line.pickedDisplay) + '</span>' : '')
       + '</div>'
@@ -4120,9 +4167,18 @@ function loadPickupTicketData(ticketId, options) {
   if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) {
     return Promise.resolve(false);
   }
-  const tasks = [refreshRemotePickupTickets({ silent: true })];
+  const tasks = [];
+  if (!state.pickupTicketsLoaded || !Array.isArray(state.pickupTickets) || !state.pickupTickets.length) {
+    tasks.push(refreshRemotePickupTicketsBootstrap({ silent: true }));
+  } else {
+    tasks.push(refreshRemotePickupTickets({ silent: true }));
+  }
   if (normalizedTicketId && includeDetail) {
-    tasks.push(refreshRemotePickupTicket(normalizedTicketId, { silent: true }));
+    if (!(state.pickupTicketData && state.pickupTicketData.ticket)) {
+      tasks.push(refreshRemotePickupTicket(normalizedTicketId, { silent: true }));
+    } else {
+      state.pickupTicketLoading = false;
+    }
   } else {
     state.pickupTicketLoading = false;
   }
@@ -4620,17 +4676,22 @@ function initApp() {
   syncActiveShell();
   renderAll();
   registerServiceWorker();
-  refreshRemoteSnapshot({ silent: true }).then(function() {
+  Promise.all([
+    refreshRemoteSnapshot({ silent: true }),
+    refreshRemotePickupTicketsBootstrap({ silent: true })
+  ]).then(function() {
     if (state.pendingMutations.length) {
       return syncPendingMutations({ silent: true });
     }
     return false;
+  }).then(function() {
+    renderAll();
+    return true;
   });
-  refreshRemotePickupTickets({ silent: true });
   if (state.currentView === "detail" && state.detailReference) {
     refreshRemoteDetail(state.detailReference, { silent: true });
   }
-  if (route.view === "tickets" && state.pickupTicket) {
+  if (route.view === "tickets" && state.pickupTicket && !(state.pickupTicketData && state.pickupTicketData.ticket)) {
     refreshRemotePickupTicket(state.pickupTicket, { silent: true });
   }
   if (state.currentView === "imports") {
@@ -4652,8 +4713,10 @@ function initApp() {
   });
   window.addEventListener("online", function() {
     renderAll();
-    refreshRemoteSnapshot({ silent: true }).then(function() {
-      return refreshRemotePickupTickets({ silent: true });
+    Promise.all([
+      refreshRemoteSnapshot({ silent: true }),
+      refreshRemotePickupTicketsBootstrap({ silent: true })
+    ]).then(function() {
     }).then(function() {
       if (state.pendingMutations.length) {
         return syncPendingMutations({ silent: true });

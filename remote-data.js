@@ -102,6 +102,15 @@
     return normalized;
   }
 
+  function normalizePickupTicketsBootstrapPayload(payload) {
+    return {
+      items: Array.isArray(payload && payload.items) ? payload.items : [],
+      detailsById: payload && payload.detailsById && typeof payload.detailsById === "object" ? payload.detailsById : {},
+      generatedAt: payload && typeof payload.generatedAt === "string" ? payload.generatedAt : "",
+      source: payload && payload.source ? payload.source : "google_sheets"
+    };
+  }
+
   window.createRemoteDataSource = function createRemoteDataSource(config) {
     const baseUrl = getBaseUrl(config);
 
@@ -140,6 +149,10 @@
       fetchPickupTickets: function() {
         ensureConfigured();
         return fetchJson(buildUrl(baseUrl, "pickup_tickets"));
+      },
+      fetchPickupTicketsBootstrap: function() {
+        ensureConfigured();
+        return fetchJson(buildUrl(baseUrl, "pickup_tickets_bootstrap")).then(normalizePickupTicketsBootstrapPayload);
       },
       fetchPickupTicket: function(ticketId) {
         ensureConfigured();

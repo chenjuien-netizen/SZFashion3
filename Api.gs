@@ -21,10 +21,13 @@ function doGet(e) {
     if (route === "pickup_tickets") {
       return apiJson_(getPickupTicketsPayload_());
     }
+    if (route === "pickup_tickets_bootstrap") {
+      return apiJson_(getPickupTicketsBootstrapPayload_());
+    }
     if (route === "pickup_ticket") {
       return apiJson_(getPickupTicketPayload_(params.ticket_id || ""));
     }
-    return apiError_("Route introuvable. Utilise route=inventory, route=history, route=detail, route=reference_import_batches, route=reference_import_batch, route=pickup_tickets ou route=pickup_ticket.", 404);
+    return apiError_("Route introuvable. Utilise route=inventory, route=history, route=detail, route=reference_import_batches, route=reference_import_batch, route=pickup_tickets, route=pickup_tickets_bootstrap ou route=pickup_ticket.", 404);
   } catch (error) {
     return apiError_(error && error.message ? error.message : "Erreur serveur inconnue.", 500);
   }
