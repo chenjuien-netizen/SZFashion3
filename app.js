@@ -2,6 +2,8 @@ let dataSource = null;
 let remoteDataSource = null;
 let remoteRefreshPromise = null;
 let remoteDetailRefreshReference = "";
+let remotePickupTicketsRefreshPromise = null;
+let remotePickupTicketRefreshPromises = Object.create(null);
 let remoteMutationSyncPromise = null;
 let hasLocalWritesThisSession = false;
 
@@ -35,6 +37,7 @@ const state = {
   pickupTicketData: null,
   pickupTicketsLoaded: false,
   pickupTicketLoading: false,
+  pickupTicketMissingConfirmed: false,
   expandedTicketIds: {},
   ticketCreationDraft: {
     title: "",
@@ -157,6 +160,89 @@ function refreshRemoteDetail(reference, options) {
   }).finally(function() {
     remoteDetailRefreshReference = "";
   });
+}
+
+function isOptimisticPickupTicketId(ticketId) {
+  return /^tmp_pt_/i.test(String(ticketId || "").trim());
+}
+
+function refreshRemotePickupTickets(options) {
+  if (!isRemoteReadAllowed(options) || !remoteDataSource.fetchPickupTickets) {
+    if (navigator.onLine === false) state.syncStatus = "offline";
+    return Promise.resolve(false);
+  }
+  if (remotePickupTicketsRefreshPromise) return remotePickupTicketsRefreshPromise;
+
+  if (!options || !options.silent) {
+    state.syncStatus = "refreshing";
+    renderAll();
+  }
+
+  remotePickupTicketsRefreshPromise = remoteDataSource.fetchPickupTickets().then(function(payload) {
+    mergeRemotePickupTicketsList(payload && payload.items, payload && payload.generatedAt);
+    if (!options || !options.silent) {
+      state.syncStatus = "idle";
+      renderAll();
+    }
+    return true;
+  }).catch(function(error) {
+    console.warn("Pickup tickets list refresh failed", error);
+    if (!options || !options.silent) {
+      state.syncStatus = navigator.onLine ? "error" : "offline";
+      renderAll();
+    }
+    return false;
+  }).finally(function() {
+    remotePickupTicketsRefreshPromise = null;
+  });
+
+  return remotePickupTicketsRefreshPromise;
+}
+
+function refreshRemotePickupTicket(ticketId, options) {
+  const normalizedTicketId = String(ticketId || "").trim();
+  if (!normalizedTicketId || isOptimisticPickupTicketId(normalizedTicketId)) return Promise.resolve(false);
+  if (!isRemoteReadAllowed(options) || !remoteDataSource.fetchPickupTicket) return Promise.resolve(false);
+  if (remotePickupTicketRefreshPromises[normalizedTicketId]) return remotePickupTicketRefreshPromises[normalizedTicketId];
+
+  if (state.pickupTicket === normalizedTicketId) {
+    state.pickupTicketLoading = true;
+    state.pickupTicketMissingConfirmed = false;
+    renderPickupTicketsPage();
+  }
+
+  remotePickupTicketRefreshPromises[normalizedTicketId] = remoteDataSource.fetchPickupTicket(normalizedTicketId).then(function(payload) {
+    if (payload && payload.ticket) {
+      mergeRemotePickupTicketDetail({
+        ticket: payload.ticket,
+        lines: Array.isArray(payload.lines) ? payload.lines : [],
+        events: Array.isArray(payload.events) ? payload.events : []
+      }, payload.generatedAt);
+      if (state.pickupTicket === normalizedTicketId) state.pickupTicketMissingConfirmed = false;
+      return true;
+    }
+    if (state.pickupTicket === normalizedTicketId) {
+      state.pickupTicketMissingConfirmed = true;
+      state.pickupTicketData = null;
+    }
+    renderPickupTicketsPage();
+    return false;
+  }).catch(function(error) {
+    console.warn("Pickup ticket detail refresh failed", error);
+    if (state.pickupTicket === normalizedTicketId) {
+      state.pickupTicketMissingConfirmed = false;
+      renderPickupTicketsPage();
+    }
+    return false;
+  }).finally(function() {
+    if (state.pickupTicket === normalizedTicketId) {
+      state.pickupTicketLoading = false;
+      renderPickupTicketsPage();
+    }
+    delete remotePickupTicketRefreshPromises[normalizedTicketId];
+  });
+
+  return remotePickupTicketRefreshPromises[normalizedTicketId];
 }
 
 function syncPendingMutations(options) {
@@ -310,6 +396,7 @@ function applyLocalPickupTicketsState(ticketId) {
   if (!dataSource || !dataSource.loadPickupTickets) return;
   const ticketsResult = dataSource.loadPickupTickets();
   state.pickupTickets = Array.isArray(ticketsResult.items) ? ticketsResult.items : [];
+  state.pickupTicketsLoaded = true;
   if (ticketId && dataSource.loadPickupTicket) {
     const detailResult = dataSource.loadPickupTicket(ticketId);
     state.pickupTicketData = detailResult && detailResult.ticket ? {
@@ -318,8 +405,10 @@ function applyLocalPickupTicketsState(ticketId) {
       events: Array.isArray(detailResult.events) ? detailResult.events : []
     } : null;
     if (state.pickupTicketData) seedPickupTicketLineDrafts();
+    state.pickupTicketMissingConfirmed = false;
   } else if (!ticketId) {
     state.pickupTicketData = null;
+    state.pickupTicketMissingConfirmed = false;
   }
 }
 
@@ -3578,6 +3667,23 @@ function renderPickupTicketDetailView(selectedTicket) {
   return markup;
 }
 
+function renderPickupTicketDetailLoadingView(ticketId) {
+  const ticketSummary = (Array.isArray(state.pickupTickets) ? state.pickupTickets : []).find(function(entry) {
+    return String(entry && entry.ticketId || "") === String(ticketId || "");
+  }) || null;
+  return '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+    + '<div class="flex items-start justify-between gap-3">'
+    + '<div class="min-w-0"><div class="truncate text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(formatPickupTicketNumberForDisplay(ticketSummary && ticketSummary.ticketNumber || ticketId || "-")) + '</div>'
+    + '<div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml(ticketSummary ? (getPickupTicketUiStatus(ticketSummary.status) + " · " + formatDateTimeLabel(ticketSummary.createdAt)) : "Chargement du ticket...") + '</div></div>'
+    + '</div>'
+    + '<div class="mt-3 flex flex-col gap-2">'
+    + '<div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>'
+    + '<div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>'
+    + '<div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>'
+    + '</div>'
+    + '</section>';
+}
+
 function renderPickupTicketsPage() {
   const status = document.getElementById("pickupTicketsStatus");
   const content = document.getElementById("pickupTicketsContent");
@@ -3586,6 +3692,9 @@ function renderPickupTicketsPage() {
   if (!content) return;
   const tickets = Array.isArray(state.pickupTickets) ? state.pickupTickets : [];
   const selectedTicketId = state.pickupTicket ? String(state.pickupTicket) : "";
+  const selectedTicketSummary = selectedTicketId ? tickets.find(function(entry) {
+    return String(entry && entry.ticketId || "") === selectedTicketId;
+  }) : null;
   const selectedTicket = selectedTicketId && state.pickupTicketData && state.pickupTicketData.ticket
     && String(state.pickupTicketData.ticket.ticketId || "") === selectedTicketId ? state.pickupTicketData : null;
   const subview = state.ticketsSubview || "list";
@@ -3594,16 +3703,22 @@ function renderPickupTicketsPage() {
   if (status) {
     status.textContent = subview === "new"
       ? "Nouveau ticket"
-      : (selectedTicket && selectedTicket.ticket ? ("Ticket " + formatPickupTicketNumberForDisplay(selectedTicket.ticket.ticketNumber || selectedTicketId)) : "Sorties entrepôt");
+      : ((selectedTicket && selectedTicket.ticket) || selectedTicketSummary
+          ? ("Ticket " + formatPickupTicketNumberForDisplay((selectedTicket && selectedTicket.ticket ? selectedTicket.ticket.ticketNumber : selectedTicketSummary.ticketNumber) || selectedTicketId))
+          : "Sorties entrepôt");
   }
   if (subview === "new") {
     content.innerHTML = renderPickupTicketCreationView();
     return;
   }
   if (subview === "detail") {
-    content.innerHTML = selectedTicket
-      ? renderPickupTicketDetailView(selectedTicket)
-      : '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">' + escapeHtml(state.pickupTicketLoading ? "Chargement du ticket..." : "Ticket introuvable.") + '</div>';
+    if (selectedTicket) {
+      content.innerHTML = renderPickupTicketDetailView(selectedTicket);
+      return;
+    }
+    content.innerHTML = state.pickupTicketMissingConfirmed
+      ? '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Ticket introuvable.</div>'
+      : renderPickupTicketDetailLoadingView(selectedTicketId);
     return;
   }
   content.innerHTML = renderPickupTicketsListView(tickets);
@@ -3997,36 +4112,23 @@ function loadReferenceImportData(batchId) {
 
 function loadPickupTicketData(ticketId, options) {
   const includeDetail = !(options && options.includeDetail === false);
+  const normalizedTicketId = String(ticketId || "").trim();
   applyLocalPickupTicketsState(ticketId);
-  state.pickupTicketsLoaded = true;
-  state.pickupTicketLoading = Boolean(ticketId && includeDetail && !(state.pickupTicketData && state.pickupTicketData.ticket));
+  state.pickupTicketMissingConfirmed = false;
+  state.pickupTicketLoading = Boolean(normalizedTicketId && includeDetail && !(state.pickupTicketData && state.pickupTicketData.ticket) && !isOptimisticPickupTicketId(normalizedTicketId));
   renderPickupTicketsPage();
   if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) {
     return Promise.resolve(false);
   }
-  const ticketsPromise = remoteDataSource.fetchPickupTickets();
-  const detailPromise = ticketId && includeDetail ? remoteDataSource.fetchPickupTicket(ticketId) : Promise.resolve(null);
-  return Promise.all([ticketsPromise, detailPromise]).then(function(results) {
-    const ticketsPayload = results[0];
-    const ticketPayload = results[1];
-    mergeRemotePickupTicketsList(ticketsPayload && ticketsPayload.items, ticketsPayload && ticketsPayload.generatedAt);
-    if (ticketPayload && ticketPayload.ticket) {
-      mergeRemotePickupTicketDetail({
-        ticket: ticketPayload.ticket,
-        lines: Array.isArray(ticketPayload.lines) ? ticketPayload.lines : [],
-        events: Array.isArray(ticketPayload.events) ? ticketPayload.events : []
-      }, ticketPayload.generatedAt);
-    } else if (!ticketId) {
-      state.pickupTicketData = null;
-    }
+  const tasks = [refreshRemotePickupTickets({ silent: true })];
+  if (normalizedTicketId && includeDetail) {
+    tasks.push(refreshRemotePickupTicket(normalizedTicketId, { silent: true }));
+  } else {
+    state.pickupTicketLoading = false;
+  }
+  return Promise.all(tasks).then(function() {
     renderPickupTicketsPage();
     return true;
-  }).catch(function(error) {
-    console.warn("Pickup tickets fetch failed", error);
-    renderPickupTicketsPage();
-    return false;
-  }).finally(function() {
-    state.pickupTicketLoading = false;
   });
 }
 
@@ -4524,8 +4626,12 @@ function initApp() {
     }
     return false;
   });
+  refreshRemotePickupTickets({ silent: true });
   if (state.currentView === "detail" && state.detailReference) {
     refreshRemoteDetail(state.detailReference, { silent: true });
+  }
+  if (route.view === "tickets" && state.pickupTicket) {
+    refreshRemotePickupTicket(state.pickupTicket, { silent: true });
   }
   if (state.currentView === "imports") {
     loadReferenceImportData(state.referenceImportBatch);
@@ -4547,6 +4653,8 @@ function initApp() {
   window.addEventListener("online", function() {
     renderAll();
     refreshRemoteSnapshot({ silent: true }).then(function() {
+      return refreshRemotePickupTickets({ silent: true });
+    }).then(function() {
       if (state.pendingMutations.length) {
         return syncPendingMutations({ silent: true });
       }
@@ -4560,6 +4668,9 @@ function initApp() {
       }
       if (state.currentView === "tickets") {
         return loadPickupTicketData(state.pickupTicket, { includeDetail: Boolean(state.pickupTicket) });
+      }
+      if (state.lastTicketsView && state.lastTicketsView.view === "ticket_detail" && state.lastTicketsView.ticketId) {
+        return refreshRemotePickupTicket(state.lastTicketsView.ticketId, { silent: true });
       }
       return false;
     });
