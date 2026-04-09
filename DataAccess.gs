@@ -1771,7 +1771,7 @@ function applyCreatePickupTicketMutation_(mutation) {
 
 function generatePickupTicketNumber_(sheet) {
   const timeZone = Session.getScriptTimeZone ? Session.getScriptTimeZone() : "Europe/Paris";
-  const prefix = Utilities.formatDate(new Date(), timeZone || "Europe/Paris", "'PT-'yyyyMMdd-");
+  const prefix = Utilities.formatDate(new Date(), timeZone || "Europe/Paris", "ddMMyyyy-");
   const existing = readPickupTickets_(sheet).filter(function(ticket) {
     return String(ticket.ticketNumber || "").indexOf(prefix) === 0;
   }).length;
@@ -1860,8 +1860,8 @@ function applyResolvePickupTicketLineMutation_(mutation) {
     lineId: lineId,
     eventType: canonical.status === "not_found" ? "line_marked_not_found" : (canonical.status === "partial" ? "line_marked_partial" : "line_updated"),
     actor: String(request.updatedBy || "").trim(),
-    payload: canonical,
-    message: "Ligne mise à jour"
+    payload: Object.assign({ reference: normalizedReference }, canonical),
+    message: canonical.status === "not_found" ? "Ligne marquée introuvable" : (canonical.status === "to_confirm" ? "Ligne rouverte" : "Ligne confirmée")
   });
 
   return {
@@ -1903,6 +1903,9 @@ function canonicalizePickupLineResolution_(line, request, stockItem) {
   const explicitStatus = String(request.status || "").trim();
   if (explicitStatus === "cancelled") {
     return { status: "cancelled", pickedUnit: "", pickedQuantity: null, pickedDisplay: "" };
+  }
+  if (explicitStatus === "to_confirm") {
+    return { status: "to_confirm", pickedUnit: "", pickedQuantity: null, pickedDisplay: "" };
   }
   if (explicitStatus === "not_found") {
     return { status: "not_found", pickedUnit: "", pickedQuantity: null, pickedDisplay: "" };

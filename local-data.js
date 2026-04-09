@@ -16,6 +16,8 @@
       return {
         items: [],
         historyItems: [],
+        pickupTickets: [],
+        pickupTicketDetails: {},
         pendingMutations: [],
         syncStatus: "idle",
         lastSyncAt: "",
@@ -136,6 +138,8 @@
       const payload = {
         items: Array.isArray(snapshot.items) ? snapshot.items : [],
         historyItems: Array.isArray(snapshot.historyItems) ? snapshot.historyItems : [],
+        pickupTickets: Array.isArray(snapshot.pickupTickets) ? snapshot.pickupTickets : [],
+        pickupTicketDetails: snapshot.pickupTicketDetails && typeof snapshot.pickupTicketDetails === "object" ? snapshot.pickupTicketDetails : {},
         pendingMutations: Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations : [],
         syncStatus: snapshot.syncStatus || "idle",
         lastSyncAt: typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : "",
@@ -157,6 +161,8 @@
         return {
           items: items,
           historyItems: historyItems,
+          pickupTickets: Array.isArray(parsed.pickupTickets) ? parsed.pickupTickets.slice() : [],
+          pickupTicketDetails: parsed.pickupTicketDetails && typeof parsed.pickupTicketDetails === "object" ? parsed.pickupTicketDetails : {},
           pendingMutations: Array.isArray(parsed.pendingMutations) ? parsed.pendingMutations.slice() : [],
           syncStatus: parsed.syncStatus || "idle",
           lastSyncAt: typeof parsed.lastSyncAt === "string" ? parsed.lastSyncAt : "",
@@ -183,6 +189,114 @@
       const snapshot = readSnapshot();
       return {
         items: snapshot.historyItems.slice(),
+        meta: getMeta(snapshot)
+      };
+    }
+
+    function replacePickupTicketInList(list, nextTicket, matchId) {
+      const ticketId = String(matchId || (nextTicket && nextTicket.ticketId) || "").trim();
+      const nextList = Array.isArray(list) ? list.slice() : [];
+      let replaced = false;
+      for (let index = 0; index < nextList.length; index++) {
+        if (String(nextList[index] && nextList[index].ticketId || "").trim() === ticketId) {
+          nextList[index] = nextTicket;
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced && nextTicket) nextList.unshift(nextTicket);
+      nextList.sort(function(a, b) {
+        return new Date((b && b.createdAt) || 0) - new Date((a && a.createdAt) || 0);
+      });
+      return nextList;
+    }
+
+    function removePickupTicketFromList(list, ticketId) {
+      return (Array.isArray(list) ? list : []).filter(function(entry) {
+        return String(entry && entry.ticketId || "").trim() !== String(ticketId || "").trim();
+      });
+    }
+
+    function clonePickupTicketDetail(detail) {
+      if (!detail) return null;
+      return {
+        ticket: detail.ticket ? Object.assign({}, detail.ticket) : null,
+        lines: Array.isArray(detail.lines) ? detail.lines.map(function(line) { return Object.assign({}, line); }) : [],
+        events: Array.isArray(detail.events) ? detail.events.map(function(event) { return Object.assign({}, event); }) : []
+      };
+    }
+
+    function upsertPickupTicketDetail(details, ticketId, detail) {
+      const nextDetails = Object.assign({}, details || {});
+      const normalizedTicketId = String(ticketId || (detail && detail.ticket && detail.ticket.ticketId) || "").trim();
+      if (!normalizedTicketId) return nextDetails;
+      if (detail) nextDetails[normalizedTicketId] = clonePickupTicketDetail(detail);
+      return nextDetails;
+    }
+
+    function removePickupTicketDetail(details, ticketId) {
+      const nextDetails = Object.assign({}, details || {});
+      delete nextDetails[String(ticketId || "").trim()];
+      return nextDetails;
+    }
+
+    function computePickupTicketCounters(lines) {
+      const safeLines = Array.isArray(lines) ? lines : [];
+      const resolvedLineCount = safeLines.filter(function(line) {
+        const status = String(line && line.status || "").trim();
+        return status === "ready" || status === "partial" || status === "not_found" || status === "validated" || status === "cancelled";
+      }).length;
+      const blockedLineCount = safeLines.filter(function(line) {
+        return String(line && line.status || "").trim() === "to_confirm";
+      }).length;
+      return {
+        lineCount: safeLines.length,
+        resolvedLineCount: resolvedLineCount,
+        blockedLineCount: blockedLineCount
+      };
+    }
+
+    function derivePickupTicketStatus(ticket, lines) {
+      const currentStatus = String(ticket && ticket.status || "").trim();
+      if (currentStatus === "validated" || currentStatus === "cancelled") return currentStatus;
+      const counters = computePickupTicketCounters(lines);
+      return counters.resolvedLineCount > 0 ? "in_progress" : "draft";
+    }
+
+    function buildTempPickupTicketNumber() {
+      const now = new Date();
+      const day = String(now.getDate()).padStart(2, "0");
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const year = String(now.getFullYear());
+      return day + month + year + "-...";
+    }
+
+    function buildPickupTicketEventMessage(eventType) {
+      if (eventType === "ticket_created") return "Ticket créé";
+      if (eventType === "line_marked_not_found") return "Ligne marquée introuvable";
+      if (eventType === "line_marked_partial") return "Ligne partielle";
+      if (eventType === "ticket_validated") return "Ticket validé";
+      if (eventType === "ticket_cancelled") return "Ticket annulé";
+      return "Ligne confirmée";
+    }
+
+    function loadPickupTickets() {
+      const snapshot = readSnapshot();
+      return {
+        items: Array.isArray(snapshot.pickupTickets) ? snapshot.pickupTickets.slice() : [],
+        meta: getMeta(snapshot)
+      };
+    }
+
+    function loadPickupTicket(ticketId) {
+      const snapshot = readSnapshot();
+      const normalizedTicketId = String(ticketId || "").trim();
+      const detail = normalizedTicketId && snapshot.pickupTicketDetails ? snapshot.pickupTicketDetails[normalizedTicketId] : null;
+      const cloned = clonePickupTicketDetail(detail);
+      return {
+        ticket: cloned && cloned.ticket ? cloned.ticket : null,
+        lines: cloned && Array.isArray(cloned.lines) ? cloned.lines : [],
+        events: cloned && Array.isArray(cloned.events) ? cloned.events : [],
         meta: getMeta(snapshot)
       };
     }
@@ -283,6 +397,8 @@
       const nextPendingMutations = Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations.slice() : [];
       let nextItems = Array.isArray(payload.items) ? payload.items.map(deps.hydrateItem) : snapshot.items.slice();
       let nextHistoryItems = Array.isArray(payload.historyItems) ? payload.historyItems.slice() : snapshot.historyItems.slice();
+      let nextPickupTickets = Array.isArray(payload.pickupTickets) ? payload.pickupTickets.slice() : (Array.isArray(snapshot.pickupTickets) ? snapshot.pickupTickets.slice() : []);
+      let nextPickupTicketDetails = snapshot.pickupTicketDetails && typeof snapshot.pickupTicketDetails === "object" ? Object.assign({}, snapshot.pickupTicketDetails) : {};
       const hasScopedReference = !!payload.reference;
       const normalizedReference = hasScopedReference ? deps.normalizeReference(payload.reference) : "";
 
@@ -302,6 +418,15 @@
         nextHistoryItems = payload.history.slice().concat(otherHistory);
       }
 
+      if (Array.isArray(payload.pickupTickets)) {
+        nextPickupTickets = payload.pickupTickets.slice();
+      }
+
+      if (payload.pickupTicket && payload.pickupTicket.ticket) {
+        nextPickupTicketDetails = upsertPickupTicketDetail(nextPickupTicketDetails, payload.pickupTicket.ticket.ticketId, payload.pickupTicket);
+        nextPickupTickets = replacePickupTicketInList(nextPickupTickets, payload.pickupTicket.ticket, payload.pickupTicket.ticket.ticketId);
+      }
+
       const replayedSnapshot = applyPendingMutations({
         items: nextItems,
         historyItems: nextHistoryItems
@@ -310,6 +435,8 @@
       const nextSnapshot = {
         items: replayedSnapshot.items,
         historyItems: replayedSnapshot.historyItems,
+        pickupTickets: nextPickupTickets,
+        pickupTicketDetails: nextPickupTicketDetails,
         pendingMutations: Array.isArray(payload.pendingMutations) ? payload.pendingMutations.slice() : nextPendingMutations,
         syncStatus: payload.syncStatus || snapshot.syncStatus || "idle",
         lastSyncAt: typeof payload.lastSyncAt === "string" ? payload.lastSyncAt : (typeof snapshot.lastSyncAt === "string" ? snapshot.lastSyncAt : ""),
@@ -333,6 +460,8 @@
       });
       let nextItems = Array.isArray(snapshot.items) ? snapshot.items.slice() : [];
       let nextHistoryItems = Array.isArray(snapshot.historyItems) ? snapshot.historyItems.slice() : [];
+      let nextPickupTickets = Array.isArray(snapshot.pickupTickets) ? snapshot.pickupTickets.slice() : [];
+      let nextPickupTicketDetails = snapshot.pickupTicketDetails && typeof snapshot.pickupTicketDetails === "object" ? Object.assign({}, snapshot.pickupTicketDetails) : {};
 
       if (nextPayload.item) {
         const normalizedReference = deps.normalizeReference(nextPayload.item.reference);
@@ -343,9 +472,20 @@
         nextHistoryItems = mergeHistoryEntry(nextHistoryItems, nextPayload.historyEntry);
       }
 
+      if (Array.isArray(nextPayload.pickupTickets)) {
+        nextPickupTickets = nextPayload.pickupTickets.slice();
+      }
+
+      if (nextPayload.pickupTicket && nextPayload.pickupTicket.ticket) {
+        nextPickupTicketDetails = upsertPickupTicketDetail(nextPickupTicketDetails, nextPayload.pickupTicket.ticket.ticketId, nextPayload.pickupTicket);
+        nextPickupTickets = replacePickupTicketInList(nextPickupTickets, nextPayload.pickupTicket.ticket, nextPayload.pickupTicket.ticket.ticketId);
+      }
+
       const nextSnapshot = {
         items: nextItems,
         historyItems: nextHistoryItems,
+        pickupTickets: nextPickupTickets,
+        pickupTicketDetails: nextPickupTicketDetails,
         pendingMutations: nextPendingMutations,
         syncStatus: nextPayload.syncStatus || "idle",
         lastSyncAt: typeof nextPayload.lastSyncAt === "string" ? nextPayload.lastSyncAt : snapshot.lastSyncAt || "",
@@ -360,12 +500,169 @@
       };
     }
 
+    function saveOptimisticPickupTicketCreate(request) {
+      const snapshot = readSnapshot();
+      const createdAt = new Date().toISOString();
+      const ticketId = "tmp_pt_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+      const lines = (Array.isArray(request && request.lines) ? request.lines : []).map(function(line, index) {
+        const quantity = line && line.requestQuantity != null ? Number(line.requestQuantity || 0) : null;
+        const unit = String(line && line.requestUnit || "").trim();
+        return {
+          lineId: "tmp_ptl_" + Date.now() + "_" + index + "_" + Math.random().toString(36).slice(2, 5),
+          ticketId: ticketId,
+          lineNumber: index + 1,
+          reference: deps.normalizeReference(line && line.reference),
+          status: "to_confirm",
+          requestUnit: unit,
+          requestQuantity: quantity,
+          requestedDisplay: quantity && unit ? (quantity + (unit === "box" ? "箱" : (unit === "pack" ? "包" : "件"))) : "",
+          pickedUnit: "",
+          pickedQuantity: null,
+          pickedDisplay: "",
+          stockAvailablePiecesSnapshot: null,
+          warehouseHelpDisplay: "",
+          arrivalNoteSnapshot: "",
+          lineNote: "",
+          stockMutationId: "",
+          createdAt: createdAt,
+          updatedAt: createdAt
+        };
+      });
+      const counters = computePickupTicketCounters(lines);
+      const ticket = {
+        ticketId: ticketId,
+        ticketNumber: buildTempPickupTicketNumber(),
+        status: "draft",
+        createdAt: createdAt,
+        createdBy: String(request && request.createdBy || "").trim(),
+        updatedAt: createdAt,
+        validatedAt: "",
+        validatedBy: "",
+        title: String(request && request.title || "").trim(),
+        requestTextRaw: String(request && request.requestTextRaw || "").trim(),
+        globalNote: String(request && request.globalNote || "").trim(),
+        lineCount: counters.lineCount,
+        resolvedLineCount: counters.resolvedLineCount,
+        blockedLineCount: counters.blockedLineCount,
+        version: 0
+      };
+      const detail = {
+        ticket: ticket,
+        lines: lines,
+        events: [{
+          eventId: "tmp_pte_" + Date.now(),
+          ticketId: ticketId,
+          lineId: "",
+          eventType: "ticket_created",
+          actor: String(request && request.createdBy || "").trim(),
+          createdAt: createdAt,
+          payload: { requestTextRaw: ticket.requestTextRaw },
+          message: buildPickupTicketEventMessage("ticket_created")
+        }]
+      };
+      const nextSnapshot = {
+        items: snapshot.items.slice(),
+        historyItems: snapshot.historyItems.slice(),
+        pickupTickets: replacePickupTicketInList(snapshot.pickupTickets, ticket, ticketId),
+        pickupTicketDetails: upsertPickupTicketDetail(snapshot.pickupTicketDetails, ticketId, detail),
+        pendingMutations: snapshot.pendingMutations.slice(),
+        syncStatus: snapshot.syncStatus,
+        lastSyncAt: snapshot.lastSyncAt,
+        dataSource: snapshot.dataSource
+      };
+      writeSnapshot(nextSnapshot);
+      return {
+        ticket: ticket,
+        lines: lines,
+        events: detail.events,
+        items: nextSnapshot.pickupTickets.slice(),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function replaceOptimisticPickupTicket(tempTicketId, payload) {
+      const snapshot = readSnapshot();
+      const detail = payload && payload.ticket ? {
+        ticket: payload.ticket,
+        lines: Array.isArray(payload.lines) ? payload.lines : [],
+        events: Array.isArray(payload.events) ? payload.events : []
+      } : null;
+      let nextTickets = removePickupTicketFromList(snapshot.pickupTickets, tempTicketId);
+      let nextDetails = removePickupTicketDetail(snapshot.pickupTicketDetails, tempTicketId);
+      if (detail && detail.ticket) {
+        nextTickets = replacePickupTicketInList(nextTickets, detail.ticket, detail.ticket.ticketId);
+        nextDetails = upsertPickupTicketDetail(nextDetails, detail.ticket.ticketId, detail);
+      }
+      const nextSnapshot = {
+        items: snapshot.items.slice(),
+        historyItems: snapshot.historyItems.slice(),
+        pickupTickets: nextTickets,
+        pickupTicketDetails: nextDetails,
+        pendingMutations: snapshot.pendingMutations.slice(),
+        syncStatus: snapshot.syncStatus,
+        lastSyncAt: snapshot.lastSyncAt,
+        dataSource: snapshot.dataSource
+      };
+      writeSnapshot(nextSnapshot);
+      return {
+        items: nextSnapshot.pickupTickets.slice(),
+        detail: detail,
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function discardOptimisticPickupTicket(ticketId) {
+      const snapshot = readSnapshot();
+      const nextSnapshot = {
+        items: snapshot.items.slice(),
+        historyItems: snapshot.historyItems.slice(),
+        pickupTickets: removePickupTicketFromList(snapshot.pickupTickets, ticketId),
+        pickupTicketDetails: removePickupTicketDetail(snapshot.pickupTicketDetails, ticketId),
+        pendingMutations: snapshot.pendingMutations.slice(),
+        syncStatus: snapshot.syncStatus,
+        lastSyncAt: snapshot.lastSyncAt,
+        dataSource: snapshot.dataSource
+      };
+      writeSnapshot(nextSnapshot);
+      return {
+        items: nextSnapshot.pickupTickets.slice(),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
+    function saveOptimisticPickupTicketDetail(detail) {
+      const snapshot = readSnapshot();
+      if (!detail || !detail.ticket || !detail.ticket.ticketId) return null;
+      const nextSnapshot = {
+        items: snapshot.items.slice(),
+        historyItems: snapshot.historyItems.slice(),
+        pickupTickets: replacePickupTicketInList(snapshot.pickupTickets, detail.ticket, detail.ticket.ticketId),
+        pickupTicketDetails: upsertPickupTicketDetail(snapshot.pickupTicketDetails, detail.ticket.ticketId, detail),
+        pendingMutations: snapshot.pendingMutations.slice(),
+        syncStatus: snapshot.syncStatus,
+        lastSyncAt: snapshot.lastSyncAt,
+        dataSource: snapshot.dataSource
+      };
+      writeSnapshot(nextSnapshot);
+      return {
+        items: nextSnapshot.pickupTickets.slice(),
+        detail: clonePickupTicketDetail(detail),
+        meta: getMeta(nextSnapshot)
+      };
+    }
+
     return {
       loadInventory: loadInventory,
       loadHistory: loadHistory,
       loadDetail: loadDetail,
+      loadPickupTickets: loadPickupTickets,
+      loadPickupTicket: loadPickupTicket,
       saveQuickEdit: saveQuickEdit,
       saveProductRemark: saveProductRemark,
+      saveOptimisticPickupTicketCreate: saveOptimisticPickupTicketCreate,
+      replaceOptimisticPickupTicket: replaceOptimisticPickupTicket,
+      discardOptimisticPickupTicket: discardOptimisticPickupTicket,
+      saveOptimisticPickupTicketDetail: saveOptimisticPickupTicketDetail,
       mergeRemoteSnapshot: mergeRemoteSnapshot,
       commitSyncedMutation: commitSyncedMutation,
       getMeta: function() {
