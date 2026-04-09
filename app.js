@@ -25,12 +25,26 @@ const state = {
   currentView: "inventory",
   previousView: "inventory",
   lastInventoryView: { view: "inventory", ref: "" },
+  lastTicketsView: { view: "tickets", ticketId: "" },
+  ticketsSubview: "list",
   detailReference: "",
   referenceImportBatches: [],
   referenceImportBatch: null,
   pickupTickets: [],
   pickupTicket: null,
   pickupTicketData: null,
+  pickupTicketsLoaded: false,
+  pickupTicketLoading: false,
+  expandedTicketIds: {},
+  ticketCreationDraft: {
+    title: "",
+    globalNote: "",
+    requestTextRaw: "",
+    quickReference: "",
+    quickQuantity: "",
+    lines: []
+  },
+  ticketLineDraftsById: {},
   ticketReferenceDrafts: [],
   quickEditOpen: false,
   quickEditTab: "quick-exit",
@@ -213,6 +227,7 @@ function parseCurrentRoute() {
   if (hash === "history") return { view: "history", ref: "" };
   if (hash === "imports") return { view: "imports", ref: "" };
   if (hash === "tickets") return { view: "tickets", ref: "" };
+  if (hash === "tickets/new") return { view: "tickets_new", ref: "" };
   if (hash.indexOf("detail/") === 0) {
     return { view: "detail", ref: normalizeReference(decodeURIComponent(hash.slice("detail/".length))) };
   }
@@ -228,6 +243,7 @@ function parseCurrentRoute() {
 function buildHashRoute(view, ref) {
   if (view === "history") return "#history";
   if (view === "imports") return ref ? ("#import/" + encodeURIComponent(String(ref))) : "#imports";
+  if (view === "tickets_new") return "#tickets/new";
   if (view === "tickets") return ref ? ("#ticket/" + encodeURIComponent(String(ref))) : "#tickets";
   if (view === "detail" && ref) return "#detail/" + encodeURIComponent(normalizeReference(ref));
   return "#inventory";
@@ -258,6 +274,38 @@ function forceInventoryListView() {
   navigateTo("inventory");
 }
 
+function rememberTicketsView(view, ticketId) {
+  if (view === "tickets_new") {
+    state.lastTicketsView = { view: "tickets_new", ticketId: "" };
+    return;
+  }
+  if (view === "ticket_detail" && ticketId) {
+    state.lastTicketsView = { view: "ticket_detail", ticketId: String(ticketId) };
+    return;
+  }
+  state.lastTicketsView = { view: "tickets", ticketId: "" };
+}
+
+function getLastTicketsRoute() {
+  if (state.lastTicketsView && state.lastTicketsView.view === "ticket_detail" && state.lastTicketsView.ticketId) {
+    return { view: "tickets", ref: state.lastTicketsView.ticketId };
+  }
+  if (state.lastTicketsView && state.lastTicketsView.view === "tickets_new") {
+    return { view: "tickets_new", ref: "" };
+  }
+  return { view: "tickets", ref: "" };
+}
+
+function navigateToTicketsContext() {
+  const route = getLastTicketsRoute();
+  navigateTo(route.view, route.ref ? { ref: route.ref } : null);
+}
+
+function forceTicketsListView() {
+  rememberTicketsView("tickets", "");
+  navigateTo("tickets");
+}
+
 function navigateTo(view, options) {
   const nextHash = buildHashRoute(view, options && options.ref);
   if (window.location.hash === nextHash) {
@@ -271,7 +319,7 @@ function handleRouteChange() {
   const route = parseCurrentRoute();
   if (route.view === "detail") {
     state.previousView = state.currentView === "history" ? "history" : "inventory";
-  } else if (route.view === "imports" || route.view === "tickets") {
+  } else if (route.view === "imports" || route.view === "tickets" || route.view === "tickets_new") {
     state.previousView = "inventory";
   } else {
     state.previousView = route.view;
@@ -279,12 +327,18 @@ function handleRouteChange() {
   if (route.view === "inventory" || route.view === "detail") {
     rememberInventoryView(route.view, route.ref);
   }
-  state.currentView = route.view;
+  if (route.view === "tickets_new") {
+    rememberTicketsView("tickets_new", "");
+  } else if (route.view === "tickets") {
+    rememberTicketsView(route.ref ? "ticket_detail" : "tickets", route.ref || "");
+  }
+  state.currentView = route.view === "tickets_new" ? "tickets" : route.view;
+  state.ticketsSubview = route.view === "tickets_new" ? "new" : (route.view === "tickets" && route.ref ? "detail" : "list");
   state.detailReference = route.view === "detail" ? route.ref : state.detailReference;
   if (route.view === "imports") {
     state.referenceImportBatch = route.ref || null;
   }
-  if (route.view === "tickets") {
+  if (route.view === "tickets" || route.view === "tickets_new") {
     state.pickupTicket = route.ref || null;
   }
   syncActiveShell();
@@ -296,7 +350,10 @@ function handleRouteChange() {
     loadReferenceImportData(route.ref);
   }
   if (route.view === "tickets") {
-    loadPickupTicketData(route.ref);
+    loadPickupTicketData(route.ref, { includeDetail: Boolean(route.ref) });
+  }
+  if (route.view === "tickets_new") {
+    loadPickupTicketData("", { includeDetail: false });
   }
 }
 
@@ -3182,51 +3239,238 @@ function renderReferenceImportsPage() {
   content.innerHTML = markup;
 }
 
+function getPickupTicketUiStatus(status) {
+  if (status === "validated") return "Validé";
+  if (status === "cancelled") return "Annulé";
+  return "À préparer";
+}
+
+function getPickupLineUiStatus(status) {
+  if (status === "validated") return "Validé";
+  if (status === "cancelled") return "Annulé";
+  if (status === "not_found") return "Introuvable";
+  if (status === "partial") return "Partiel";
+  if (status === "ready") return "Prêt";
+  return "À confirmer";
+}
+
+function canEditPickupTicket(ticket) {
+  const status = ticket && ticket.status ? String(ticket.status) : "";
+  return status !== "validated" && status !== "cancelled";
+}
+
+function buildRequestedDisplayFromDraftLine(line) {
+  if (!line) return "";
+  if (line.requestedDisplay) return String(line.requestedDisplay);
+  if (line.requestQuantity > 0 && line.requestUnit) {
+    return String(line.requestQuantity) + (line.requestUnit === "box" ? "箱" : (line.requestUnit === "pack" ? "包" : "件"));
+  }
+  return "";
+}
+
+function buildPickupTicketRequestText(lines) {
+  return (Array.isArray(lines) ? lines : []).map(function(line) {
+    const reference = normalizeReference(line && line.reference);
+    if (!reference) return "";
+    const display = buildRequestedDisplayFromDraftLine(line);
+    return display ? (reference + " " + display) : reference;
+  }).filter(Boolean).join("\n");
+}
+
+function parsePickupQuantityInput(value) {
+  const text = String(value || "").trim();
+  if (!text) return { ok: false, error: "" };
+  const match = text.match(/^(\d+)\s*(箱|包|件)$/);
+  if (!match) return { ok: false, error: "Format attendu : 2箱, 5包 ou 12件." };
+  const quantity = Number(match[1]);
+  const unit = match[2] === "箱" ? "box" : (match[2] === "包" ? "pack" : "piece");
+  if (!(quantity > 0)) return { ok: false, error: "Quantité invalide." };
+  return {
+    ok: true,
+    quantity: quantity,
+    unit: unit,
+    display: quantity + match[2]
+  };
+}
+
+function getTicketRefsPreview(ticket) {
+  const lines = parsePickupTicketTextLines(ticket && ticket.requestTextRaw);
+  const refs = lines.map(function(line) {
+    return line.reference;
+  }).filter(Boolean);
+  if (!refs.length) return "Aucune ref";
+  if (refs.length <= 3) return refs.join(", ");
+  return refs.slice(0, 2).join(", ") + ", +" + (refs.length - 2);
+}
+
+function renderPickupTicketListCard(ticket) {
+  const ticketId = String(ticket && ticket.ticketId || "");
+  const expanded = Boolean(state.expandedTicketIds && state.expandedTicketIds[ticketId]);
+  const parsedLines = parsePickupTicketTextLines(ticket && ticket.requestTextRaw);
+  const previewLines = expanded ? parsedLines : [];
+  return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+    + '<div class="flex items-start justify-between gap-3">'
+    + '<div class="min-w-0">'
+    + '<button class="truncate text-left text-[12px] font-bold tracking-tight text-primary" data-action="open-ticket" data-ticket-id="' + escapeHtml(ticketId) + '" type="button">' + escapeHtml(ticket.ticketNumber || "-") + '</button>'
+    + '<div class="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(getPickupTicketUiStatus(ticket.status)) + '</div>'
+    + '</div>'
+    + '<div class="shrink-0 text-right text-[10px] text-on-surface-variant">' + escapeHtml(formatDateLabel(ticket.createdAt)) + '</div>'
+    + '</div>'
+    + '<div class="mt-2 text-[11px] text-on-surface-variant">' + escapeHtml((ticket.title || "Sans titre") + " · " + (ticket.lineCount || 0) + " lignes") + '</div>'
+    + '<div class="mt-1 text-[11px] font-medium text-on-surface">' + escapeHtml(getTicketRefsPreview(ticket)) + '</div>'
+    + '<div class="mt-2 flex items-center justify-between gap-2">'
+    + '<div class="text-[10px] uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml((ticket.resolvedLineCount || 0) + "/" + (ticket.lineCount || 0) + " traitées") + '</div>'
+    + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="toggle-ticket-preview" data-ticket-id="' + escapeHtml(ticketId) + '" type="button">' + escapeHtml(expanded ? "Masquer refs" : "Afficher refs") + '</button>'
+    + '</div>'
+    + (previewLines.length ? '<div class="mt-2 flex flex-col gap-1 border-t border-outline-variant/20 pt-2">'
+      + previewLines.map(function(line) {
+        const requested = buildRequestedDisplayFromDraftLine(line) || "À confirmer";
+        return '<div class="flex items-center justify-between gap-3 text-[11px] text-on-surface-variant"><span class="truncate">' + escapeHtml(line.reference || "-") + '</span><span class="shrink-0">' + escapeHtml(requested) + '</span></div>';
+      }).join("")
+      + '</div>' : '')
+    + '</article>';
+}
+
+function renderPickupTicketsListView(tickets) {
+  const listMarkup = tickets.length
+    ? tickets.map(renderPickupTicketListCard).join("")
+    : '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Aucun ticket sortie pour le moment.</div>';
+  return '<section class="flex flex-col gap-3">' + listMarkup + '</section>';
+}
+
+function renderPickupTicketCreationView() {
+  const draft = state.ticketCreationDraft || {};
+  const lines = Array.isArray(draft.lines) ? draft.lines : [];
+  return '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+    + '<div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Création par lignes</div>'
+    + '<div class="mt-2 grid gap-2">'
+    + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketTitleInput" placeholder="Titre (optionnel)" type="text" value="' + escapeHtml(draft.title || "") + '" />'
+    + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketQuickReferenceInput" placeholder="Référence" type="text" value="' + escapeHtml(draft.quickReference || "") + '" />'
+    + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketQuickQuantityInput" placeholder="Quantité souhaitée (optionnel, ex: 2箱)" type="text" value="' + escapeHtml(draft.quickQuantity || "") + '" />'
+    + '<button class="border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" data-action="add-ticket-draft-line" type="button">Ajouter ligne</button>'
+    + '</div>'
+    + '<div class="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Saisie rapide</div>'
+    + '<textarea class="mt-2 min-h-[7rem] w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketRequestTextInput" placeholder="REF&#10;REF 2箱&#10;REF 5包">' + escapeHtml(draft.requestTextRaw || "") + '</textarea>'
+    + '<button class="mt-2 border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" data-action="add-ticket-text-lines" type="button">Ajouter au ticket</button>'
+    + '<textarea class="mt-4 min-h-[4.5rem] w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketGlobalNoteInput" placeholder="Note ticket (optionnel)">' + escapeHtml(draft.globalNote || "") + '</textarea>'
+    + '<div class="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Lignes prêtes</div>'
+    + (lines.length
+      ? '<div class="mt-2 flex flex-col gap-2">' + lines.map(function(line, index) {
+        return '<div class="flex items-center justify-between gap-3 border border-outline-variant/20 bg-surface-container-low px-3 py-2 text-[11px]">'
+          + '<div class="min-w-0"><div class="truncate font-semibold text-on-surface">' + escapeHtml(line.reference || "-") + '</div>'
+          + '<div class="text-on-surface-variant">' + escapeHtml(buildRequestedDisplayFromDraftLine(line) || "À confirmer") + '</div></div>'
+          + '<button class="shrink-0 border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="remove-ticket-draft-line" data-line-index="' + escapeHtml(index) + '" type="button">Retirer</button>'
+          + '</div>';
+      }).join("") + '</div>'
+      : '<div class="mt-2 text-[11px] text-on-surface-variant">Ajoute au moins une ligne avant de créer le ticket.</div>')
+    + '<button class="mt-4 bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="pickupTicketCreateButton" type="button">Créer ticket</button>'
+    + '</section>';
+}
+
+function inferPickupLineStatus(line, parsedQuantity) {
+  if (!parsedQuantity || !parsedQuantity.ok) return "to_confirm";
+  const requestedQuantity = Number(line && line.requestQuantity || 0);
+  const requestedUnit = line && line.requestUnit ? String(line.requestUnit) : "";
+  if (requestedQuantity > 0 && requestedUnit && requestedUnit === parsedQuantity.unit && parsedQuantity.quantity < requestedQuantity) {
+    return "partial";
+  }
+  return "ready";
+}
+
+function getPickupLineDraft(line) {
+  const lineId = String(line && line.lineId || "");
+  if (!lineId) return { pickedInput: "", lineNote: "", error: "" };
+  if (!state.ticketLineDraftsById[lineId]) {
+    state.ticketLineDraftsById[lineId] = {
+      pickedInput: String(line.pickedDisplay || ""),
+      lineNote: String(line.lineNote || ""),
+      error: ""
+    };
+  }
+  return state.ticketLineDraftsById[lineId];
+}
+
+function renderPickupTicketDetailView(selectedTicket) {
+  const ticket = selectedTicket && selectedTicket.ticket ? selectedTicket.ticket : null;
+  if (!ticket) {
+    return '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Ticket introuvable.</div>';
+  }
+  const lines = Array.isArray(selectedTicket.lines) ? selectedTicket.lines : [];
+  const events = Array.isArray(selectedTicket.events) ? selectedTicket.events : [];
+  const editable = canEditPickupTicket(ticket);
+  const canValidate = editable && lines.some(function(line) {
+    return (line.status === "ready" || line.status === "partial" || line.status === "not_found");
+  });
+  let markup = '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+    + '<div class="flex items-start justify-between gap-3">'
+    + '<div class="min-w-0"><div class="truncate text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(ticket.ticketNumber || "-") + '</div>'
+    + '<div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml(getPickupTicketUiStatus(ticket.status) + " · " + formatDateLabel(ticket.createdAt)) + '</div></div>'
+    + (canValidate ? '<button class="shrink-0 bg-surface-tint px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-primary" data-action="validate-ticket" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" type="button">Valider</button>' : '')
+    + '</div>'
+    + (ticket.title ? '<div class="mt-2 text-[12px] font-semibold text-on-surface">' + escapeHtml(ticket.title) + '</div>' : '')
+    + (ticket.requestTextRaw ? '<div class="mt-2 whitespace-pre-wrap text-[11px] text-on-surface-variant">' + escapeHtml(ticket.requestTextRaw) + '</div>' : '')
+    + '</section>';
+  markup += lines.map(function(line) {
+    const draft = getPickupLineDraft(line);
+    return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+      + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="truncate text-[12px] font-bold tracking-tight text-primary">' + escapeHtml(line.reference || "-") + '</div>'
+      + '<div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml((line.requestedDisplay || "À confirmer") + (line.warehouseHelpDisplay ? (" · " + line.warehouseHelpDisplay) : "")) + '</div></div>'
+      + '<div class="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(getPickupLineUiStatus(line.status)) + '</div></div>'
+      + (editable
+        ? '<div class="mt-3 grid gap-2">'
+          + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" data-role="ticket-line-picked-input" data-line-id="' + escapeHtml(line.lineId || "") + '" placeholder="Quantité prise (ex: 2箱)" type="text" value="' + escapeHtml(draft.pickedInput || "") + '" />'
+          + '<textarea class="min-h-[4.5rem] w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" data-role="ticket-line-note-input" data-line-id="' + escapeHtml(line.lineId || "") + '" placeholder="' + escapeHtml(line.status === "not_found" ? "Précision optionnelle : absent, mauvais emplacement, stock introuvable..." : "Commentaire ligne (optionnel)") + '">' + escapeHtml(draft.lineNote || "") + '</textarea>'
+          + (draft.error ? '<div class="text-[11px] font-medium text-error">' + escapeHtml(draft.error) + '</div>' : '')
+          + '<div class="flex flex-wrap gap-2">'
+          + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="save-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button">Enregistrer</button>'
+          + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="mark-ticket-line-not-found" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button">Introuvable</button>'
+          + '</div>'
+          + '</div>'
+        : '<div class="mt-2 text-[11px] text-on-surface-variant">'
+          + (line.pickedDisplay ? ('<div class="font-semibold text-on-surface">' + escapeHtml("Pris : " + line.pickedDisplay) + '</div>') : "")
+          + (line.lineNote ? ('<div class="mt-1">' + escapeHtml(line.lineNote) + '</div>') : "")
+          + '</div>')
+      + (editable && line.pickedDisplay ? '<div class="mt-2 text-[11px] font-semibold text-on-surface">' + escapeHtml("Dernière valeur : " + line.pickedDisplay) + '</div>' : '')
+      + '</article>';
+  }).join("");
+  markup += '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3">'
+    + '<div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Historique ticket</div>'
+    + (events.length ? '<div class="mt-2 flex flex-col gap-2">' + events.map(function(event) {
+      return '<div class="text-[11px] text-on-surface-variant">' + escapeHtml(formatDateLabel(event.createdAt) + " · " + (event.eventType || "-") + (event.message ? (" · " + event.message) : "")) + '</div>';
+    }).join("") + '</div>' : '<div class="mt-2 text-[11px] text-on-surface-variant">Aucun événement.</div>')
+    + '</section>';
+  return markup;
+}
+
 function renderPickupTicketsPage() {
   const status = document.getElementById("pickupTicketsStatus");
   const content = document.getElementById("pickupTicketsContent");
+  const backButton = document.getElementById("pickupTicketsBackButton");
+  const newButton = document.getElementById("pickupTicketNewButton");
   if (!content) return;
   const tickets = Array.isArray(state.pickupTickets) ? state.pickupTickets : [];
   const selectedTicketId = state.pickupTicket ? String(state.pickupTicket) : "";
   const selectedTicket = selectedTicketId && state.pickupTicketData && state.pickupTicketData.ticket
     && String(state.pickupTicketData.ticket.ticketId || "") === selectedTicketId ? state.pickupTicketData : null;
-  if (status) status.textContent = selectedTicket ? ("Ticket " + (selectedTicket.ticket.ticketNumber || selectedTicketId)) : "Sorties entrepôt";
-  let markup = "";
-  if (selectedTicket && selectedTicket.ticket) {
-    const ticket = selectedTicket.ticket;
-    const lines = Array.isArray(selectedTicket.lines) ? selectedTicket.lines : [];
-    const events = Array.isArray(selectedTicket.events) ? selectedTicket.events : [];
-    markup += '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3">'
-      + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="truncate text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(ticket.ticketNumber || "-") + '</div><div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml((ticket.status || "-") + " · " + formatDateLabel(ticket.createdAt)) + '</div></div><div class="flex shrink-0 gap-2"><button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="back-to-tickets" type="button">Retour liste</button><button class="bg-surface-tint px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-primary" data-action="validate-ticket" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" type="button">Valider</button></div></div>'
-      + '<div class="mt-2 whitespace-pre-wrap text-[11px] text-on-surface-variant">' + escapeHtml(ticket.requestTextRaw || "") + '</div>'
-      + '</section>';
-    markup += lines.map(function(line) {
-      return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
-        + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="truncate text-[12px] font-bold tracking-tight text-primary">' + escapeHtml(line.reference || "-") + '</div><div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml((line.requestedDisplay || "À confirmer") + (line.warehouseHelpDisplay ? (" · " + line.warehouseHelpDisplay) : "")) + '</div></div><div class="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(line.status || "-") + '</div></div>'
-        + '<div class="mt-2 flex flex-wrap gap-2">'
-        + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="resolve-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" data-line-status="ready" type="button">Renseigner</button>'
-        + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="resolve-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" data-line-status="not_found" type="button">Introuvable</button>'
-        + '</div>'
-        + (line.pickedDisplay ? '<div class="mt-2 text-[11px] font-semibold text-on-surface">' + escapeHtml("Pris : " + line.pickedDisplay) + '</div>' : '')
-        + (line.lineNote ? '<div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml(line.lineNote) + '</div>' : '')
-        + '</article>';
-    }).join("");
-    markup += '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3"><div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Historique ticket</div>'
-      + (events.length ? '<div class="mt-2 flex flex-col gap-2">' + events.map(function(event) {
-        return '<div class="text-[11px] text-on-surface-variant">' + escapeHtml(formatDateLabel(event.createdAt) + " · " + (event.eventType || "-") + (event.message ? (" · " + event.message) : "")) + '</div>';
-      }).join("") + '</div>' : '<div class="mt-2 text-[11px] text-on-surface-variant">Aucun événement.</div>')
-      + '</section>';
-  } else if (tickets.length) {
-    markup = tickets.map(function(ticket) {
-      return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
-        + '<div class="flex items-start justify-between gap-3"><div class="min-w-0"><button class="truncate text-left text-[12px] font-bold tracking-tight text-primary" data-action="open-ticket" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" type="button">' + escapeHtml(ticket.ticketNumber || "-") + '</button><div class="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(ticket.status || "-") + '</div></div><div class="shrink-0 text-right text-[10px] text-on-surface-variant">' + escapeHtml(formatDateLabel(ticket.createdAt)) + '</div></div>'
-        + '<div class="mt-2 text-[11px] text-on-surface-variant">' + escapeHtml((ticket.title || "Sans titre") + " · " + ticket.lineCount + " lignes") + '</div>'
-        + '</article>';
-    }).join("");
-  } else {
-    markup = '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Aucun ticket sortie pour le moment.</div>';
+  const subview = state.ticketsSubview || "list";
+  if (backButton) backButton.classList.toggle("hidden", subview === "list");
+  if (newButton) newButton.classList.toggle("hidden", subview !== "list");
+  if (status) {
+    status.textContent = subview === "new"
+      ? "Nouveau ticket"
+      : (selectedTicket && selectedTicket.ticket ? ("Ticket " + (selectedTicket.ticket.ticketNumber || selectedTicketId)) : "Sorties entrepôt");
   }
-  content.innerHTML = markup;
+  if (subview === "new") {
+    content.innerHTML = renderPickupTicketCreationView();
+    return;
+  }
+  if (subview === "detail") {
+    content.innerHTML = selectedTicket
+      ? renderPickupTicketDetailView(selectedTicket)
+      : '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">' + escapeHtml(state.pickupTicketLoading ? "Chargement du ticket..." : "Ticket introuvable.") + '</div>';
+    return;
+  }
+  content.innerHTML = renderPickupTicketsListView(tickets);
 }
 
 function renderAll() {
@@ -3335,11 +3579,11 @@ function bindInventoryEvents() {
   }
   if (navTicketsButton) {
     navTicketsButton.addEventListener("click", function() {
-      if (state.currentView === "tickets" && state.pickupTicket) {
-        navigateTo("tickets");
-        return;
-      }
-      navigateTo("tickets");
+      navigateToTicketsContext();
+    });
+    navTicketsButton.addEventListener("dblclick", function(event) {
+      event.preventDefault();
+      forceTicketsListView();
     });
   }
   if (openReferenceImportsButton) {
@@ -3453,21 +3697,61 @@ function bindReferenceImportsEvents() {
 function bindPickupTicketsEvents() {
   const backButton = document.getElementById("pickupTicketsBackButton");
   const refreshButton = document.getElementById("pickupTicketsRefreshButton");
-  const createButton = document.getElementById("pickupTicketCreateButton");
+  const newButton = document.getElementById("pickupTicketNewButton");
   const content = document.getElementById("pickupTicketsContent");
   if (backButton) {
     backButton.addEventListener("click", function() {
-      navigateTo("inventory");
+      navigateTo("tickets");
     });
   }
   if (refreshButton) {
     refreshButton.addEventListener("click", function() {
-      loadPickupTicketData(state.pickupTicket);
+      loadPickupTicketData(state.pickupTicket, { includeDetail: Boolean(state.pickupTicket) });
     });
   }
-  if (createButton) {
-    createButton.addEventListener("click", function() {
-      createPickupTicketFromForm();
+  if (newButton) {
+    newButton.addEventListener("click", function() {
+      navigateTo("tickets_new");
+    });
+  }
+  if (content) {
+    content.addEventListener("input", function(event) {
+      const target = event.target;
+      if (!target) return;
+      if (target.id === "pickupTicketTitleInput") {
+        state.ticketCreationDraft.title = String(target.value || "");
+        return;
+      }
+      if (target.id === "pickupTicketQuickReferenceInput") {
+        state.ticketCreationDraft.quickReference = String(target.value || "");
+        return;
+      }
+      if (target.id === "pickupTicketQuickQuantityInput") {
+        state.ticketCreationDraft.quickQuantity = String(target.value || "");
+        return;
+      }
+      if (target.id === "pickupTicketRequestTextInput") {
+        state.ticketCreationDraft.requestTextRaw = String(target.value || "");
+        return;
+      }
+      if (target.id === "pickupTicketGlobalNoteInput") {
+        state.ticketCreationDraft.globalNote = String(target.value || "");
+        return;
+      }
+      if (target.matches('[data-role="ticket-line-picked-input"]')) {
+        const lineId = String(target.getAttribute("data-line-id") || "");
+        if (!lineId) return;
+        const draft = state.ticketLineDraftsById[lineId] || (state.ticketLineDraftsById[lineId] = { pickedInput: "", lineNote: "", error: "" });
+        draft.pickedInput = String(target.value || "");
+        draft.error = "";
+        return;
+      }
+      if (target.matches('[data-role="ticket-line-note-input"]')) {
+        const lineId = String(target.getAttribute("data-line-id") || "");
+        if (!lineId) return;
+        const draft = state.ticketLineDraftsById[lineId] || (state.ticketLineDraftsById[lineId] = { pickedInput: "", lineNote: "", error: "" });
+        draft.lineNote = String(target.value || "");
+      }
     });
   }
   if (content) {
@@ -3477,23 +3761,53 @@ function bindPickupTicketsEvents() {
         navigateTo("tickets", { ref: openTrigger.getAttribute("data-ticket-id") });
         return;
       }
-      const backTrigger = event.target.closest('[data-action="back-to-tickets"]');
-      if (backTrigger) {
-        navigateTo("tickets");
+      const togglePreviewTrigger = event.target.closest('[data-action="toggle-ticket-preview"]');
+      if (togglePreviewTrigger) {
+        const ticketId = String(togglePreviewTrigger.getAttribute("data-ticket-id") || "");
+        if (!ticketId) return;
+        state.expandedTicketIds[ticketId] = !state.expandedTicketIds[ticketId];
+        renderPickupTicketsPage();
         return;
       }
-      const resolveTrigger = event.target.closest('[data-action="resolve-ticket-line"]');
-      if (resolveTrigger) {
-        handleResolveTicketLine(
-          resolveTrigger.getAttribute("data-ticket-id"),
-          resolveTrigger.getAttribute("data-line-id"),
-          resolveTrigger.getAttribute("data-line-status")
+      const addDraftLineTrigger = event.target.closest('[data-action="add-ticket-draft-line"]');
+      if (addDraftLineTrigger) {
+        addPickupTicketDraftLineFromFields();
+        return;
+      }
+      const addTextLinesTrigger = event.target.closest('[data-action="add-ticket-text-lines"]');
+      if (addTextLinesTrigger) {
+        addPickupTicketDraftLinesFromText();
+        return;
+      }
+      const removeDraftLineTrigger = event.target.closest('[data-action="remove-ticket-draft-line"]');
+      if (removeDraftLineTrigger) {
+        removePickupTicketDraftLine(removeDraftLineTrigger.getAttribute("data-line-index"));
+        return;
+      }
+      const saveLineTrigger = event.target.closest('[data-action="save-ticket-line"]');
+      if (saveLineTrigger) {
+        handleSavePickupTicketLine(
+          saveLineTrigger.getAttribute("data-ticket-id"),
+          saveLineTrigger.getAttribute("data-line-id")
+        );
+        return;
+      }
+      const notFoundTrigger = event.target.closest('[data-action="mark-ticket-line-not-found"]');
+      if (notFoundTrigger) {
+        handleMarkPickupTicketLineNotFound(
+          notFoundTrigger.getAttribute("data-ticket-id"),
+          notFoundTrigger.getAttribute("data-line-id")
         );
         return;
       }
       const validateTrigger = event.target.closest('[data-action="validate-ticket"]');
       if (validateTrigger) {
         handleValidateTicket(validateTrigger.getAttribute("data-ticket-id"));
+        return;
+      }
+      const createTrigger = event.target.closest("#pickupTicketCreateButton");
+      if (createTrigger) {
+        createPickupTicketFromDraft();
       }
     });
   }
@@ -3537,17 +3851,21 @@ function loadReferenceImportData(batchId) {
   });
 }
 
-function loadPickupTicketData(ticketId) {
+function loadPickupTicketData(ticketId, options) {
+  const includeDetail = !(options && options.includeDetail === false);
   if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) {
     state.pickupTickets = [];
     state.pickupTicketData = null;
+    state.pickupTicketsLoaded = true;
     renderPickupTicketsPage();
     return Promise.resolve(false);
   }
+  state.pickupTicketLoading = true;
   return remoteDataSource.fetchPickupTickets().then(function(payload) {
     state.pickupTickets = Array.isArray(payload && payload.items) ? payload.items : [];
+    state.pickupTicketsLoaded = true;
     renderPickupTicketsPage();
-    if (ticketId) {
+    if (ticketId && includeDetail) {
       return remoteDataSource.fetchPickupTicket(ticketId).then(function(ticketPayload) {
         state.pickupTicket = ticketId;
         state.pickupTicketData = {
@@ -3555,19 +3873,40 @@ function loadPickupTicketData(ticketId) {
           lines: Array.isArray(ticketPayload && ticketPayload.lines) ? ticketPayload.lines : [],
           events: Array.isArray(ticketPayload && ticketPayload.events) ? ticketPayload.events : []
         };
+        seedPickupTicketLineDrafts();
         renderPickupTicketsPage();
         return true;
       });
     }
-    state.pickupTicket = null;
-    state.pickupTicketData = null;
+    if (!ticketId) {
+      state.pickupTicket = null;
+      state.pickupTicketData = null;
+    }
     renderPickupTicketsPage();
     return true;
   }).catch(function(error) {
     console.warn("Pickup tickets fetch failed", error);
     renderPickupTicketsPage();
     return false;
+  }).finally(function() {
+    state.pickupTicketLoading = false;
   });
+}
+
+function seedPickupTicketLineDrafts() {
+  const lines = state.pickupTicketData && Array.isArray(state.pickupTicketData.lines) ? state.pickupTicketData.lines : [];
+  const nextDrafts = {};
+  lines.forEach(function(line) {
+    const lineId = String(line && line.lineId || "");
+    if (!lineId) return;
+    const existing = state.ticketLineDraftsById[lineId] || {};
+    nextDrafts[lineId] = {
+      pickedInput: typeof existing.pickedInput === "string" ? existing.pickedInput : String(line.pickedDisplay || ""),
+      lineNote: typeof existing.lineNote === "string" ? existing.lineNote : String(line.lineNote || ""),
+      error: typeof existing.error === "string" ? existing.error : ""
+    };
+  });
+  state.ticketLineDraftsById = nextDrafts;
 }
 
 function getReferenceImportMappingFromForm() {
@@ -3671,76 +4010,147 @@ function parsePickupTicketTextLines(text) {
   }).filter(Boolean);
 }
 
-function createPickupTicketFromForm() {
-  const titleInput = document.getElementById("pickupTicketTitleInput");
-  const requestTextInput = document.getElementById("pickupTicketRequestTextInput");
-  const globalNoteInput = document.getElementById("pickupTicketGlobalNoteInput");
-  const requestTextRaw = requestTextInput ? String(requestTextInput.value || "").trim() : "";
-  const lines = parsePickupTicketTextLines(requestTextRaw);
+function addPickupTicketDraftLineFromFields() {
+  const reference = normalizeReference(state.ticketCreationDraft.quickReference);
+  const quantityText = String(state.ticketCreationDraft.quickQuantity || "").trim();
+  if (!reference) {
+    window.alert("Saisis une référence.");
+    return;
+  }
+  let nextLine = { reference: reference, requestUnit: "", requestQuantity: null, requestedDisplay: "" };
+  if (quantityText) {
+    const parsedQuantity = parsePickupQuantityInput(quantityText);
+    if (!parsedQuantity.ok) {
+      window.alert(parsedQuantity.error);
+      return;
+    }
+    nextLine = {
+      reference: reference,
+      requestUnit: parsedQuantity.unit,
+      requestQuantity: parsedQuantity.quantity,
+      requestedDisplay: parsedQuantity.display
+    };
+  }
+  state.ticketCreationDraft.lines = state.ticketCreationDraft.lines.concat([nextLine]);
+  state.ticketCreationDraft.quickReference = "";
+  state.ticketCreationDraft.quickQuantity = "";
+  renderPickupTicketsPage();
+}
+
+function addPickupTicketDraftLinesFromText() {
+  const rawText = String(state.ticketCreationDraft.requestTextRaw || "").trim();
+  const parsedLines = parsePickupTicketTextLines(rawText);
+  if (!parsedLines.length) {
+    window.alert("Ajoute au moins une ligne valide.");
+    return;
+  }
+  state.ticketCreationDraft.lines = state.ticketCreationDraft.lines.concat(parsedLines.map(function(line) {
+    return {
+      reference: line.reference,
+      requestUnit: line.requestUnit || "",
+      requestQuantity: line.requestQuantity || null,
+      requestedDisplay: buildRequestedDisplayFromDraftLine(line)
+    };
+  }));
+  state.ticketCreationDraft.requestTextRaw = "";
+  renderPickupTicketsPage();
+}
+
+function removePickupTicketDraftLine(index) {
+  const numericIndex = Math.max(0, toInt(index));
+  state.ticketCreationDraft.lines = state.ticketCreationDraft.lines.filter(function(_, currentIndex) {
+    return currentIndex !== numericIndex;
+  });
+  renderPickupTicketsPage();
+}
+
+function createPickupTicketFromDraft() {
+  const lines = Array.isArray(state.ticketCreationDraft.lines) ? state.ticketCreationDraft.lines : [];
   if (!lines.length) {
     window.alert("Saisis au moins une ligne de ticket.");
     return;
   }
+  const requestTextRaw = buildPickupTicketRequestText(lines);
   pushOnlineMutation({
     type: "create_pickup_ticket",
     request: {
-      title: titleInput ? String(titleInput.value || "").trim() : "",
+      title: String(state.ticketCreationDraft.title || "").trim(),
       requestTextRaw: requestTextRaw,
-      globalNote: globalNoteInput ? String(globalNoteInput.value || "").trim() : "",
+      globalNote: String(state.ticketCreationDraft.globalNote || "").trim(),
       createdBy: "webapp",
       lines: lines
     }
   }).then(function(result) {
     if (!result || !result.ticket) return;
+    state.ticketCreationDraft = {
+      title: "",
+      globalNote: "",
+      requestTextRaw: "",
+      quickReference: "",
+      quickQuantity: "",
+      lines: []
+    };
     navigateTo("tickets", { ref: result.ticket.ticketId });
   }).catch(function(error) {
     window.alert(error && error.message ? error.message : "Création ticket impossible.");
   });
 }
 
-function handleResolveTicketLine(ticketId, lineId, suggestedStatus) {
-  if (!ticketId || !lineId) return;
-  if (suggestedStatus === "not_found") {
-    pushOnlineMutation({
-      type: "resolve_pickup_ticket_line",
-      request: {
-        ticketId: ticketId,
-        lineId: lineId,
-        status: "not_found",
-        updatedBy: "webapp",
-        version: state.pickupTicketData && state.pickupTicketData.ticket ? state.pickupTicketData.ticket.version : 0
-      }
-    }).then(function() {
-      return loadPickupTicketData(ticketId);
-    }).catch(function(error) {
-      window.alert(error && error.message ? error.message : "Mise à jour ligne impossible.");
-    });
-    return;
-  }
-  const pickedText = window.prompt("Quantité réellement prise (ex: 2箱, 5包, 12件)", "");
-  if (pickedText === null) return;
-  const parsed = parsePickupTicketTextLines("TMP " + pickedText)[0];
-  if (!parsed || !parsed.requestUnit || !(parsed.requestQuantity > 0)) {
-    window.alert("Format attendu : 2箱, 5包 ou 12件.");
-    return;
-  }
-  const lineNote = window.prompt("Note ligne (optionnel)", "") || "";
-  pushOnlineMutation({
+function updatePickupTicketLine(ticketId, lineId, request) {
+  return pushOnlineMutation({
     type: "resolve_pickup_ticket_line",
-    request: {
+    request: Object.assign({
       ticketId: ticketId,
       lineId: lineId,
-      status: "ready",
-      pickedUnit: parsed.requestUnit,
-      pickedQuantity: parsed.requestQuantity,
-      lineNote: lineNote,
       updatedBy: "webapp",
       version: state.pickupTicketData && state.pickupTicketData.ticket ? state.pickupTicketData.ticket.version : 0
-    }
+    }, request)
   }).then(function() {
-    return loadPickupTicketData(ticketId);
+    return loadPickupTicketData(ticketId, { includeDetail: true });
   }).catch(function(error) {
     window.alert(error && error.message ? error.message : "Mise à jour ligne impossible.");
+  });
+}
+
+function handleMarkPickupTicketLineNotFound(ticketId, lineId) {
+  if (!ticketId || !lineId) return;
+  const line = state.pickupTicketData && Array.isArray(state.pickupTicketData.lines)
+    ? state.pickupTicketData.lines.find(function(entry) { return String(entry.lineId || "") === String(lineId); })
+    : null;
+  const draft = state.ticketLineDraftsById[lineId] || {};
+  return updatePickupTicketLine(ticketId, lineId, {
+    status: "not_found",
+    pickedUnit: "",
+    pickedQuantity: 0,
+    lineNote: String(draft.lineNote || (line && line.lineNote) || "").trim()
+  });
+}
+
+function handleSavePickupTicketLine(ticketId, lineId) {
+  if (!ticketId || !lineId) return;
+  const line = state.pickupTicketData && Array.isArray(state.pickupTicketData.lines)
+    ? state.pickupTicketData.lines.find(function(entry) { return String(entry.lineId || "") === String(lineId); })
+    : null;
+  const draft = state.ticketLineDraftsById[lineId] || {};
+  const parsedQuantity = parsePickupQuantityInput(draft.pickedInput || "");
+  if (!String(draft.pickedInput || "").trim()) {
+    draft.error = "";
+    return updatePickupTicketLine(ticketId, lineId, {
+      status: line && line.status === "not_found" ? "not_found" : "to_confirm",
+      lineNote: String(draft.lineNote || "").trim()
+    });
+  }
+  if (!parsedQuantity.ok) {
+    draft.error = parsedQuantity.error || "Format invalide.";
+    renderPickupTicketsPage();
+    return;
+  }
+  draft.error = "";
+  return updatePickupTicketLine(ticketId, lineId, {
+    status: inferPickupLineStatus(line, parsedQuantity),
+    pickedUnit: parsedQuantity.unit,
+    pickedQuantity: parsedQuantity.quantity,
+    lineNote: String(draft.lineNote || "").trim()
   });
 }
 
@@ -3766,7 +4176,7 @@ function handleValidateTicket(ticketId) {
     }
   }).then(function() {
     return Promise.all([
-      loadPickupTicketData(ticketId),
+      loadPickupTicketData(ticketId, { includeDetail: true }),
       refreshRemoteSnapshot({ silent: true })
     ]);
   }).catch(function(error) {
@@ -3814,12 +4224,18 @@ function initApp() {
   applyDataMeta(inventoryResult.meta);
   state.columnCount = getColumnCount();
   const route = parseCurrentRoute();
-  state.currentView = route.view;
+  state.currentView = route.view === "tickets_new" ? "tickets" : route.view;
   state.previousView = route.view === "detail" ? "inventory" : route.view;
   state.detailReference = route.view === "detail" ? route.ref : "";
   state.referenceImportBatch = route.view === "imports" ? route.ref : null;
   state.pickupTicket = route.view === "tickets" ? route.ref : null;
+  state.ticketsSubview = route.view === "tickets_new" ? "new" : (route.view === "tickets" && route.ref ? "detail" : "list");
   rememberInventoryView(route.view, route.ref);
+  if (route.view === "tickets_new") {
+    rememberTicketsView("tickets_new", "");
+  } else if (route.view === "tickets") {
+    rememberTicketsView(route.ref ? "ticket_detail" : "tickets", route.ref || "");
+  }
   bindInventoryEvents();
   bindHistoryEvents();
   bindDetailEvents();
@@ -3841,8 +4257,11 @@ function initApp() {
   if (state.currentView === "imports") {
     loadReferenceImportData(state.referenceImportBatch);
   }
-  if (state.currentView === "tickets") {
-    loadPickupTicketData(state.pickupTicket);
+  if (route.view === "tickets") {
+    loadPickupTicketData(state.pickupTicket, { includeDetail: Boolean(state.pickupTicket) });
+  }
+  if (route.view === "tickets_new") {
+    loadPickupTicketData("", { includeDetail: false });
   }
 
   let resizeTimer = 0;
@@ -3867,7 +4286,7 @@ function initApp() {
         return loadReferenceImportData(state.referenceImportBatch);
       }
       if (state.currentView === "tickets") {
-        return loadPickupTicketData(state.pickupTicket);
+        return loadPickupTicketData(state.pickupTicket, { includeDetail: Boolean(state.pickupTicket) });
       }
       return false;
     });

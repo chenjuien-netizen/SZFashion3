@@ -397,16 +397,11 @@
                 <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="pickupTicketsStatus">Sorties entrepôt</p>
               </div>
             </div>
-            <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="pickupTicketsRefreshButton" type="button">Rafraîchir</button>
-          </header>
-          <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">
-            <div class="grid gap-2">
-              <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketTitleInput" placeholder="Titre ticket (optionnel)" type="text" />
-              <textarea class="min-h-[5.5rem] border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketRequestTextInput" placeholder="FL259-8 2箱&#10;FL536-5 5包&#10;CM291"></textarea>
-              <textarea class="min-h-[3.5rem] border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketGlobalNoteInput" placeholder="Note globale (optionnelle)"></textarea>
-              <button class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="pickupTicketCreateButton" type="button">Créer ticket</button>
+            <div class="flex items-center gap-2">
+              <button class="hidden border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="pickupTicketNewButton" type="button">Nouveau ticket</button>
+              <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="pickupTicketsRefreshButton" type="button">Rafraîchir</button>
             </div>
-          </section>
+          </header>
         </div>
         <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-outline-variant/20" id="pickupTicketsScroll">
           <div class="flex flex-col gap-3 px-3 py-3" id="pickupTicketsContent"></div>
