@@ -91,6 +91,11 @@
       baseSnapshot.pendingMutations.forEach(function(mutation) {
         if (!mutation || !mutation.request) return;
 
+        if (mutation.type === "validate_pickup_ticket") {
+          applyPendingValidatePickupTicketMutation_(baseSnapshot, mutation);
+          return;
+        }
+
         const normalizedReference = deps.normalizeReference(mutation.reference || mutation.request.reference);
         const baseItem = baseSnapshot.items.find(function(entry) {
           if (mutation.itemId && entry.id === mutation.itemId) return true;
@@ -132,6 +137,70 @@
         items: baseSnapshot.items,
         historyItems: baseSnapshot.historyItems
       };
+    }
+
+    function convertTicketQuantityToPiecesLocal_(referenceItem, unit, quantity) {
+      const safeUnit = String(unit || "").trim();
+      const safeQuantity = Number(quantity || 0);
+      if (!(safeQuantity > 0)) throw new Error("Quantité ticket invalide.");
+      if (safeUnit === "piece") return Math.round(safeQuantity);
+      if (safeUnit === "box") {
+        const unitsPerBox = Math.max(0, Number(referenceItem && referenceItem.unitsPerBox || 0));
+        if (!(unitsPerBox > 0)) throw new Error("Impossible de convertir en 箱 sans 件/箱.");
+        return Math.round(safeQuantity * unitsPerBox);
+      }
+      if (safeUnit === "pack") {
+        const packSize = Math.max(0, Number(referenceItem && referenceItem.colisage || 0));
+        if (!(packSize > 0)) throw new Error("Impossible de convertir en 包 sans Colisage.");
+        return Math.round(safeQuantity * packSize);
+      }
+      throw new Error("Unité ticket non supportée.");
+    }
+
+    function buildHistoryEntryFromPickupTicketValidation_(beforeItem, afterItem, linePayload, mutation) {
+      const historyEntry = deps.buildHistoryEntryFromLocalChange(
+        "pickup_ticket",
+        beforeItem,
+        afterItem,
+        linePayload && linePayload.lineNote ? linePayload.lineNote : ""
+      );
+      if (!historyEntry) return null;
+      historyEntry.source = "stock_mobile_sync_pending";
+      historyEntry.businessId = String(mutation && mutation.request && mutation.request.ticketId || mutation && mutation.ticketId || "").trim();
+      historyEntry.businessLineId = String(linePayload && linePayload.lineId || "").trim();
+      return historyEntry;
+    }
+
+    function applyPendingValidatePickupTicketMutation_(baseSnapshot, mutation) {
+      const request = mutation && mutation.request ? mutation.request : {};
+      const requestLines = Array.isArray(request.lines) ? request.lines : [];
+      requestLines.forEach(function(linePayload) {
+        const normalizedReference = deps.normalizeReference(linePayload && linePayload.reference);
+        if (!normalizedReference) return;
+        const baseItem = baseSnapshot.items.find(function(entry) {
+          return deps.normalizeReference(entry && entry.reference) === normalizedReference;
+        }) || null;
+        if (!baseItem) return;
+        try {
+          const beforePieces = Number(deps.stateModelToPieces(baseItem) || 0);
+          const removePieces = convertTicketQuantityToPiecesLocal_(baseItem, linePayload && linePayload.pickedUnit, linePayload && linePayload.pickedQuantity);
+          if (!(removePieces > 0) || removePieces > beforePieces) return;
+          const afterPieces = beforePieces - removePieces;
+          const nextState = deps.buildStateFromPieces(afterPieces, {
+            unitsPerBox: baseItem.unitsPerBox,
+            colisage: baseItem.colisage,
+            remark: baseItem.remark,
+            reconstructionMode: String(linePayload && linePayload.pickedUnit || "").trim() === "pack" ? "packs" : ""
+          });
+          const nextItem = deps.hydrateItem(Object.assign({}, baseItem, nextState));
+          const historyEntry = buildHistoryEntryFromPickupTicketValidation_(baseItem, nextItem, linePayload, mutation);
+          if (historyEntry && mutation.id) historyEntry.id = "pending-history-" + mutation.id + "-" + String(linePayload && linePayload.lineId || normalizedReference);
+          baseSnapshot.items = replaceItemInList(baseSnapshot.items, nextItem, normalizedReference);
+          baseSnapshot.historyItems = mergeHistoryEntry(baseSnapshot.historyItems, historyEntry);
+        } catch (_error) {
+          return;
+        }
+      });
     }
 
     function writeSnapshot(snapshot) {
@@ -889,9 +958,21 @@
       if (!detail || !detail.ticket || !detail.ticket.ticketId) return null;
       const nextPendingMutations = snapshot.pendingMutations.slice();
       if (pendingMutation) nextPendingMutations.push(cloneRequestPayload(pendingMutation));
+      let nextItems = snapshot.items.slice();
+      let nextHistoryItems = snapshot.historyItems.slice();
+      if (pendingMutation && pendingMutation.type === "validate_pickup_ticket") {
+        const projected = {
+          items: nextItems,
+          historyItems: nextHistoryItems,
+          pendingMutations: []
+        };
+        applyPendingValidatePickupTicketMutation_(projected, pendingMutation);
+        nextItems = projected.items;
+        nextHistoryItems = projected.historyItems;
+      }
       const nextSnapshot = {
-        items: snapshot.items.slice(),
-        historyItems: snapshot.historyItems.slice(),
+        items: nextItems,
+        historyItems: nextHistoryItems,
         pickupTickets: replacePickupTicketInList(snapshot.pickupTickets, detail.ticket, detail.ticket.ticketId),
         pickupTicketDetails: upsertPickupTicketDetail(snapshot.pickupTicketDetails, detail.ticket.ticketId, detail),
         pendingMutations: nextPendingMutations,

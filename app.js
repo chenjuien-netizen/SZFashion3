@@ -313,13 +313,26 @@ function syncPendingMutations(options) {
     if (!mutation) {
       const finalTasks = [refreshRemoteSnapshot({ silent: true })];
       if (processedTicketMutation) finalTasks.push(refreshRemotePickupTicketsBootstrap({ silent: true }));
+      console.info("[syncPendingMutations] queue drained, final refresh start", {
+        queueLength: state.pendingMutations.length,
+        processedTicketMutation: processedTicketMutation
+      });
       return Promise.all(finalTasks).then(function() {
         state.syncStatus = "idle";
+        console.info("[syncPendingMutations] final refresh complete", {
+          queueLength: state.pendingMutations.length,
+          syncStatus: state.syncStatus
+        });
         renderAll();
         return true;
       });
     }
 
+    const startMs = Date.now();
+    console.info("[syncPendingMutations] start", {
+      queueLength: state.pendingMutations.length,
+      mutation: describePendingMutation_(mutation)
+    });
     return remoteDataSource.pushMutation(mutation).then(function(result) {
       const committed = dataSource.commitSyncedMutation({
         mutationId: mutation.id,
@@ -352,6 +365,11 @@ function syncPendingMutations(options) {
       } else if (mutation && mutation.type === "create_pickup_ticket" && result && result.ticket) {
         applyLocalPickupTicketsState(result.ticket.ticketId);
       }
+      console.info("[syncPendingMutations] success", {
+        mutation: describePendingMutation_(mutation),
+        durationMs: Date.now() - startMs,
+        remainingQueue: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0
+      });
       renderAll();
       if (/^create_pickup_ticket$|^resolve_pickup_ticket_line$|^validate_pickup_ticket$|^cancel_pickup_ticket$/i.test(String(mutation.type || ""))) {
         return syncNext();
@@ -359,7 +377,12 @@ function syncPendingMutations(options) {
       return refreshRemoteSnapshot({ silent: true }).then(syncNext);
     });
   }).catch(function(error) {
-    console.warn("Remote mutation sync failed", error);
+    const blockingMutation = state.pendingMutations && state.pendingMutations[0] ? describePendingMutation_(state.pendingMutations[0]) : null;
+    console.warn("[syncPendingMutations] failed", {
+      mutation: blockingMutation,
+      remainingQueue: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0,
+      error: error && error.message ? error.message : String(error || "")
+    });
     state.syncStatus = navigator.onLine ? "error" : "offline";
     renderAll();
     return false;
@@ -4078,6 +4101,25 @@ function getPickupTicketTitleNoteLabel(ticket) {
   return [title, note].filter(Boolean).join(" · ");
 }
 
+function describePendingMutation_(mutation) {
+  return {
+    id: String(mutation && mutation.id || ""),
+    type: String(mutation && mutation.type || ""),
+    ticketId: String(mutation && mutation.ticketId || mutation && mutation.request && mutation.request.ticketId || ""),
+    lineId: String(mutation && mutation.lineId || mutation && mutation.request && mutation.request.lineId || ""),
+    createdAt: String(mutation && mutation.createdAt || "")
+  };
+}
+
+window.__szPendingMutations = function __szPendingMutations() {
+  const list = Array.isArray(state.pendingMutations) ? state.pendingMutations.map(describePendingMutation_) : [];
+  return {
+    length: list.length,
+    head: list[0] || null,
+    items: list
+  };
+};
+
 function formatTicketLineCountLabel(count) {
   const safeCount = Math.max(0, toInt(count));
   return safeCount + " " + (safeCount > 1 ? "lignes" : "ligne");
@@ -5253,7 +5295,8 @@ function handleValidateTicket(ticketId) {
       lineId: line.lineId,
       reference: line.reference,
       pickedUnit: line.pickedUnit,
-      pickedQuantity: line.pickedQuantity
+      pickedQuantity: line.pickedQuantity,
+      lineNote: String(line.lineNote || "").trim()
     };
   });
   if (dataSource && dataSource.saveOptimisticPickupTicketDetail) {
@@ -5327,7 +5370,9 @@ function initApp() {
     normalizeReference: normalizeReference,
     formatHistoryTimestamp: formatHistoryTimestamp,
     buildOptimisticItemFromRequest: buildOptimisticItemFromRequest,
-    buildHistoryEntryFromLocalChange: buildHistoryEntryFromLocalChange
+    buildHistoryEntryFromLocalChange: buildHistoryEntryFromLocalChange,
+    stateModelToPieces: stateModelToPieces,
+    buildStateFromPieces: buildStateFromPieces
   });
   remoteDataSource = window.createRemoteDataSource ? window.createRemoteDataSource() : null;
   const inventoryResult = dataSource.loadInventory();

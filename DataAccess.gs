@@ -2041,6 +2041,7 @@ function applyValidatePickupTicketMutation_(mutation) {
   const request = mutation && mutation.request ? mutation.request : null;
   if (!request) throw new Error("Payload validation ticket manquant.");
   const ticketId = String(request.ticketId || "").trim();
+  console.log("[applyValidatePickupTicketMutation_] start ticketId=%s version=%s requestLines=%s mutationId=%s", ticketId, String(request.version || ""), String(Array.isArray(request.lines) ? request.lines.length : 0), String(mutation && mutation.id || ""));
   const ticketsSheet = getOrCreatePickupTicketsSheet_();
   const linesSheet = getOrCreatePickupTicketLinesSheet_();
   const eventsSheet = getOrCreatePickupTicketEventsSheet_();
@@ -2066,6 +2067,7 @@ function applyValidatePickupTicketMutation_(mutation) {
     line.pickedUnit = canonical.pickedUnit;
     line.pickedQuantity = canonical.pickedQuantity;
     line.pickedDisplay = canonical.pickedDisplay;
+    console.log("[applyValidatePickupTicketMutation_] line prepared ticketId=%s lineId=%s reference=%s picked=%s%s status=%s", ticketId, String(line.lineId || ""), String(line.reference || ""), String(line.pickedQuantity || ""), String(line.pickedUnit || ""), String(line.status || ""));
   });
 
   const blockingLine = lines.find(function(line) {
@@ -2078,6 +2080,7 @@ function applyValidatePickupTicketMutation_(mutation) {
     if (line.status === "not_found" || line.status === "cancelled") return;
     const stockRowIndex = findInventoryRowIndexByReference_(stockSheet, stockCols, line.reference);
     if (stockRowIndex < 2) throw new Error("Référence introuvable dans STOCK : " + line.reference);
+    console.log("[applyValidatePickupTicketMutation_] stock row found ticketId=%s lineId=%s reference=%s row=%s", ticketId, String(line.lineId || ""), String(line.reference || ""), String(stockRowIndex || ""));
     const beforeRow = stockSheet.getRange(stockRowIndex, 1, 1, stockSheet.getLastColumn()).getDisplayValues()[0];
     const beforeItem = buildInventoryItem_(beforeRow, stockCols, stockRowIndex);
     const nextState = convertTicketQuantityToStockMutation_(beforeItem, {
@@ -2102,6 +2105,7 @@ function applyValidatePickupTicketMutation_(mutation) {
         businessLineId: line.lineId
       }
     }, beforeItem, afterItem);
+    console.log("[applyValidatePickupTicketMutation_] history written ticketId=%s lineId=%s historyId=%s before=%s after=%s", ticketId, String(line.lineId || ""), String(historyEntry && historyEntry.id || ""), String(beforeItem && beforeItem.stockDisplay || ""), String(afterItem && afterItem.stockDisplay || ""));
     line.stockMutationId = String(historyEntry && historyEntry.id || "").trim();
     line.status = "validated";
     linesSheet.getRange(line._rowIndex, 5, 1, 14).setValues([[
@@ -2145,6 +2149,7 @@ function applyValidatePickupTicketMutation_(mutation) {
     payload: { lines: lines.map(function(line) { return { lineId: line.lineId, status: line.status, pickedDisplay: line.pickedDisplay }; }) },
     message: "Ticket validé"
   });
+  console.log("[applyValidatePickupTicketMutation_] success ticketId=%s validatedLines=%s", ticketId, String(lines.length || 0));
   return {
     ok: true,
     mutationId: String(mutation.id || ""),
