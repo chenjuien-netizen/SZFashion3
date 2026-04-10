@@ -259,8 +259,7 @@
     function derivePickupTicketStatus(ticket, lines) {
       const currentStatus = String(ticket && ticket.status || "").trim();
       if (currentStatus === "validated" || currentStatus === "cancelled") return currentStatus;
-      const counters = computePickupTicketCounters(lines);
-      return counters.resolvedLineCount > 0 ? "in_progress" : "draft";
+      return "in_progress";
     }
 
     function buildTempPickupTicketNumber() {
@@ -541,7 +540,7 @@
       const ticket = {
         ticketId: ticketId,
         ticketNumber: buildTempPickupTicketNumber(),
-        status: "draft",
+        status: "in_progress",
         createdAt: createdAt,
         createdBy: String(request && request.createdBy || "").trim(),
         updatedAt: createdAt,

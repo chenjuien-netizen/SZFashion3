@@ -1777,7 +1777,7 @@ function applyCreatePickupTicketMutation_(mutation) {
   ticketsSheet.appendRow([
     ticketId,
     ticketNumber,
-    "draft",
+    "in_progress",
     createdAt,
     String(request.createdBy || "").trim(),
     createdAt,
@@ -2010,7 +2010,7 @@ function updatePickupTicketCounters_(ticketsSheet, linesSheet, ticketId, nextVer
   }).length;
   const nextStatus = ticket.status === "validated" || ticket.status === "cancelled"
     ? ticket.status
-    : (resolvedLineCount > 0 ? "in_progress" : "draft");
+    : "in_progress";
   ticketsSheet.getRange(ticket._rowIndex, 3, 1, 13).setValues([[
     nextStatus,
     String(ticket.createdAt || ""),

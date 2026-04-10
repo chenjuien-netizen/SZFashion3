@@ -23,9 +23,13 @@ const state = {
   historyQuery: "",
   historyActionType: "",
   historyPeriod: "all",
+  ticketsQuery: "",
+  ticketsPeriod: "all",
+  ticketsStatusFilter: "",
   columnCount: 2,
   currentView: "inventory",
   previousView: "inventory",
+  detailOrigin: "inventory",
   lastInventoryView: { view: "inventory", ref: "" },
   lastTicketsView: { view: "tickets", ticketId: "" },
   ticketsSubview: "list",
@@ -558,11 +562,14 @@ function navigateTo(view, options) {
 function handleRouteChange() {
   const route = parseCurrentRoute();
   if (route.view === "detail") {
-    state.previousView = state.currentView === "history" ? "history" : "inventory";
+    const fromHistory = state.currentView === "history" || (state.currentView === "detail" && state.detailOrigin === "history");
+    state.detailOrigin = fromHistory ? "history" : "inventory";
+    state.previousView = state.detailOrigin;
   } else if (route.view === "imports" || route.view === "tickets" || route.view === "tickets_new") {
     state.previousView = "inventory";
   } else {
     state.previousView = route.view;
+    if (route.view === "inventory" || route.view === "history") state.detailOrigin = route.view;
   }
   if (route.view === "inventory" || route.view === "detail") {
     rememberInventoryView(route.view, route.ref);
@@ -3639,6 +3646,24 @@ function shouldDisplayPickupTicketEvent_(event) {
   return getPickupTicketEventLabel(event) !== "Ligne rouverte";
 }
 
+function compactPickupTicketEventsForDisplay(events) {
+  const safeEvents = (Array.isArray(events) ? events : []).filter(shouldDisplayPickupTicketEvent_);
+  const seenLineIds = {};
+  const kept = [];
+  for (let index = safeEvents.length - 1; index >= 0; index -= 1) {
+    const event = safeEvents[index];
+    const lineId = String(event && event.lineId || "").trim();
+    if (!lineId) {
+      kept.push(event);
+      continue;
+    }
+    if (seenLineIds[lineId]) continue;
+    seenLineIds[lineId] = true;
+    kept.push(event);
+  }
+  return kept.reverse();
+}
+
 function getPickupTicketEventReference(event, lines) {
   const lineId = String(event && event.lineId || "").trim();
   if (!lineId) return "";
@@ -3984,6 +4009,58 @@ function getTicketRefsPreview(ticket) {
   return refs.slice(0, 2).join(", ") + ", +" + (refs.length - 2);
 }
 
+function formatTicketLineCountLabel(count) {
+  const safeCount = Math.max(0, toInt(count));
+  return safeCount + " " + (safeCount > 1 ? "lignes" : "ligne");
+}
+
+function formatTicketResolvedCountLabel(resolvedCount, totalCount) {
+  const safeResolved = Math.max(0, toInt(resolvedCount));
+  const safeTotal = Math.max(0, toInt(totalCount));
+  return safeResolved + "/" + safeTotal + " " + (safeTotal > 1 ? "traitées" : "traitée");
+}
+
+function getPickupTicketDateGroupLabel(createdAt) {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return "Date inconnue";
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(date);
+}
+
+function isPickupTicketInPeriod(ticket, period) {
+  if (!period || period === "all") return true;
+  const date = new Date(ticket && ticket.createdAt);
+  if (Number.isNaN(date.getTime())) return true;
+  const now = new Date();
+  if (period === "week") {
+    const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+    return date >= sevenDaysAgo;
+  }
+  if (period === "month") {
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  }
+  return true;
+}
+
+function filterPickupTickets(query, period, statusFilter) {
+  const normalizedQuery = normalizeText(query);
+  const safeStatusFilter = String(statusFilter || "").trim();
+  return (Array.isArray(state.pickupTickets) ? state.pickupTickets : []).filter(function(ticket) {
+    if (safeStatusFilter && String(ticket && ticket.status || "") !== safeStatusFilter) return false;
+    if (!isPickupTicketInPeriod(ticket, period)) return false;
+    if (!normalizedQuery) return true;
+    const refsPreview = getTicketRefsPreview(ticket);
+    const haystack = normalizeText([
+      ticket && ticket.ticketNumber,
+      ticket && ticket.title,
+      refsPreview,
+      getPickupTicketUiStatus(ticket && ticket.status)
+    ].join(" "));
+    return haystack.indexOf(normalizedQuery) >= 0;
+  }).sort(function(left, right) {
+    return new Date(right && right.createdAt || 0) - new Date(left && left.createdAt || 0);
+  });
+}
+
 function renderPickupTicketListCard(ticket) {
   const ticketId = String(ticket && ticket.ticketId || "");
   const expanded = Boolean(state.expandedTicketIds && state.expandedTicketIds[ticketId]);
@@ -3992,6 +4069,7 @@ function renderPickupTicketListCard(ticket) {
   const detailLines = cachedDetail && Array.isArray(cachedDetail.lines) && cachedDetail.lines.length ? cachedDetail.lines : null;
   const parsedLines = detailLines || parsePickupTicketTextLines(ticket && ticket.requestTextRaw);
   const previewLines = expanded ? parsedLines : [];
+  const headerMeta = [ticket && ticket.title ? String(ticket.title) : "", formatTicketLineCountLabel(ticket && ticket.lineCount)].filter(Boolean).join(" · ");
   return '<article class="border ' + escapeHtml(tone.article) + ' p-3 shadow-ledger">'
     + '<div class="flex items-start justify-between gap-3">'
     + '<div class="min-w-0">'
@@ -4000,10 +4078,10 @@ function renderPickupTicketListCard(ticket) {
     + '</div>'
     + '<div class="shrink-0 text-right text-[10px] text-on-surface-variant">' + escapeHtml(formatDateLabel(ticket.createdAt)) + '</div>'
     + '</div>'
-    + '<div class="mt-2 text-[11px] text-on-surface-variant">' + escapeHtml((ticket.title || "Sans titre") + " · " + (ticket.lineCount || 0) + " lignes") + '</div>'
+    + (headerMeta ? '<div class="mt-2 text-[11px] text-on-surface-variant">' + escapeHtml(headerMeta) + '</div>' : '')
     + '<div class="mt-1 text-[11px] font-medium text-on-surface">' + escapeHtml(getTicketRefsPreview(ticket)) + '</div>'
     + '<div class="mt-2 flex items-center justify-between gap-2">'
-    + '<div class="text-[10px] uppercase tracking-[0.14em] ' + escapeHtml(tone.counter) + '">' + escapeHtml((ticket.resolvedLineCount || 0) + "/" + (ticket.lineCount || 0) + " traitées") + '</div>'
+    + '<div class="text-[10px] uppercase tracking-[0.14em] ' + escapeHtml(tone.counter) + '">' + escapeHtml(formatTicketResolvedCountLabel(ticket.resolvedLineCount, ticket.lineCount)) + '</div>'
     + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="toggle-ticket-preview" data-ticket-id="' + escapeHtml(ticketId) + '" type="button">' + escapeHtml(expanded ? "Masquer refs" : "Afficher refs") + '</button>'
     + '</div>'
     + (previewLines.length ? '<div class="mt-2 flex flex-col gap-1 border-t border-outline-variant/20 pt-2">'
@@ -4023,11 +4101,46 @@ function renderPickupTicketListCard(ticket) {
     + '</article>';
 }
 
-function renderPickupTicketsListView(tickets) {
+function renderPickupTicketsGroupedListView(tickets) {
+  let lastGroup = "";
   const listMarkup = tickets.length
-    ? tickets.map(renderPickupTicketListCard).join("")
+    ? tickets.map(function(ticket) {
+      const group = getPickupTicketDateGroupLabel(ticket && ticket.createdAt);
+      const separator = group !== lastGroup
+        ? '<div class="sticky top-0 z-10 border-y border-outline-variant/20 bg-surface-container-high px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-on-surface-variant">' + escapeHtml(group) + '</div>'
+        : "";
+      lastGroup = group;
+      return separator + renderPickupTicketListCard(ticket);
+    }).join("")
     : '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Aucun ticket sortie pour le moment.</div>';
   return '<section class="flex flex-col gap-3">' + listMarkup + '</section>';
+}
+
+function renderPickupTicketsListView() {
+  const tickets = filterPickupTickets(state.ticketsQuery, state.ticketsPeriod, state.ticketsStatusFilter);
+  const hasFilters = !!(state.ticketsQuery || (state.ticketsPeriod && state.ticketsPeriod !== "all") || state.ticketsStatusFilter);
+  const controlsMarkup = '<section class="sticky top-0 z-20 border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">'
+    + '<div class="flex items-center gap-2">'
+    + '<span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>'
+    + '<input autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" id="ticketsSearchInput" placeholder="RECHERCHE NUMÉRO / RÉF / TITRE..." type="search" value="' + escapeHtml(state.ticketsQuery || "") + '" />'
+    + '</div>'
+    + '<div class="mt-2 grid grid-cols-[1fr_1fr_auto] items-center gap-2">'
+    + '<label class="min-w-0"><select class="w-full border-outline-variant/30 bg-surface-container-lowest text-[12px] font-medium text-on-surface" id="ticketsPeriodFilter">'
+    + '<option value="week"' + (state.ticketsPeriod === "week" ? ' selected' : '') + '>Cette semaine</option>'
+    + '<option value="month"' + (state.ticketsPeriod === "month" ? ' selected' : '') + '>Ce mois</option>'
+    + '<option value="all"' + (!state.ticketsPeriod || state.ticketsPeriod === "all" ? ' selected' : '') + '>Tout</option>'
+    + '</select></label>'
+    + '<label class="min-w-0 flex-1"><select class="w-full border-outline-variant/30 bg-surface-container-lowest text-[12px] font-medium text-on-surface" id="ticketsStatusFilter">'
+    + '<option value="">Tous statuts</option>'
+    + '<option value="draft"' + (state.ticketsStatusFilter === "draft" ? ' selected' : '') + '>Brouillon</option>'
+    + '<option value="in_progress"' + (state.ticketsStatusFilter === "in_progress" ? ' selected' : '') + '>En cours</option>'
+    + '<option value="validated"' + (state.ticketsStatusFilter === "validated" ? ' selected' : '') + '>Validé</option>'
+    + '<option value="cancelled"' + (state.ticketsStatusFilter === "cancelled" ? ' selected' : '') + '>Annulé</option>'
+    + '</select></label>'
+    + '<div class="shrink-0 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" id="ticketsStatusText">' + escapeHtml(getSyncStatusLabel(hasFilters ? "Filtré" : "Pret")) + '</div>'
+    + '</div>'
+    + '</section>';
+  return controlsMarkup + renderPickupTicketsGroupedListView(tickets);
 }
 
 function renderPickupTicketCreationView() {
@@ -4089,7 +4202,7 @@ function renderPickupTicketDetailView(selectedTicket) {
     return '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Ticket introuvable.</div>';
   }
   const lines = Array.isArray(selectedTicket.lines) ? selectedTicket.lines : [];
-  const events = (Array.isArray(selectedTicket.events) ? selectedTicket.events : []).filter(shouldDisplayPickupTicketEvent_);
+  const events = compactPickupTicketEventsForDisplay(selectedTicket && selectedTicket.events);
   const editable = canEditPickupTicket(ticket);
   const serverReady = isPickupTicketServerReady(ticket);
   const canValidate = editable && lines.some(function(line) {
@@ -4193,9 +4306,7 @@ function renderPickupTicketsPage() {
   if (status) {
     status.textContent = subview === "new"
       ? "Nouveau ticket"
-      : ((selectedTicket && selectedTicket.ticket) || selectedTicketSummary
-          ? ("Ticket " + formatPickupTicketNumberForDisplay((selectedTicket && selectedTicket.ticket ? selectedTicket.ticket.ticketNumber : selectedTicketSummary.ticketNumber) || selectedTicketId))
-          : "Sorties entrepôt");
+      : (subview === "detail" ? "Détail ticket" : "Sorties entrepôt");
   }
   const setTicketContent = function(markup) {
     content.innerHTML = '<div id="pickupTicketsContentWrap" class="relative">' + markup + '<div id="ticketQuantityDropdownLayer" class="pointer-events-none absolute inset-0 z-20 hidden"></div></div>';
@@ -4215,7 +4326,7 @@ function renderPickupTicketsPage() {
       : renderPickupTicketDetailLoadingView(selectedTicketId));
     return;
   }
-  setTicketContent(renderPickupTicketsListView(tickets));
+  setTicketContent(renderPickupTicketsListView());
 }
 
 function renderAll() {
@@ -4245,12 +4356,12 @@ function syncActiveShell() {
   if (pickupTicketsShell) pickupTicketsShell.classList.toggle("hidden", view !== "tickets");
 
   if (navInventoryButton) {
-    const active = view === "inventory" || view === "detail";
+    const active = view === "inventory" || (view === "detail" && state.detailOrigin !== "history");
     navInventoryButton.className = "flex flex-1 flex-col items-center justify-center px-2 py-1 " + (active ? "bg-slate-200 text-slate-900" : "text-slate-400");
     navInventoryButton.setAttribute("aria-current", active ? "page" : "false");
   }
   if (navHistoryButton) {
-    const active = view === "history";
+    const active = view === "history" || (view === "detail" && state.detailOrigin === "history");
     navHistoryButton.className = "flex flex-1 flex-col items-center justify-center px-2 py-1 " + (active ? "bg-slate-200 text-slate-900" : "text-slate-400");
     navHistoryButton.setAttribute("aria-current", active ? "page" : "false");
   }
@@ -4321,6 +4432,10 @@ function bindInventoryEvents() {
     navHistoryButton.addEventListener("click", function() {
       navigateTo("history");
     });
+    navHistoryButton.addEventListener("dblclick", function(event) {
+      event.preventDefault();
+      navigateTo("history");
+    });
   }
   if (navTicketsButton) {
     navTicketsButton.addEventListener("click", function() {
@@ -4376,7 +4491,7 @@ function bindDetailEvents() {
   const detailRemarkEditButton = document.getElementById("detailRemarkEditButton");
   if (detailBackButton) {
     detailBackButton.addEventListener("click", function() {
-      navigateTo(state.previousView || "inventory");
+      navigateTo(state.detailOrigin || state.previousView || "inventory");
     });
   }
   if (detailQuickEditButton) {
@@ -4467,6 +4582,11 @@ function bindPickupTicketsEvents() {
         state.ticketCreationDraft.title = String(target.value || "");
         return;
       }
+      if (target.id === "ticketsSearchInput") {
+        state.ticketsQuery = String(target.value || "").trim();
+        renderPickupTicketsPage();
+        return;
+      }
       if (target.id === "pickupTicketQuickReferenceInput") {
         state.ticketCreationDraft.quickReference = String(target.value || "");
         return;
@@ -4494,6 +4614,19 @@ function bindPickupTicketsEvents() {
         if (!lineId) return;
         const draft = state.ticketLineDraftsById[lineId] || (state.ticketLineDraftsById[lineId] = { pickedInput: "", lineNote: "", error: "" });
         draft.lineNote = String(target.value || "");
+      }
+    });
+    content.addEventListener("change", function(event) {
+      const target = event.target;
+      if (!target) return;
+      if (target.id === "ticketsPeriodFilter") {
+        state.ticketsPeriod = String(target.value || "all").trim() || "all";
+        renderPickupTicketsPage();
+        return;
+      }
+      if (target.id === "ticketsStatusFilter") {
+        state.ticketsStatusFilter = String(target.value || "").trim();
+        renderPickupTicketsPage();
       }
     });
     content.addEventListener("focusin", function(event) {
@@ -4987,7 +5120,7 @@ function updatePickupTicketLine(ticketId, lineId, request) {
     nextTicket.resolvedLineCount = resolvedLineCount;
     nextTicket.blockedLineCount = blockedLineCount;
     if (nextTicket.status !== "validated" && nextTicket.status !== "cancelled") {
-      nextTicket.status = resolvedLineCount > 0 ? "in_progress" : "draft";
+      nextTicket.status = "in_progress";
     }
     const nextEvents = (Array.isArray(currentDetail.events) ? currentDetail.events : []).concat([{
       eventId: "tmp_evt_" + Date.now() + "_" + Math.random().toString(36).slice(2, 5),
