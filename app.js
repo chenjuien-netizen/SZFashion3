@@ -32,6 +32,7 @@ const state = {
   detailOrigin: "inventory",
   nextDetailOrigin: "",
   lastInventoryView: { view: "inventory", ref: "" },
+  lastHistoryView: { view: "history", ref: "" },
   lastTicketsView: { view: "tickets", ticketId: "" },
   ticketsSubview: "list",
   detailReference: "",
@@ -449,6 +450,21 @@ function getLastInventoryRoute() {
   return { view: "inventory", ref: "" };
 }
 
+function rememberHistoryView(view, ref) {
+  if (view === "detail" && ref) {
+    state.lastHistoryView = { view: "detail", ref: normalizeReference(ref) };
+    return;
+  }
+  state.lastHistoryView = { view: "history", ref: "" };
+}
+
+function getLastHistoryRoute() {
+  if (state.lastHistoryView && state.lastHistoryView.view === "detail" && state.lastHistoryView.ref) {
+    return { view: "detail", ref: state.lastHistoryView.ref };
+  }
+  return { view: "history", ref: "" };
+}
+
 function navigateToInventoryContext() {
   const route = getLastInventoryRoute();
   if (route.view === "detail" && route.ref) state.nextDetailOrigin = "inventory";
@@ -458,6 +474,17 @@ function navigateToInventoryContext() {
 function forceInventoryListView() {
   rememberInventoryView("inventory", "");
   navigateTo("inventory");
+}
+
+function navigateToHistoryContext() {
+  const route = getLastHistoryRoute();
+  if (route.view === "detail" && route.ref) state.nextDetailOrigin = "history";
+  navigateTo(route.view, route.ref ? { ref: route.ref } : null);
+}
+
+function forceHistoryListView() {
+  rememberHistoryView("history", "");
+  navigateTo("history");
 }
 
 function rememberTicketsView(view, ticketId) {
@@ -655,8 +682,15 @@ function handleRouteChange() {
     state.previousView = route.view;
     if (route.view === "inventory" || route.view === "history") state.detailOrigin = route.view;
   }
-  if (route.view === "inventory" || route.view === "detail") {
+  if (route.view === "inventory") {
     rememberInventoryView(route.view, route.ref);
+  } else if (route.view === "detail" && state.detailOrigin === "inventory") {
+    rememberInventoryView(route.view, route.ref);
+  }
+  if (route.view === "history") {
+    rememberHistoryView(route.view, route.ref);
+  } else if (route.view === "detail" && state.detailOrigin === "history") {
+    rememberHistoryView(route.view, route.ref);
   }
   if (route.view === "tickets_new") {
     rememberTicketsView("tickets_new", "");
@@ -4554,11 +4588,11 @@ function bindInventoryEvents() {
   }
   if (navHistoryButton) {
     navHistoryButton.addEventListener("click", function() {
-      navigateTo("history");
+      navigateToHistoryContext();
     });
     navHistoryButton.addEventListener("dblclick", function(event) {
       event.preventDefault();
-      navigateTo("history");
+      forceHistoryListView();
     });
   }
   if (navTicketsButton) {
@@ -5413,7 +5447,13 @@ function initApp() {
   state.referenceImportBatch = route.view === "imports" ? route.ref : null;
   state.pickupTicket = route.view === "tickets" ? route.ref : null;
   state.ticketsSubview = route.view === "tickets_new" ? "new" : (route.view === "tickets" && route.ref ? "detail" : "list");
-  rememberInventoryView(route.view, route.ref);
+  if (route.view === "inventory") {
+    rememberInventoryView(route.view, route.ref);
+  } else if (route.view === "history") {
+    rememberHistoryView(route.view, route.ref);
+  } else if (route.view === "detail") {
+    rememberInventoryView(route.view, route.ref);
+  }
   if (route.view === "tickets_new") {
     rememberTicketsView("tickets_new", "");
   } else if (route.view === "tickets") {
