@@ -50,6 +50,14 @@ const state = {
     lines: []
   },
   ticketLineDraftsById: {},
+  ticketQuantityDropdown: {
+    open: false,
+    activeField: "",
+    activeLineId: "",
+    entry: "",
+    suggestions: [],
+    highlightedIndex: -1
+  },
   ticketReferenceDrafts: [],
   quickEditOpen: false,
   quickEditTab: "quick-exit",
@@ -2331,6 +2339,73 @@ function getAllowedQuickExitFractions_() {
   return ["1/2", "1/3", "1/4", "2/3", "2/4", "3/4"];
 }
 
+function dedupeSharedSuggestions_(values) {
+  const seen = {};
+  return (Array.isArray(values) ? values : []).filter(function(value) {
+    const key = String(value || "");
+    if (!key || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+}
+
+function buildSharedQuantitySuggestions_(item, entry, options) {
+  const settings = options || {};
+  const normalized = String(entry || "").trim();
+  const suggestions = Array.isArray(settings.baseSuggestions) ? settings.baseSuggestions.slice() : [];
+  const allowBoxes = settings.allowBoxes !== false;
+  const allowPacks = settings.allowPacks !== false;
+  const allowPieces = settings.allowPieces !== false;
+  const boxLimit = Math.max(0, Math.trunc(Number(settings.boxLimit) || 0));
+  const packLimit = Math.max(0, Math.trunc(Number(settings.packLimit) || 0));
+  const pieceLimit = Math.max(0, Math.trunc(Number(settings.pieceLimit) || 0));
+  const allowedFractions = Array.isArray(settings.allowedFractions) ? settings.allowedFractions.slice() : [];
+  const numeric = /^\d+$/.test(normalized) ? Math.max(0, Math.trunc(Number(normalized) || 0)) : 0;
+
+  if (!normalized) {
+    if (allowBoxes) {
+      for (let count = 1; count <= Math.min(boxLimit, 3); count++) suggestions.push(count + "箱");
+    }
+    if (allowPacks) {
+      for (let count = 1; count <= Math.min(packLimit, 3); count++) suggestions.push(count + "包");
+    }
+    if (allowPieces) {
+      for (let count = 1; count <= Math.min(pieceLimit, 3); count++) suggestions.push(count + "件");
+    }
+    allowedFractions.forEach(function(fractionText) {
+      suggestions.push(fractionText);
+    });
+    return dedupeSharedSuggestions_(suggestions);
+  }
+
+  if (numeric > 0) {
+    if (allowBoxes && numeric <= boxLimit) suggestions.unshift(numeric + "箱");
+    if (allowPacks && numeric <= packLimit) suggestions.unshift(numeric + "包");
+    if (allowPieces && numeric <= pieceLimit) suggestions.unshift(numeric + "件");
+  } else if (/^\d+箱$/.test(normalized)) {
+    if (allowBoxes) suggestions.unshift(normalizeQuickExitEntry_(normalized));
+  } else if (/^\d+包$/.test(normalized)) {
+    if (allowPacks) suggestions.unshift(normalizeQuickExitEntry_(normalized));
+  } else if (/^\d+件$/.test(normalized)) {
+    if (allowPieces) suggestions.unshift(normalizeQuickExitEntry_(normalized));
+  } else if (/^1\/?$/.test(normalized)) {
+    ["1/2", "1/3", "1/4"].forEach(function(fractionText) {
+      if (allowedFractions.indexOf(fractionText) >= 0) suggestions.unshift(fractionText);
+    });
+  } else if (/^2\/?$/.test(normalized)) {
+    ["2/3", "2/4"].forEach(function(fractionText) {
+      if (allowedFractions.indexOf(fractionText) >= 0) suggestions.unshift(fractionText);
+    });
+  } else if (/^3\/?$/.test(normalized) && allowedFractions.indexOf("3/4") >= 0) {
+    suggestions.unshift("3/4");
+  }
+
+  const lower = normalized.toLowerCase();
+  return dedupeSharedSuggestions_(suggestions).filter(function(suggestion) {
+    return !normalized || suggestion.toLowerCase().indexOf(lower) === 0;
+  });
+}
+
 function getQuickExitWholeBoxesLimit_(item, segment) {
   if (!item || !segment || segment.id !== "main") return 0;
   const unitsPerBox = Math.max(0, Math.trunc(Number(item.unitsPerBox) || 0));
@@ -2432,13 +2507,7 @@ function getQuickExitDefaultSuggestions_(item, segment) {
 }
 
 function dedupeQuickExitSuggestions_(values) {
-  const seen = {};
-  return values.filter(function(value) {
-    const key = String(value || "");
-    if (!key || seen[key]) return false;
-    seen[key] = true;
-    return true;
-  });
+  return dedupeSharedSuggestions_(values);
 }
 
 function buildQuickExitSuggestions_(item, segment, entry) {
@@ -2449,29 +2518,19 @@ function buildQuickExitSuggestions_(item, segment, entry) {
   const normalizedNumeric = /^\d+$/.test(normalized) ? Math.max(0, Math.trunc(Number(normalized) || 0)) : 0;
   const tailPiecesText = segment.id === "tail" ? String(Math.max(0, Math.trunc(Number(segment.availablePieces) || 0))) : "";
   const isTailNumericPrefixMatch = segment.id === "tail" && !!segment.label && normalizedNumeric > 0 && tailPiecesText.indexOf(String(normalizedNumeric)) === 0;
-  const suggestions = getQuickExitDefaultSuggestions_(currentItem, segment).slice();
-  if (!normalized) return dedupeQuickExitSuggestions_(suggestions);
+  let suggestions = buildSharedQuantitySuggestions_(currentItem, rawEntry, {
+    baseSuggestions: getQuickExitDefaultSuggestions_(currentItem, segment),
+    allowBoxes: segment.id === "main",
+    allowPacks: true,
+    allowPieces: false,
+    boxLimit: segment.id === "main" ? getQuickExitWholeBoxesLimit_(currentItem, segment) : 0,
+    packLimit: getQuickExitPackLimit_(currentItem, segment),
+    pieceLimit: 0,
+    allowedFractions: getAllowedQuickExitFractions_().filter(function(fractionText) {
+      return isQuickExitFractionAllowed_(currentItem, segment, fractionText);
+    })
+  });
   if (segment.id === "tail" && /^\($/.test(normalized) && segment.label) suggestions.unshift(segment.label);
-  if (/^\d+$/.test(normalized)) {
-    const numeric = Math.max(0, Math.trunc(Number(normalized) || 0));
-    if (numeric > 0) {
-      if (isTailNumericPrefixMatch) suggestions.unshift(segment.label);
-      if (segment.id === "main" && numeric <= getQuickExitWholeBoxesLimit_(currentItem, segment)) suggestions.unshift(numeric + "箱");
-      if (numeric <= getQuickExitPackLimit_(currentItem, segment)) suggestions.unshift(numeric + "包");
-    }
-  } else if (/^\d+包$/.test(normalized)) {
-    const packCount = Math.max(0, Math.trunc(Number(normalized.replace(/[^\d]/g, "")) || 0));
-    if (packCount > 0 && packCount <= getQuickExitPackLimit_(currentItem, segment)) suggestions.unshift(packCount + "包");
-  } else if (segment.id === "main" && /^\d+箱$/.test(normalized)) {
-    const boxCount = Math.max(0, Math.trunc(Number(normalized.replace(/[^\d]/g, "")) || 0));
-    if (boxCount > 0 && boxCount <= getQuickExitWholeBoxesLimit_(currentItem, segment)) suggestions.unshift(boxCount + "箱");
-  } else if (/^1\/?$/.test(normalized)) {
-    ["1/2", "1/3", "1/4"].forEach(function(fractionText) { if (isQuickExitFractionAllowed_(currentItem, segment, fractionText)) suggestions.unshift(fractionText); });
-  } else if (/^2\/?$/.test(normalized)) {
-    ["2/3", "2/4"].forEach(function(fractionText) { if (isQuickExitFractionAllowed_(currentItem, segment, fractionText)) suggestions.unshift(fractionText); });
-  } else if (/^3\/?$/.test(normalized) && isQuickExitFractionAllowed_(currentItem, segment, "3/4")) {
-    suggestions.unshift("3/4");
-  }
   const lower = normalized.toLowerCase();
   return dedupeQuickExitSuggestions_(suggestions).filter(function(suggestion) {
     if (!normalized) return true;
@@ -3544,6 +3603,10 @@ function getPickupTicketEventLabel(event) {
   return "Ligne confirmée";
 }
 
+function shouldDisplayPickupTicketEvent_(event) {
+  return getPickupTicketEventLabel(event) !== "Ligne rouverte";
+}
+
 function getPickupTicketEventReference(event, lines) {
   const lineId = String(event && event.lineId || "").trim();
   if (!lineId) return "";
@@ -3674,6 +3737,180 @@ function parsePickupQuantityInput(value) {
   return parseSharedQuantityInput(value, { allowFractions: true });
 }
 
+function getTicketQuantityFieldElement_() {
+  const dropdownState = state.ticketQuantityDropdown || {};
+  if (dropdownState.activeField === "create") {
+    return document.getElementById("pickupTicketQuickQuantityInput");
+  }
+  if (dropdownState.activeField === "line" && dropdownState.activeLineId) {
+    return document.querySelector('[data-role="ticket-line-picked-input"][data-line-id="' + CSS.escape(String(dropdownState.activeLineId)) + '"]');
+  }
+  return null;
+}
+
+function resolveTicketQuantityContext_(target) {
+  if (!target || !target.getAttribute) return { fieldType: "", lineId: "", reference: "", item: null };
+  if (target.id === "pickupTicketQuickQuantityInput") {
+    const reference = normalizeReference(state.ticketCreationDraft && state.ticketCreationDraft.quickReference);
+    const item = reference ? getInventoryByReference(reference) : null;
+    return { fieldType: "create", lineId: "", reference: reference, item: item };
+  }
+  if (target.matches && target.matches('[data-role="ticket-line-picked-input"]')) {
+    const lineId = String(target.getAttribute("data-line-id") || "");
+    const viewModel = state.pickupTicket ? getPickupTicketViewModel(state.pickupTicket) : null;
+    const line = viewModel && Array.isArray(viewModel.lines)
+      ? viewModel.lines.find(function(entry) { return String(entry && entry.lineId || "") === lineId; })
+      : null;
+    const reference = normalizeReference(line && line.reference);
+    return {
+      fieldType: "line",
+      lineId: lineId,
+      reference: reference,
+      item: reference ? getInventoryByReference(reference) : null
+    };
+  }
+  return { fieldType: "", lineId: "", reference: "", item: null };
+}
+
+function getTicketAllowedFractions_(item) {
+  if (!item) return getAllowedQuickExitFractions_().slice();
+  const unitsPerBox = Math.max(0, toInt(item.unitsPerBox));
+  if (!(unitsPerBox > 0)) return [];
+  return getAllowedQuickExitFractions_().filter(function(fractionText) {
+    const pieces = Math.round(unitsPerBox * parseFractionValue(fractionText));
+    return pieces > 0 && Math.abs((unitsPerBox * parseFractionValue(fractionText)) - pieces) < 1e-9;
+  });
+}
+
+function buildTicketQuantitySuggestions_(item, entry) {
+  const totalPieces = Math.max(0, Math.round(item ? stateModelToPieces(item) : 0));
+  const unitsPerBox = Math.max(0, toInt(item && item.unitsPerBox));
+  const colisage = Math.max(0, toInt(item && item.colisage));
+  const genericFractions = ["1/2", "2/3"];
+  const rawSuggestions = buildSharedQuantitySuggestions_(item, entry, {
+    baseSuggestions: [],
+    allowBoxes: true,
+    allowPacks: true,
+    allowPieces: true,
+    boxLimit: item ? Math.max(0, Math.floor(totalPieces / Math.max(1, unitsPerBox))) : 3,
+    packLimit: item ? Math.max(0, Math.floor(totalPieces / Math.max(1, colisage))) : 3,
+    pieceLimit: item ? Math.min(totalPieces, 12) : 12,
+    allowedFractions: item ? getTicketAllowedFractions_(item) : genericFractions
+  });
+  return rawSuggestions.filter(function(suggestion) {
+    const parsed = parseSharedQuantityInput(suggestion, { allowFractions: true });
+    if (!parsed || !parsed.ok) return false;
+    if (!item || parsed.kind !== "fraction") return true;
+    const resolved = resolvePickupParsedQuantityForLine({ reference: item.reference || "" }, parsed);
+    return !!(resolved && resolved.ok);
+  });
+}
+
+function setTicketQuantityDropdownState_(patch) {
+  state.ticketQuantityDropdown = Object.assign({}, state.ticketQuantityDropdown || {}, patch || {});
+}
+
+function closeTicketQuantityDropdown_(options) {
+  setTicketQuantityDropdownState_({
+    open: false,
+    activeField: "",
+    activeLineId: "",
+    entry: "",
+    suggestions: [],
+    highlightedIndex: -1
+  });
+  if (!(options && options.skipRender)) renderTicketQuantityDropdown_();
+}
+
+function openTicketQuantityDropdown_(target, entry) {
+  const context = resolveTicketQuantityContext_(target);
+  if (!context.fieldType) return;
+  const suggestions = buildTicketQuantitySuggestions_(context.item, entry);
+  setTicketQuantityDropdownState_({
+    open: suggestions.length > 0,
+    activeField: context.fieldType,
+    activeLineId: context.lineId,
+    entry: String(entry || ""),
+    suggestions: suggestions,
+    highlightedIndex: suggestions.length ? 0 : -1
+  });
+  renderTicketQuantityDropdown_();
+}
+
+function moveTicketQuantityDropdownSelection_(direction) {
+  const dropdownState = state.ticketQuantityDropdown || {};
+  const suggestions = Array.isArray(dropdownState.suggestions) ? dropdownState.suggestions : [];
+  if (!dropdownState.open || !suggestions.length) return;
+  const currentIndex = Math.max(-1, Math.min(Number(dropdownState.highlightedIndex || -1), suggestions.length - 1));
+  const nextIndex = direction === "up"
+    ? (currentIndex <= 0 ? suggestions.length - 1 : currentIndex - 1)
+    : (currentIndex >= suggestions.length - 1 ? 0 : currentIndex + 1);
+  setTicketQuantityDropdownState_({ highlightedIndex: nextIndex });
+  renderTicketQuantityDropdown_();
+}
+
+function applyTicketQuantityFieldValue_(target, value) {
+  if (!target) return;
+  const normalizedValue = normalizeQuickExitEntry_(value);
+  if (target.id === "pickupTicketQuickQuantityInput") {
+    state.ticketCreationDraft.quickQuantity = normalizedValue;
+  } else if (target.matches && target.matches('[data-role="ticket-line-picked-input"]')) {
+    const lineId = String(target.getAttribute("data-line-id") || "");
+    if (lineId) {
+      const draft = state.ticketLineDraftsById[lineId] || (state.ticketLineDraftsById[lineId] = { pickedInput: "", lineNote: "", error: "" });
+      draft.pickedInput = normalizedValue;
+      draft.error = "";
+    }
+  }
+  target.value = normalizedValue;
+}
+
+function applyTicketQuantitySuggestionSelection_(suggestion) {
+  const target = getTicketQuantityFieldElement_();
+  if (!target) {
+    closeTicketQuantityDropdown_();
+    return;
+  }
+  applyTicketQuantityFieldValue_(target, suggestion);
+  closeTicketQuantityDropdown_({ skipRender: true });
+  renderTicketQuantityDropdown_();
+  if (target && target.focus) target.focus({ preventScroll: true });
+}
+
+function renderTicketQuantityDropdown_() {
+  const layer = document.getElementById("ticketQuantityDropdownLayer");
+  const wrap = document.getElementById("pickupTicketsContentWrap");
+  const dropdownState = state.ticketQuantityDropdown || {};
+  const target = getTicketQuantityFieldElement_();
+  if (!layer || !wrap || !dropdownState.open || !target) {
+    if (layer) {
+      layer.innerHTML = "";
+      layer.classList.add("hidden");
+    }
+    return;
+  }
+  const suggestions = Array.isArray(dropdownState.suggestions) ? dropdownState.suggestions : [];
+  if (!suggestions.length) {
+    layer.innerHTML = "";
+    layer.classList.add("hidden");
+    return;
+  }
+  const wrapRect = wrap.getBoundingClientRect();
+  const inputRect = target.getBoundingClientRect();
+  const dropdownWidth = Math.max(150, Math.round(inputRect.width));
+  const left = Math.max(0, Math.round(inputRect.left - wrapRect.left));
+  const top = Math.max(0, Math.round(inputRect.bottom - wrapRect.top + 4));
+  const highlightedIndex = Math.max(-1, Math.min(Number(dropdownState.highlightedIndex || -1), suggestions.length - 1));
+  layer.innerHTML = '<div class="pointer-events-auto absolute overflow-y-auto rounded border border-outline-variant/40 bg-surface-container-lowest shadow-[0_16px_32px_rgba(11,15,16,0.24)]" style="left:' + left + 'px;top:' + top + 'px;width:' + dropdownWidth + 'px;max-height:220px;">'
+    + suggestions.map(function(suggestion, index) {
+      return '<button class="flex w-full items-center justify-between border-b border-outline-variant/10 px-3 py-2 text-left text-[12px] font-medium transition-colors duration-150 last:border-b-0 '
+        + (index === highlightedIndex ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container')
+        + '" data-ticket-quantity-suggestion="' + escapeHtml(suggestion) + '" type="button"><span>' + escapeHtml(suggestion) + '</span></button>';
+    }).join("")
+    + '</div>';
+  layer.classList.remove("hidden");
+}
+
 function resolvePickupParsedQuantityForLine(line, parsedQuantity) {
   if (!parsedQuantity || !parsedQuantity.ok) return { ok: false, error: parsedQuantity && parsedQuantity.error ? parsedQuantity.error : "Valeur invalide." };
   if (parsedQuantity.kind !== "fraction") {
@@ -3769,14 +4006,13 @@ function renderPickupTicketCreationView() {
     + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketTitleInput" placeholder="Titre (optionnel)" type="text" value="' + escapeHtml(draft.title || "") + '" />'
     + '<div class="grid grid-cols-[minmax(0,1fr)_7.5rem_auto] gap-2">'
     + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketQuickReferenceInput" placeholder="Référence" type="text" value="' + escapeHtml(draft.quickReference || "") + '" />'
-    + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketQuickQuantityInput" placeholder="2箱" type="text" value="' + escapeHtml(draft.quickQuantity || "") + '" />'
+    + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketQuickQuantityInput" inputmode="decimal" placeholder="2箱 / 1/2" type="text" value="' + escapeHtml(draft.quickQuantity || "") + '" />'
     + '<button class="border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" data-action="add-ticket-draft-line" type="button">Ajouter</button>'
     + '</div>'
     + '</div>'
     + '<div class="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Saisie rapide</div>'
     + '<textarea class="mt-2 min-h-[7rem] w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketRequestTextInput" placeholder="REF&#10;REF 2箱&#10;REF 5包">' + escapeHtml(draft.requestTextRaw || "") + '</textarea>'
     + '<button class="mt-2 border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" data-action="add-ticket-text-lines" type="button">Ajouter au ticket</button>'
-    + '<textarea class="mt-4 min-h-[4.5rem] w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketGlobalNoteInput" placeholder="Note ticket (optionnel)">' + escapeHtml(draft.globalNote || "") + '</textarea>'
     + '<div class="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Lignes prêtes</div>'
     + (lines.length
       ? '<div class="mt-2 flex flex-col gap-2">' + lines.map(function(line, index) {
@@ -3820,7 +4056,7 @@ function renderPickupTicketDetailView(selectedTicket) {
     return '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Ticket introuvable.</div>';
   }
   const lines = Array.isArray(selectedTicket.lines) ? selectedTicket.lines : [];
-  const events = Array.isArray(selectedTicket.events) ? selectedTicket.events : [];
+  const events = (Array.isArray(selectedTicket.events) ? selectedTicket.events : []).filter(shouldDisplayPickupTicketEvent_);
   const editable = canEditPickupTicket(ticket);
   const serverReady = isPickupTicketServerReady(ticket);
   const canValidate = editable && lines.some(function(line) {
@@ -3867,7 +4103,7 @@ function renderPickupTicketDetailView(selectedTicket) {
           + '</div>'
         : '<div class="mt-2 grid gap-2">'
           + '<div class="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto_auto] items-center gap-2">'
-          + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" data-role="ticket-line-picked-input" data-line-id="' + escapeHtml(line.lineId || "") + '" placeholder="2箱 / 1/2" type="text" value="' + escapeHtml(draft.pickedInput || "") + '" />'
+          + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" data-role="ticket-line-picked-input" data-line-id="' + escapeHtml(line.lineId || "") + '" inputmode="decimal" placeholder="2箱 / 1/2" type="text" value="' + escapeHtml(draft.pickedInput || "") + '" />'
           + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" data-role="ticket-line-note-input" data-line-id="' + escapeHtml(line.lineId || "") + '" placeholder="' + escapeHtml(line.status === "not_found" ? "Précision introuvable..." : "Commentaire") + '" type="text" value="' + escapeHtml(draft.lineNote || "") + '" />'
           + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="save-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button"' + (serverActionDisabled ? ' disabled' : '') + '>Confirmer</button>'
           + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="mark-ticket-line-not-found" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button"' + (serverActionDisabled ? ' disabled' : '') + '>Introuvable</button>'
@@ -3928,21 +4164,25 @@ function renderPickupTicketsPage() {
           ? ("Ticket " + formatPickupTicketNumberForDisplay((selectedTicket && selectedTicket.ticket ? selectedTicket.ticket.ticketNumber : selectedTicketSummary.ticketNumber) || selectedTicketId))
           : "Sorties entrepôt");
   }
+  const setTicketContent = function(markup) {
+    content.innerHTML = '<div id="pickupTicketsContentWrap" class="relative">' + markup + '<div id="ticketQuantityDropdownLayer" class="pointer-events-none absolute inset-0 z-20 hidden"></div></div>';
+    renderTicketQuantityDropdown_();
+  };
   if (subview === "new") {
-    content.innerHTML = renderPickupTicketCreationView();
+    setTicketContent(renderPickupTicketCreationView());
     return;
   }
   if (subview === "detail") {
     if (selectedTicket) {
-      content.innerHTML = renderPickupTicketDetailView(selectedTicket);
+      setTicketContent(renderPickupTicketDetailView(selectedTicket));
       return;
     }
-    content.innerHTML = state.pickupTicketMissingConfirmed
+    setTicketContent(state.pickupTicketMissingConfirmed
       ? '<div class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Ticket introuvable.</div>'
-      : renderPickupTicketDetailLoadingView(selectedTicketId);
+      : renderPickupTicketDetailLoadingView(selectedTicketId));
     return;
   }
-  content.innerHTML = renderPickupTicketsListView(tickets);
+  setTicketContent(renderPickupTicketsListView(tickets));
 }
 
 function renderAll() {
@@ -4198,16 +4438,13 @@ function bindPickupTicketsEvents() {
         state.ticketCreationDraft.quickReference = String(target.value || "");
         return;
       }
-      if (target.id === "pickupTicketQuickQuantityInput") {
-        state.ticketCreationDraft.quickQuantity = String(target.value || "");
-        return;
-      }
       if (target.id === "pickupTicketRequestTextInput") {
         state.ticketCreationDraft.requestTextRaw = String(target.value || "");
         return;
       }
-      if (target.id === "pickupTicketGlobalNoteInput") {
-        state.ticketCreationDraft.globalNote = String(target.value || "");
+      if (target.id === "pickupTicketQuickQuantityInput") {
+        state.ticketCreationDraft.quickQuantity = String(target.value || "");
+        openTicketQuantityDropdown_(target, target.value || "");
         return;
       }
       if (target.matches('[data-role="ticket-line-picked-input"]')) {
@@ -4216,6 +4453,7 @@ function bindPickupTicketsEvents() {
         const draft = state.ticketLineDraftsById[lineId] || (state.ticketLineDraftsById[lineId] = { pickedInput: "", lineNote: "", error: "" });
         draft.pickedInput = String(target.value || "");
         draft.error = "";
+        openTicketQuantityDropdown_(target, target.value || "");
         return;
       }
       if (target.matches('[data-role="ticket-line-note-input"]')) {
@@ -4225,11 +4463,76 @@ function bindPickupTicketsEvents() {
         draft.lineNote = String(target.value || "");
       }
     });
+    content.addEventListener("focusin", function(event) {
+      const target = event.target;
+      if (!target) return;
+      if (target.id === "pickupTicketQuickQuantityInput" || (target.matches && target.matches('[data-role="ticket-line-picked-input"]'))) {
+        openTicketQuantityDropdown_(target, target.value || "");
+      }
+    });
+    content.addEventListener("focusout", function(event) {
+      const target = event.target;
+      if (!target) return;
+      if (!(target.id === "pickupTicketQuickQuantityInput" || (target.matches && target.matches('[data-role="ticket-line-picked-input"]')))) return;
+      window.setTimeout(function() {
+        const active = document.activeElement;
+        if (active && active.closest && active.closest("#ticketQuantityDropdownLayer")) return;
+        const sameField = active && active.getAttribute && target.getAttribute
+          && String(active.id || "") === String(target.id || "")
+          && String(active.getAttribute("data-line-id") || "") === String(target.getAttribute("data-line-id") || "");
+        if (sameField) return;
+        closeTicketQuantityDropdown_();
+      }, 0);
+    });
+    content.addEventListener("keydown", function(event) {
+      const target = event.target;
+      if (!target) return;
+      const isQuantityField = target.id === "pickupTicketQuickQuantityInput" || (target.matches && target.matches('[data-role="ticket-line-picked-input"]'));
+      if (!isQuantityField) return;
+      const dropdownState = state.ticketQuantityDropdown || {};
+      const suggestions = Array.isArray(dropdownState.suggestions) ? dropdownState.suggestions : [];
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (!dropdownState.open) {
+          openTicketQuantityDropdown_(target, target.value || "");
+          return;
+        }
+        moveTicketQuantityDropdownSelection_("down");
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (!dropdownState.open) {
+          openTicketQuantityDropdown_(target, target.value || "");
+          return;
+        }
+        moveTicketQuantityDropdownSelection_("up");
+      } else if (event.key === "Enter" && dropdownState.open && suggestions.length) {
+        const highlightedIndex = Math.max(0, Math.min(Number(dropdownState.highlightedIndex || 0), suggestions.length - 1));
+        if (suggestions[highlightedIndex]) {
+          event.preventDefault();
+          applyTicketQuantitySuggestionSelection_(suggestions[highlightedIndex]);
+        }
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        closeTicketQuantityDropdown_();
+        if (target.focus) target.focus({ preventScroll: true });
+      }
+    });
   }
   if (content) {
+    content.addEventListener("mousedown", function(event) {
+      const trigger = event.target.closest("[data-ticket-quantity-suggestion]");
+      if (!trigger) return;
+      event.preventDefault();
+    });
     content.addEventListener("click", function(event) {
+      const suggestionTrigger = event.target.closest("[data-ticket-quantity-suggestion]");
+      if (suggestionTrigger) {
+        applyTicketQuantitySuggestionSelection_(suggestionTrigger.getAttribute("data-ticket-quantity-suggestion"));
+        return;
+      }
       const openTrigger = event.target.closest('[data-action="open-ticket"]');
       if (openTrigger) {
+        closeTicketQuantityDropdown_({ skipRender: true });
         navigateTo("tickets", { ref: openTrigger.getAttribute("data-ticket-id") });
         return;
       }
@@ -4288,6 +4591,10 @@ function bindPickupTicketsEvents() {
       const createTrigger = event.target.closest("#pickupTicketCreateButton");
       if (createTrigger) {
         createPickupTicketFromDraft();
+        return;
+      }
+      if (!event.target.closest("#ticketQuantityDropdownLayer") && !(event.target.id === "pickupTicketQuickQuantityInput" || (event.target.matches && event.target.matches('[data-role="ticket-line-picked-input"]')))) {
+        closeTicketQuantityDropdown_();
       }
     });
   }
