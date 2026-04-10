@@ -3570,9 +3570,41 @@ function renderReferenceImportsPage() {
 }
 
 function getPickupTicketUiStatus(status) {
+  if (status === "draft") return "Brouillon";
+  if (status === "in_progress") return "En cours";
   if (status === "validated") return "Validé";
   if (status === "cancelled") return "Annulé";
-  return "À préparer";
+  return "Brouillon";
+}
+
+function getPickupTicketTone(status) {
+  const safeStatus = String(status || "").trim();
+  if (safeStatus === "validated") {
+    return {
+      article: "border-emerald-300/60 bg-emerald-50/30",
+      badge: "bg-emerald-100 text-emerald-800",
+      counter: "text-emerald-700"
+    };
+  }
+  if (safeStatus === "cancelled") {
+    return {
+      article: "border-slate-400/70 bg-slate-100/50",
+      badge: "bg-slate-200 text-slate-700",
+      counter: "text-slate-600"
+    };
+  }
+  if (safeStatus === "in_progress") {
+    return {
+      article: "border-amber-300/70 bg-amber-50/35",
+      badge: "bg-amber-100 text-amber-800",
+      counter: "text-amber-700"
+    };
+  }
+  return {
+    article: "border-slate-300/60 bg-surface-container-lowest",
+    badge: "bg-slate-100 text-slate-700",
+    counter: "text-on-surface-variant"
+  };
 }
 
 function formatPickupTicketNumberForDisplay(ticketNumber) {
@@ -3955,22 +3987,23 @@ function getTicketRefsPreview(ticket) {
 function renderPickupTicketListCard(ticket) {
   const ticketId = String(ticket && ticket.ticketId || "");
   const expanded = Boolean(state.expandedTicketIds && state.expandedTicketIds[ticketId]);
+  const tone = getPickupTicketTone(ticket && ticket.status);
   const cachedDetail = dataSource && dataSource.loadPickupTicket ? dataSource.loadPickupTicket(ticketId) : null;
   const detailLines = cachedDetail && Array.isArray(cachedDetail.lines) && cachedDetail.lines.length ? cachedDetail.lines : null;
   const parsedLines = detailLines || parsePickupTicketTextLines(ticket && ticket.requestTextRaw);
   const previewLines = expanded ? parsedLines : [];
-  return '<article class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
+  return '<article class="border ' + escapeHtml(tone.article) + ' p-3 shadow-ledger">'
     + '<div class="flex items-start justify-between gap-3">'
     + '<div class="min-w-0">'
     + '<button class="truncate text-left text-[12px] font-bold tracking-tight text-primary" data-action="open-ticket" data-ticket-id="' + escapeHtml(ticketId) + '" type="button">' + escapeHtml(formatPickupTicketNumberForDisplay(ticket.ticketNumber || "-")) + '</button>'
-    + '<div class="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">' + escapeHtml(getPickupTicketUiStatus(ticket.status)) + '</div>'
+    + '<div class="mt-1 inline-flex rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ' + escapeHtml(tone.badge) + '">' + escapeHtml(getPickupTicketUiStatus(ticket.status)) + '</div>'
     + '</div>'
     + '<div class="shrink-0 text-right text-[10px] text-on-surface-variant">' + escapeHtml(formatDateLabel(ticket.createdAt)) + '</div>'
     + '</div>'
     + '<div class="mt-2 text-[11px] text-on-surface-variant">' + escapeHtml((ticket.title || "Sans titre") + " · " + (ticket.lineCount || 0) + " lignes") + '</div>'
     + '<div class="mt-1 text-[11px] font-medium text-on-surface">' + escapeHtml(getTicketRefsPreview(ticket)) + '</div>'
     + '<div class="mt-2 flex items-center justify-between gap-2">'
-    + '<div class="text-[10px] uppercase tracking-[0.14em] text-on-surface-variant">' + escapeHtml((ticket.resolvedLineCount || 0) + "/" + (ticket.lineCount || 0) + " traitées") + '</div>'
+    + '<div class="text-[10px] uppercase tracking-[0.14em] ' + escapeHtml(tone.counter) + '">' + escapeHtml((ticket.resolvedLineCount || 0) + "/" + (ticket.lineCount || 0) + " traitées") + '</div>'
     + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="toggle-ticket-preview" data-ticket-id="' + escapeHtml(ticketId) + '" type="button">' + escapeHtml(expanded ? "Masquer refs" : "Afficher refs") + '</button>'
     + '</div>'
     + (previewLines.length ? '<div class="mt-2 flex flex-col gap-1 border-t border-outline-variant/20 pt-2">'
