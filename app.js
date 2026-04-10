@@ -436,12 +436,14 @@ function applyLocalPickupTicketsState(ticketId) {
   state.pickupTicketsLoaded = true;
   if (ticketId && dataSource.loadPickupTicket) {
     const detailResult = dataSource.loadPickupTicket(ticketId);
+    if (detailResult && detailResult.ticket) {
+      seedPickupTicketLineDrafts(ticketId);
+    }
     state.pickupTicketData = detailResult && detailResult.ticket ? {
       ticket: detailResult.ticket,
       lines: Array.isArray(detailResult.lines) ? detailResult.lines : [],
       events: Array.isArray(detailResult.events) ? detailResult.events : []
     } : null;
-    if (state.pickupTicketData) seedPickupTicketLineDrafts();
     state.pickupTicketMissingConfirmed = false;
   } else if (!ticketId) {
     state.pickupTicketData = null;
@@ -480,7 +482,49 @@ function mergeRemotePickupTicketDetail(payload, generatedAt) {
     lines: Array.isArray(payload.lines) ? payload.lines : [],
     events: Array.isArray(payload.events) ? payload.events : []
   };
-  seedPickupTicketLineDrafts();
+  seedPickupTicketLineDrafts(payload.ticket && payload.ticket.ticketId);
+}
+
+function getPickupTicketDetail(ticketId) {
+  const normalizedTicketId = String(ticketId || "").trim();
+  if (!normalizedTicketId || !dataSource || !dataSource.loadPickupTicket) {
+    return { ticket: null, lines: [], events: [] };
+  }
+  const detail = dataSource.loadPickupTicket(normalizedTicketId);
+  return {
+    ticket: detail && detail.ticket ? detail.ticket : null,
+    lines: detail && Array.isArray(detail.lines) ? detail.lines : [],
+    events: detail && Array.isArray(detail.events) ? detail.events : []
+  };
+}
+
+function getPickupTicketViewModel(ticketId) {
+  const normalizedTicketId = String(ticketId || "").trim();
+  const tickets = Array.isArray(state.pickupTickets) ? state.pickupTickets : [];
+  const summary = normalizedTicketId ? tickets.find(function(entry) {
+    return String(entry && entry.ticketId || "") === normalizedTicketId;
+  }) : null;
+  const detail = normalizedTicketId ? getPickupTicketDetail(normalizedTicketId) : { ticket: null, lines: [], events: [] };
+  const ticket = detail.ticket || summary || null;
+  const lines = detail.ticket ? detail.lines : [];
+  const events = detail.ticket ? detail.events : [];
+  const editable = canEditPickupTicket(ticket);
+  const serverReady = isPickupTicketServerReady(ticket);
+  return {
+    ticketId: normalizedTicketId,
+    summary: summary,
+    ticket: ticket,
+    lines: lines,
+    events: events,
+    existsLocally: Boolean(detail.ticket || summary),
+    hasDetail: Boolean(detail.ticket),
+    isOptimistic: isOptimisticPickupTicketId(normalizedTicketId),
+    isServerReady: Boolean(ticket && serverReady),
+    editable: Boolean(ticket && editable),
+    canValidate: Boolean(ticket && editable && serverReady && lines.some(function(line) {
+      return line.status === "ready" || line.status === "partial" || line.status === "not_found";
+    }))
+  };
 }
 
 function getPickupLineAvailableStockDisplay(line) {
@@ -3871,11 +3915,9 @@ function renderPickupTicketsPage() {
   if (!content) return;
   const tickets = Array.isArray(state.pickupTickets) ? state.pickupTickets : [];
   const selectedTicketId = state.pickupTicket ? String(state.pickupTicket) : "";
-  const selectedTicketSummary = selectedTicketId ? tickets.find(function(entry) {
-    return String(entry && entry.ticketId || "") === selectedTicketId;
-  }) : null;
-  const selectedTicket = selectedTicketId && state.pickupTicketData && state.pickupTicketData.ticket
-    && String(state.pickupTicketData.ticket.ticketId || "") === selectedTicketId ? state.pickupTicketData : null;
+  const selectedTicketVm = selectedTicketId ? getPickupTicketViewModel(selectedTicketId) : null;
+  const selectedTicketSummary = selectedTicketVm && selectedTicketVm.summary ? selectedTicketVm.summary : null;
+  const selectedTicket = selectedTicketVm && selectedTicketVm.ticket ? selectedTicketVm : null;
   const subview = state.ticketsSubview || "list";
   if (backButton) backButton.classList.toggle("hidden", subview === "list");
   if (newButton) newButton.classList.toggle("hidden", subview !== "list");
@@ -4298,7 +4340,11 @@ function loadPickupTicketData(ticketId, options) {
     state.pickupTicketPendingServerId = "";
   }
   state.pickupTicketMissingConfirmed = false;
-  state.pickupTicketLoading = Boolean(normalizedTicketId && includeDetail && !(state.pickupTicketData && state.pickupTicketData.ticket) && !isOptimisticPickupTicketId(normalizedTicketId));
+  const localViewModel = normalizedTicketId ? getPickupTicketViewModel(normalizedTicketId) : null;
+  if (localViewModel && localViewModel.hasDetail) {
+    seedPickupTicketLineDrafts(normalizedTicketId);
+  }
+  state.pickupTicketLoading = Boolean(normalizedTicketId && includeDetail && !(localViewModel && localViewModel.hasDetail) && !isOptimisticPickupTicketId(normalizedTicketId));
   renderPickupTicketsPage();
   if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) {
     return Promise.resolve(false);
@@ -4310,7 +4356,7 @@ function loadPickupTicketData(ticketId, options) {
     tasks.push(refreshRemotePickupTickets({ silent: true }));
   }
   if (normalizedTicketId && includeDetail) {
-    if (!(state.pickupTicketData && state.pickupTicketData.ticket)) {
+    if (!(localViewModel && localViewModel.hasDetail)) {
       tasks.push(refreshRemotePickupTicket(normalizedTicketId, { silent: true }));
     } else {
       state.pickupTicketLoading = false;
@@ -4324,8 +4370,10 @@ function loadPickupTicketData(ticketId, options) {
   });
 }
 
-function seedPickupTicketLineDrafts() {
-  const lines = state.pickupTicketData && Array.isArray(state.pickupTicketData.lines) ? state.pickupTicketData.lines : [];
+function seedPickupTicketLineDrafts(ticketId) {
+  const normalizedTicketId = String(ticketId || state.pickupTicket || "").trim();
+  const detail = normalizedTicketId ? getPickupTicketDetail(normalizedTicketId) : { ticket: null, lines: [] };
+  const lines = Array.isArray(detail.lines) ? detail.lines : [];
   const nextDrafts = {};
   lines.forEach(function(line) {
     const lineId = String(line && line.lineId || "");
@@ -4516,12 +4564,8 @@ function createPickupTicketFromDraft() {
     state.pickupTicket = optimisticResult.ticket.ticketId;
     state.pickupTicketCreatePending = true;
     state.pickupTicketPendingServerId = optimisticResult.ticket.ticketId;
-    state.pickupTicketData = {
-      ticket: optimisticResult.ticket,
-      lines: optimisticResult.lines,
-      events: optimisticResult.events
-    };
-    seedPickupTicketLineDrafts();
+    applyLocalPickupTicketsState(optimisticResult.ticket.ticketId);
+    seedPickupTicketLineDrafts(optimisticResult.ticket.ticketId);
     navigateTo("tickets", { ref: optimisticResult.ticket.ticketId });
   }
   const requestTextRaw = buildPickupTicketRequestText(lines);
@@ -4555,12 +4599,8 @@ function createPickupTicketFromDraft() {
     state.pickupTicketCreatePending = false;
     state.pickupTicketPendingServerId = "";
     state.pickupTicket = result.ticket.ticketId;
-    state.pickupTicketData = {
-      ticket: result.ticket,
-      lines: Array.isArray(result.lines) ? result.lines : [],
-      events: Array.isArray(result.events) ? result.events : []
-    };
-    seedPickupTicketLineDrafts();
+    applyLocalPickupTicketsState(result.ticket.ticketId);
+    seedPickupTicketLineDrafts(result.ticket.ticketId);
     navigateTo("tickets", { ref: result.ticket.ticketId });
   }).catch(function(error) {
     if (dataSource && dataSource.discardOptimisticPickupTicket && optimisticResult) {
@@ -4581,7 +4621,7 @@ function updatePickupTicketLine(ticketId, lineId, request) {
     window.alert("Le ticket est encore en cours de création. Réessaie dans un instant.");
     return Promise.resolve(false);
   }
-  const currentDetail = state.pickupTicketData;
+  const currentDetail = getPickupTicketDetail(ticketId);
   if (currentDetail && currentDetail.ticket && String(currentDetail.ticket.ticketId || "") === String(ticketId || "")) {
     const nextTicket = Object.assign({}, currentDetail.ticket);
     const nextLines = (Array.isArray(currentDetail.lines) ? currentDetail.lines : []).map(function(line) {
@@ -4624,17 +4664,18 @@ function updatePickupTicketLine(ticketId, lineId, request) {
       const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail);
       state.pickupTickets = saved.items;
     }
-    state.pickupTicketData = optimisticDetail;
-    seedPickupTicketLineDrafts();
+    applyLocalPickupTicketsState(ticketId);
+    seedPickupTicketLineDrafts(ticketId);
     renderPickupTicketsPage();
   }
+  const latestDetail = getPickupTicketDetail(ticketId);
   return pushOnlineMutation({
     type: "resolve_pickup_ticket_line",
     request: Object.assign({
       ticketId: ticketId,
       lineId: lineId,
       updatedBy: "webapp",
-      version: state.pickupTicketData && state.pickupTicketData.ticket ? state.pickupTicketData.ticket.version : 0
+      version: latestDetail && latestDetail.ticket ? latestDetail.ticket.version : 0
     }, request)
   }).then(function() {
     return loadPickupTicketData(ticketId, { includeDetail: true });
@@ -4655,8 +4696,9 @@ function handleEditPickupTicketLine(ticketId, lineId) {
 
 function handleMarkPickupTicketLineNotFound(ticketId, lineId) {
   if (!ticketId || !lineId) return;
-  const line = state.pickupTicketData && Array.isArray(state.pickupTicketData.lines)
-    ? state.pickupTicketData.lines.find(function(entry) { return String(entry.lineId || "") === String(lineId); })
+  const detail = getPickupTicketDetail(ticketId);
+  const line = Array.isArray(detail.lines)
+    ? detail.lines.find(function(entry) { return String(entry.lineId || "") === String(lineId); })
     : null;
   const draft = state.ticketLineDraftsById[lineId] || {};
   return updatePickupTicketLine(ticketId, lineId, {
@@ -4669,8 +4711,9 @@ function handleMarkPickupTicketLineNotFound(ticketId, lineId) {
 
 function handleSavePickupTicketLine(ticketId, lineId) {
   if (!ticketId || !lineId) return;
-  const line = state.pickupTicketData && Array.isArray(state.pickupTicketData.lines)
-    ? state.pickupTicketData.lines.find(function(entry) { return String(entry.lineId || "") === String(lineId); })
+  const detail = getPickupTicketDetail(ticketId);
+  const line = Array.isArray(detail.lines)
+    ? detail.lines.find(function(entry) { return String(entry.lineId || "") === String(lineId); })
     : null;
   const draft = state.ticketLineDraftsById[lineId] || {};
   const parsedQuantity = parsePickupQuantityInput(draft.pickedInput || "");
@@ -4702,12 +4745,13 @@ function handleSavePickupTicketLine(ticketId, lineId) {
 }
 
 function handleValidateTicket(ticketId) {
-  if (!ticketId || !state.pickupTicketData || !state.pickupTicketData.lines) return;
+  const currentDetail = getPickupTicketDetail(ticketId);
+  if (!ticketId || !currentDetail || !currentDetail.ticket || !currentDetail.lines) return;
   if (isOptimisticPickupTicketId(ticketId) || (state.pickupTicketCreatePending && state.pickupTicketPendingServerId === String(ticketId))) {
     window.alert("Le ticket est encore en cours de création. Attends sa confirmation serveur avant de valider.");
     return;
   }
-  const readyLines = state.pickupTicketData.lines.filter(function(line) {
+  const readyLines = currentDetail.lines.filter(function(line) {
     return (line.status === "ready" || line.status === "partial") && line.pickedUnit && Number(line.pickedQuantity || 0) > 0;
   }).map(function(line) {
     return {
@@ -4719,19 +4763,19 @@ function handleValidateTicket(ticketId) {
   });
   if (dataSource && dataSource.saveOptimisticPickupTicketDetail) {
     const optimisticDetail = {
-      ticket: Object.assign({}, state.pickupTicketData.ticket, {
+      ticket: Object.assign({}, currentDetail.ticket, {
         status: "validated",
         updatedAt: new Date().toISOString(),
         validatedAt: new Date().toISOString(),
         validatedBy: "webapp"
       }),
-      lines: state.pickupTicketData.lines.map(function(line) {
+      lines: currentDetail.lines.map(function(line) {
         if (line.status === "ready" || line.status === "partial") {
           return Object.assign({}, line, { status: "validated" });
         }
         return Object.assign({}, line);
       }),
-      events: (Array.isArray(state.pickupTicketData.events) ? state.pickupTicketData.events : []).concat([{
+      events: (Array.isArray(currentDetail.events) ? currentDetail.events : []).concat([{
         eventId: "tmp_evt_" + Date.now(),
         ticketId: ticketId,
         lineId: "",
@@ -4744,15 +4788,16 @@ function handleValidateTicket(ticketId) {
     };
     const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail);
     state.pickupTickets = saved.items;
-    state.pickupTicketData = optimisticDetail;
+    applyLocalPickupTicketsState(ticketId);
     renderPickupTicketsPage();
   }
+  const latestDetail = getPickupTicketDetail(ticketId);
   pushOnlineMutation({
     type: "validate_pickup_ticket",
     request: {
       ticketId: ticketId,
       validatedBy: "webapp",
-      version: state.pickupTicketData && state.pickupTicketData.ticket ? state.pickupTicketData.ticket.version : 0,
+      version: latestDetail && latestDetail.ticket ? latestDetail.ticket.version : 0,
       lines: readyLines
     }
   }).then(function() {
@@ -4847,7 +4892,7 @@ function initApp() {
   if (state.currentView === "detail" && state.detailReference) {
     refreshRemoteDetail(state.detailReference, { silent: true });
   }
-  if (route.view === "tickets" && state.pickupTicket && !(state.pickupTicketData && state.pickupTicketData.ticket)) {
+  if (route.view === "tickets" && state.pickupTicket && !getPickupTicketViewModel(state.pickupTicket).hasDetail) {
     refreshRemotePickupTicket(state.pickupTicket, { silent: true });
   }
   if (state.currentView === "imports") {
