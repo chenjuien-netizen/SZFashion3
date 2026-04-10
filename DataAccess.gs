@@ -1773,6 +1773,8 @@ function applyCreatePickupTicketMutation_(mutation) {
   const ticketNumber = generatePickupTicketNumber_(ticketsSheet);
   const createdAt = new Date().toISOString();
   const requestLines = Array.isArray(request.lines) ? request.lines : [];
+  const clientTicketId = String(request.clientTicketId || "").trim();
+  const lineMappings = [];
 
   ticketsSheet.appendRow([
     ticketId,
@@ -1795,8 +1797,13 @@ function applyCreatePickupTicketMutation_(mutation) {
   if (requestLines.length) {
     linesSheet.getRange(linesSheet.getLastRow() + 1, 1, requestLines.length, 18).setValues(requestLines.map(function(line, index) {
       const item = findInventoryItemByReference_(normalizeReference_(line.reference));
+      const serverLineId = buildGeneratedId_("ptl");
+      lineMappings.push({
+        clientLineId: String(line && line.clientLineId || "").trim(),
+        lineId: serverLineId
+      });
       return [
-        buildGeneratedId_("ptl"),
+        serverLineId,
         ticketId,
         index + 1,
         normalizeReference_(line.reference),
@@ -1830,6 +1837,8 @@ function applyCreatePickupTicketMutation_(mutation) {
   return {
     ok: true,
     mutationId: String(mutation.id || ""),
+    clientTicketId: clientTicketId,
+    lineMappings: lineMappings,
     ticket: getPickupTicketPayload_(ticketId).ticket,
     lines: getPickupTicketPayload_(ticketId).lines,
     events: getPickupTicketPayload_(ticketId).events,

@@ -94,7 +94,7 @@
       generatedAt: payload && typeof payload.generatedAt === "string" ? payload.generatedAt : "",
       source: payload && payload.source ? payload.source : "google_sheets"
     };
-    ["batch", "lines", "ticket", "events", "items"].forEach(function(key) {
+    ["batch", "lines", "ticket", "events", "items", "clientTicketId", "lineMappings"].forEach(function(key) {
       if (payload && Object.prototype.hasOwnProperty.call(payload, key)) {
         normalized[key] = payload[key];
       }

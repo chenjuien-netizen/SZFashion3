@@ -307,10 +307,13 @@ function syncPendingMutations(options) {
   state.syncStatus = "refreshing";
   if (!options || !options.silent) renderAll();
 
+  let processedTicketMutation = false;
   remoteMutationSyncPromise = Promise.resolve().then(function syncNext() {
     const mutation = state.pendingMutations[0];
     if (!mutation) {
-      return refreshRemoteSnapshot({ silent: true }).then(function() {
+      const finalTasks = [refreshRemoteSnapshot({ silent: true })];
+      if (processedTicketMutation) finalTasks.push(refreshRemotePickupTicketsBootstrap({ silent: true }));
+      return Promise.all(finalTasks).then(function() {
         state.syncStatus = "idle";
         renderAll();
         return true;
@@ -320,16 +323,39 @@ function syncPendingMutations(options) {
     return remoteDataSource.pushMutation(mutation).then(function(result) {
       const committed = dataSource.commitSyncedMutation({
         mutationId: mutation.id,
+        mutation: mutation,
         item: result.item,
         historyEntry: result.historyEntry,
+        pickupTicket: result && result.ticket ? {
+          ticket: result.ticket,
+          lines: Array.isArray(result.lines) ? result.lines : [],
+          events: Array.isArray(result.events) ? result.events : []
+        } : null,
+        ticket: result.ticket,
+        lines: result.lines,
+        events: result.events,
+        clientTicketId: result.clientTicketId,
+        lineMappings: result.lineMappings,
         syncStatus: "idle",
         lastSyncAt: result.generatedAt || new Date().toISOString(),
         dataSource: state.pendingMutations.length > 1 ? "remote-with-pending" : "remote-cache"
       });
       state.items = Array.isArray(committed.items) ? committed.items : state.items;
       state.historyItems = Array.isArray(committed.historyItems) ? committed.historyItems : state.historyItems;
+      state.pickupTickets = Array.isArray(committed.pickupTickets) ? committed.pickupTickets : state.pickupTickets;
       applyDataMeta(committed.meta);
+      if (/^create_pickup_ticket$|^resolve_pickup_ticket_line$|^validate_pickup_ticket$|^cancel_pickup_ticket$/i.test(String(mutation.type || ""))) {
+        processedTicketMutation = true;
+      }
+      if (committed.ticketIdentityMapping) {
+        applyPickupTicketIdentityMapping_(committed.ticketIdentityMapping);
+      } else if (mutation && mutation.type === "create_pickup_ticket" && result && result.ticket) {
+        applyLocalPickupTicketsState(result.ticket.ticketId);
+      }
       renderAll();
+      if (/^create_pickup_ticket$|^resolve_pickup_ticket_line$|^validate_pickup_ticket$|^cancel_pickup_ticket$/i.test(String(mutation.type || ""))) {
+        return syncNext();
+      }
       return refreshRemoteSnapshot({ silent: true }).then(syncNext);
     });
   }).catch(function(error) {
@@ -510,6 +536,32 @@ function getPickupTicketDetail(ticketId) {
   };
 }
 
+function applyPickupTicketIdentityMapping_(mapping) {
+  const safeMapping = mapping || {};
+  const clientTicketId = String(safeMapping.clientTicketId || "").trim();
+  const serverTicketId = String(safeMapping.ticketId || "").trim();
+  if (!clientTicketId || !serverTicketId) return;
+  const lineIdMap = safeMapping.lineIdMap || {};
+  if (state.pickupTicket === clientTicketId) state.pickupTicket = serverTicketId;
+  if (state.lastTicketsView && state.lastTicketsView.ticketId === clientTicketId) {
+    state.lastTicketsView = Object.assign({}, state.lastTicketsView, { ticketId: serverTicketId });
+  }
+  if (state.expandedTicketIds && Object.prototype.hasOwnProperty.call(state.expandedTicketIds, clientTicketId)) {
+    state.expandedTicketIds[serverTicketId] = state.expandedTicketIds[clientTicketId];
+    delete state.expandedTicketIds[clientTicketId];
+  }
+  const nextDrafts = {};
+  Object.keys(state.ticketLineDraftsById || {}).forEach(function(lineId) {
+    nextDrafts[lineIdMap[lineId] || lineId] = state.ticketLineDraftsById[lineId];
+  });
+  state.ticketLineDraftsById = nextDrafts;
+  applyLocalPickupTicketsState(serverTicketId);
+  const currentRoute = parseCurrentRoute();
+  if (currentRoute.view === "tickets" && String(currentRoute.ref || "") === clientTicketId) {
+    window.history.replaceState(null, "", buildHashRoute("tickets", serverTicketId));
+  }
+}
+
 function getPickupTicketViewModel(ticketId) {
   const normalizedTicketId = String(ticketId || "").trim();
   const tickets = Array.isArray(state.pickupTickets) ? state.pickupTickets : [];
@@ -521,7 +573,6 @@ function getPickupTicketViewModel(ticketId) {
   const lines = detail.ticket ? detail.lines : [];
   const events = detail.ticket ? detail.events : [];
   const editable = canEditPickupTicket(ticket);
-  const serverReady = isPickupTicketServerReady(ticket);
   return {
     ticketId: normalizedTicketId,
     summary: summary,
@@ -531,9 +582,9 @@ function getPickupTicketViewModel(ticketId) {
     existsLocally: Boolean(detail.ticket || summary),
     hasDetail: Boolean(detail.ticket),
     isOptimistic: isOptimisticPickupTicketId(normalizedTicketId),
-    isServerReady: Boolean(ticket && serverReady),
+    isServerReady: Boolean(ticket),
     editable: Boolean(ticket && editable),
-    canValidate: Boolean(ticket && editable && serverReady && lines.some(function(line) {
+    canValidate: Boolean(ticket && editable && lines.some(function(line) {
       return line.status === "ready" || line.status === "partial" || line.status === "not_found";
     }))
   };
@@ -3682,7 +3733,7 @@ function canEditPickupTicket(ticket) {
 
 function isPickupTicketServerReady(ticket) {
   const ticketId = String(ticket && ticket.ticketId || "").trim();
-  return !!ticketId && !isOptimisticPickupTicketId(ticketId) && !(state.pickupTicketCreatePending && state.pickupTicketPendingServerId === ticketId);
+  return !!ticketId;
 }
 
 function isPickupLineLocked(ticket, line) {
@@ -4009,6 +4060,24 @@ function getTicketRefsPreview(ticket) {
   return refs.slice(0, 2).join(", ") + ", +" + (refs.length - 2);
 }
 
+function buildPendingTicketMutation_(type, request, extra) {
+  const nextExtra = extra || {};
+  return {
+    id: "mut_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+    type: String(type || "").trim(),
+    createdAt: new Date().toISOString(),
+    ticketId: String(nextExtra.ticketId || "").trim(),
+    lineId: String(nextExtra.lineId || "").trim(),
+    request: JSON.parse(JSON.stringify(request || {}))
+  };
+}
+
+function getPickupTicketTitleNoteLabel(ticket) {
+  const title = String(ticket && ticket.title || "").trim();
+  const note = String(ticket && ticket.globalNote || "").trim();
+  return [title, note].filter(Boolean).join(" · ");
+}
+
 function formatTicketLineCountLabel(count) {
   const safeCount = Math.max(0, toInt(count));
   return safeCount + " " + (safeCount > 1 ? "lignes" : "ligne");
@@ -4052,6 +4121,7 @@ function filterPickupTickets(query, period, statusFilter) {
     const haystack = normalizeText([
       ticket && ticket.ticketNumber,
       ticket && ticket.title,
+      ticket && ticket.globalNote,
       refsPreview,
       getPickupTicketUiStatus(ticket && ticket.status)
     ].join(" "));
@@ -4069,7 +4139,8 @@ function renderPickupTicketListCard(ticket) {
   const detailLines = cachedDetail && Array.isArray(cachedDetail.lines) && cachedDetail.lines.length ? cachedDetail.lines : null;
   const parsedLines = detailLines || parsePickupTicketTextLines(ticket && ticket.requestTextRaw);
   const previewLines = expanded ? parsedLines : [];
-  const headerMeta = [ticket && ticket.title ? String(ticket.title) : "", formatTicketLineCountLabel(ticket && ticket.lineCount)].filter(Boolean).join(" · ");
+  const titleNote = getPickupTicketTitleNoteLabel(ticket);
+  const headerMeta = [titleNote, formatTicketLineCountLabel(ticket && ticket.lineCount)].filter(Boolean).join(" · ");
   return '<article class="border ' + escapeHtml(tone.article) + ' p-3 shadow-ledger">'
     + '<div class="flex items-start justify-between gap-3">'
     + '<div class="min-w-0">'
@@ -4149,7 +4220,10 @@ function renderPickupTicketCreationView() {
   return '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
     + '<div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Création par lignes</div>'
     + '<div class="mt-2 grid gap-2">'
-    + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketTitleInput" placeholder="Titre (optionnel)" type="text" value="' + escapeHtml(draft.title || "") + '" />'
+    + '<div class="grid grid-cols-2 gap-2">'
+    + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketTitleInput" placeholder="Titre (optionnel)" type="text" value="' + escapeHtml(draft.title || "") + '" />'
+    + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketGlobalNoteInput" placeholder="Remarque / note (optionnel)" type="text" value="' + escapeHtml(draft.globalNote || "") + '" />'
+    + '</div>'
     + '<div class="grid grid-cols-[minmax(0,1fr)_7.5rem_auto] gap-2">'
     + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketQuickReferenceInput" placeholder="Référence" type="text" value="' + escapeHtml(draft.quickReference || "") + '" />'
     + '<input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="pickupTicketQuickQuantityInput" inputmode="decimal" placeholder="2箱 / 1/2" type="text" value="' + escapeHtml(draft.quickQuantity || "") + '" />'
@@ -4204,18 +4278,17 @@ function renderPickupTicketDetailView(selectedTicket) {
   const lines = Array.isArray(selectedTicket.lines) ? selectedTicket.lines : [];
   const events = compactPickupTicketEventsForDisplay(selectedTicket && selectedTicket.events);
   const editable = canEditPickupTicket(ticket);
-  const serverReady = isPickupTicketServerReady(ticket);
   const canValidate = editable && lines.some(function(line) {
     return (line.status === "ready" || line.status === "partial" || line.status === "not_found");
-  }) && serverReady;
+  });
+  const titleNote = getPickupTicketTitleNoteLabel(ticket);
   let markup = '<section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">'
     + '<div class="flex items-start justify-between gap-3">'
     + '<div class="min-w-0"><div class="truncate text-[13px] font-black tracking-tight text-on-surface">' + escapeHtml(formatPickupTicketNumberForDisplay(ticket.ticketNumber || "-")) + '</div>'
     + '<div class="mt-1 text-[11px] text-on-surface-variant">' + escapeHtml(getPickupTicketUiStatus(ticket.status) + " · " + formatDateTimeLabel(ticket.createdAt)) + '</div></div>'
     + (canValidate ? '<button class="shrink-0 bg-surface-tint px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-primary" data-action="validate-ticket" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" type="button">Valider</button>' : '')
     + '</div>'
-    + (ticket.title ? '<div class="mt-2 text-[12px] font-semibold text-on-surface">' + escapeHtml(ticket.title) + '</div>' : '')
-    + (!serverReady ? '<div class="mt-2 text-[11px] font-medium text-on-surface-variant">Création du ticket en cours. Les actions lignes seront disponibles dès que le ticket est confirmé côté serveur.</div>' : '')
+    + (titleNote ? '<div class="mt-2 text-[12px] font-semibold text-on-surface">' + escapeHtml(titleNote) + '</div>' : '')
     + '</section>';
   markup += lines.map(function(line) {
     const draft = getPickupLineDraft(line);
@@ -4226,7 +4299,6 @@ function renderPickupTicketDetailView(selectedTicket) {
       : (tone.article + " px-3 py-2 shadow-ledger")).replace(/^/, "border ");
     const statusLabel = getPickupLineUiStatus(line.status);
     const availableStock = getPickupLineAvailableStockDisplay(line);
-    const serverActionDisabled = !serverReady;
     return '<article class="' + lineClass + '">'
       + '<div class="flex items-center justify-between gap-3">'
       + '<div class="min-w-0 flex-1">'
@@ -4251,8 +4323,8 @@ function renderPickupTicketDetailView(selectedTicket) {
           + '<div class="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto_auto] items-center gap-2">'
           + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" data-role="ticket-line-picked-input" data-line-id="' + escapeHtml(line.lineId || "") + '" inputmode="decimal" placeholder="2箱 / 1/2" type="text" value="' + escapeHtml(draft.pickedInput || "") + '" />'
           + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" data-role="ticket-line-note-input" data-line-id="' + escapeHtml(line.lineId || "") + '" placeholder="' + escapeHtml(line.status === "not_found" ? "Précision introuvable..." : "Commentaire") + '" type="text" value="' + escapeHtml(draft.lineNote || "") + '" />'
-          + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="save-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button"' + (serverActionDisabled ? ' disabled' : '') + '>Confirmer</button>'
-          + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="mark-ticket-line-not-found" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button"' + (serverActionDisabled ? ' disabled' : '') + '>Introuvable</button>'
+          + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="save-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button">Confirmer</button>'
+          + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="mark-ticket-line-not-found" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button">Introuvable</button>'
           + '</div>'
           + (draft.error ? '<div class="text-[11px] font-medium text-error">' + escapeHtml(draft.error) + '</div>' : '')
           + '</div>')
@@ -4582,6 +4654,10 @@ function bindPickupTicketsEvents() {
         state.ticketCreationDraft.title = String(target.value || "");
         return;
       }
+      if (target.id === "pickupTicketGlobalNoteInput") {
+        state.ticketCreationDraft.globalNote = String(target.value || "");
+        return;
+      }
       if (target.id === "ticketsSearchInput") {
         state.ticketsQuery = String(target.value || "").trim();
         renderPickupTicketsPage();
@@ -4808,10 +4884,6 @@ function loadPickupTicketData(ticketId, options) {
   const includeDetail = !(options && options.includeDetail === false);
   const normalizedTicketId = String(ticketId || "").trim();
   applyLocalPickupTicketsState(ticketId);
-  if (normalizedTicketId && !isOptimisticPickupTicketId(normalizedTicketId) && state.pickupTicketPendingServerId === normalizedTicketId) {
-    state.pickupTicketCreatePending = false;
-    state.pickupTicketPendingServerId = "";
-  }
   state.pickupTicketMissingConfirmed = false;
   const localViewModel = normalizedTicketId ? getPickupTicketViewModel(normalizedTicketId) : null;
   if (localViewModel && localViewModel.hasDetail) {
@@ -5033,34 +5105,9 @@ function createPickupTicketFromDraft() {
     ? dataSource.saveOptimisticPickupTicketCreate(optimisticRequest)
     : null;
   if (optimisticResult) {
+    hasLocalWritesThisSession = true;
     state.pickupTickets = optimisticResult.items;
     state.pickupTicket = optimisticResult.ticket.ticketId;
-    state.pickupTicketCreatePending = true;
-    state.pickupTicketPendingServerId = optimisticResult.ticket.ticketId;
-    applyLocalPickupTicketsState(optimisticResult.ticket.ticketId);
-    seedPickupTicketLineDrafts(optimisticResult.ticket.ticketId);
-    navigateTo("tickets", { ref: optimisticResult.ticket.ticketId });
-  }
-  const requestTextRaw = buildPickupTicketRequestText(lines);
-  pushOnlineMutation({
-    type: "create_pickup_ticket",
-    request: {
-      title: optimisticRequest.title,
-      requestTextRaw: requestTextRaw,
-      globalNote: optimisticRequest.globalNote,
-      createdBy: optimisticRequest.createdBy,
-      lines: lines
-    }
-  }).then(function(result) {
-    if (!result || !result.ticket) return;
-    if (dataSource && dataSource.replaceOptimisticPickupTicket && optimisticResult) {
-      const replaced = dataSource.replaceOptimisticPickupTicket(optimisticResult.ticket.ticketId, {
-        ticket: result.ticket,
-        lines: Array.isArray(result.lines) ? result.lines : [],
-        events: Array.isArray(result.events) ? result.events : []
-      });
-      state.pickupTickets = replaced.items;
-    }
     state.ticketCreationDraft = {
       title: "",
       globalNote: "",
@@ -5069,31 +5116,16 @@ function createPickupTicketFromDraft() {
       quickQuantity: "",
       lines: []
     };
-    state.pickupTicketCreatePending = false;
-    state.pickupTicketPendingServerId = "";
-    state.pickupTicket = result.ticket.ticketId;
-    applyLocalPickupTicketsState(result.ticket.ticketId);
-    seedPickupTicketLineDrafts(result.ticket.ticketId);
-    navigateTo("tickets", { ref: result.ticket.ticketId });
-  }).catch(function(error) {
-    if (dataSource && dataSource.discardOptimisticPickupTicket && optimisticResult) {
-      const discarded = dataSource.discardOptimisticPickupTicket(optimisticResult.ticket.ticketId);
-      state.pickupTickets = discarded.items;
-      state.pickupTicketData = null;
-      state.pickupTicket = null;
-      state.pickupTicketCreatePending = false;
-      state.pickupTicketPendingServerId = "";
-      navigateTo("tickets_new");
-    }
-    window.alert(error && error.message ? error.message : "Création ticket impossible.");
-  });
+    applyLocalPickupTicketsState(optimisticResult.ticket.ticketId);
+    seedPickupTicketLineDrafts(optimisticResult.ticket.ticketId);
+    navigateTo("tickets", { ref: optimisticResult.ticket.ticketId });
+    renderPickupTicketsPage();
+    if (navigator.onLine) syncPendingMutations({ silent: true });
+  }
 }
 
 function updatePickupTicketLine(ticketId, lineId, request) {
-  if (!ticketId || isOptimisticPickupTicketId(ticketId) || (state.pickupTicketCreatePending && state.pickupTicketPendingServerId === String(ticketId))) {
-    window.alert("Le ticket est encore en cours de création. Réessaie dans un instant.");
-    return Promise.resolve(false);
-  }
+  if (!ticketId) return Promise.resolve(false);
   const currentDetail = getPickupTicketDetail(ticketId);
   if (currentDetail && currentDetail.ticket && String(currentDetail.ticket.ticketId || "") === String(ticketId || "")) {
     const nextTicket = Object.assign({}, currentDetail.ticket);
@@ -5133,29 +5165,23 @@ function updatePickupTicketLine(ticketId, lineId, request) {
       message: request.status === "not_found" ? "Ligne marquée introuvable" : (request.status === "to_confirm" ? "Ligne rouverte" : "Ligne confirmée")
     }]);
     const optimisticDetail = { ticket: nextTicket, lines: nextLines, events: nextEvents };
+    const pendingMutation = buildPendingTicketMutation_("resolve_pickup_ticket_line", Object.assign({
+      ticketId: ticketId,
+      lineId: lineId,
+      updatedBy: "webapp",
+      version: 0
+    }, request), { ticketId: ticketId, lineId: lineId });
     if (dataSource && dataSource.saveOptimisticPickupTicketDetail) {
-      const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail);
+      const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail, pendingMutation);
+      hasLocalWritesThisSession = true;
       state.pickupTickets = saved.items;
     }
     applyLocalPickupTicketsState(ticketId);
     seedPickupTicketLineDrafts(ticketId);
     renderPickupTicketsPage();
+    if (navigator.onLine) return syncPendingMutations({ silent: true });
   }
-  const latestDetail = getPickupTicketDetail(ticketId);
-  return pushOnlineMutation({
-    type: "resolve_pickup_ticket_line",
-    request: Object.assign({
-      ticketId: ticketId,
-      lineId: lineId,
-      updatedBy: "webapp",
-      version: latestDetail && latestDetail.ticket ? latestDetail.ticket.version : 0
-    }, request)
-  }).then(function() {
-    return loadPickupTicketData(ticketId, { includeDetail: true });
-  }).catch(function(error) {
-    loadPickupTicketData(ticketId, { includeDetail: true });
-    window.alert(error && error.message ? error.message : "Mise à jour ligne impossible.");
-  });
+  return Promise.resolve(true);
 }
 
 function handleEditPickupTicketLine(ticketId, lineId) {
@@ -5220,10 +5246,6 @@ function handleSavePickupTicketLine(ticketId, lineId) {
 function handleValidateTicket(ticketId) {
   const currentDetail = getPickupTicketDetail(ticketId);
   if (!ticketId || !currentDetail || !currentDetail.ticket || !currentDetail.lines) return;
-  if (isOptimisticPickupTicketId(ticketId) || (state.pickupTicketCreatePending && state.pickupTicketPendingServerId === String(ticketId))) {
-    window.alert("Le ticket est encore en cours de création. Attends sa confirmation serveur avant de valider.");
-    return;
-  }
   const readyLines = currentDetail.lines.filter(function(line) {
     return (line.status === "ready" || line.status === "partial") && line.pickedUnit && Number(line.pickedQuantity || 0) > 0;
   }).map(function(line) {
@@ -5235,11 +5257,12 @@ function handleValidateTicket(ticketId) {
     };
   });
   if (dataSource && dataSource.saveOptimisticPickupTicketDetail) {
+    const nowIso = new Date().toISOString();
     const optimisticDetail = {
       ticket: Object.assign({}, currentDetail.ticket, {
         status: "validated",
-        updatedAt: new Date().toISOString(),
-        validatedAt: new Date().toISOString(),
+        updatedAt: nowIso,
+        validatedAt: nowIso,
         validatedBy: "webapp"
       }),
       lines: currentDetail.lines.map(function(line) {
@@ -5254,34 +5277,24 @@ function handleValidateTicket(ticketId) {
         lineId: "",
         eventType: "ticket_validated",
         actor: "webapp",
-        createdAt: new Date().toISOString(),
+        createdAt: nowIso,
         payload: {},
         message: "Ticket validé"
       }])
     };
-    const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail);
+    const pendingMutation = buildPendingTicketMutation_("validate_pickup_ticket", {
+      ticketId: ticketId,
+      validatedBy: "webapp",
+      version: 0,
+      lines: readyLines
+    }, { ticketId: ticketId });
+    const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail, pendingMutation);
+    hasLocalWritesThisSession = true;
     state.pickupTickets = saved.items;
     applyLocalPickupTicketsState(ticketId);
     renderPickupTicketsPage();
+    if (navigator.onLine) syncPendingMutations({ silent: true });
   }
-  const latestDetail = getPickupTicketDetail(ticketId);
-  pushOnlineMutation({
-    type: "validate_pickup_ticket",
-    request: {
-      ticketId: ticketId,
-      validatedBy: "webapp",
-      version: latestDetail && latestDetail.ticket ? latestDetail.ticket.version : 0,
-      lines: readyLines
-    }
-  }).then(function() {
-    return Promise.all([
-      loadPickupTicketData(ticketId, { includeDetail: true }),
-      refreshRemoteSnapshot({ silent: true })
-    ]);
-  }).catch(function(error) {
-    loadPickupTicketData(ticketId, { includeDetail: true });
-    window.alert(error && error.message ? error.message : "Validation ticket impossible.");
-  });
 }
 
 function pushOnlineMutation(mutation) {

@@ -240,6 +240,149 @@
       return nextDetails;
     }
 
+    function renamePickupTicketEventIds(events, mapping) {
+      const safeMapping = mapping || {};
+      return (Array.isArray(events) ? events : []).map(function(event) {
+        const nextEvent = Object.assign({}, event);
+        if (nextEvent.ticketId && safeMapping.clientTicketId && String(nextEvent.ticketId) === String(safeMapping.clientTicketId)) {
+          nextEvent.ticketId = safeMapping.ticketId;
+        }
+        if (nextEvent.lineId && safeMapping.lineIdMap && safeMapping.lineIdMap[nextEvent.lineId]) {
+          nextEvent.lineId = safeMapping.lineIdMap[nextEvent.lineId];
+        }
+        return nextEvent;
+      });
+    }
+
+    function rewritePendingTicketMutations_(pendingMutations, mapping, committedMutationId) {
+      const safeMapping = mapping || {};
+      const lineIdMap = safeMapping.lineIdMap || {};
+      return (Array.isArray(pendingMutations) ? pendingMutations : []).reduce(function(nextList, entry) {
+        if (!entry) return nextList;
+        if (String(entry.id || "") === String(committedMutationId || "")) return nextList;
+        if (!/^create_pickup_ticket$|^resolve_pickup_ticket_line$|^validate_pickup_ticket$|^cancel_pickup_ticket$/i.test(String(entry.type || ""))) {
+          nextList.push(entry);
+          return nextList;
+        }
+        const nextEntry = Object.assign({}, entry, {
+          request: cloneRequestPayload(entry.request)
+        });
+        if (safeMapping.clientTicketId && nextEntry.ticketId === safeMapping.clientTicketId) {
+          nextEntry.ticketId = safeMapping.ticketId;
+        }
+        if (safeMapping.clientTicketId && nextEntry.request && nextEntry.request.ticketId === safeMapping.clientTicketId) {
+          nextEntry.request.ticketId = safeMapping.ticketId;
+        }
+        if (nextEntry.lineId && lineIdMap[nextEntry.lineId]) {
+          nextEntry.lineId = lineIdMap[nextEntry.lineId];
+        }
+        if (nextEntry.request && nextEntry.request.lineId && lineIdMap[nextEntry.request.lineId]) {
+          nextEntry.request.lineId = lineIdMap[nextEntry.request.lineId];
+        }
+        if (nextEntry.request && Array.isArray(nextEntry.request.lines)) {
+          nextEntry.request.lines = nextEntry.request.lines.map(function(line) {
+            const nextLine = Object.assign({}, line);
+            if (nextLine.lineId && lineIdMap[nextLine.lineId]) nextLine.lineId = lineIdMap[nextLine.lineId];
+            if (!nextLine.lineId && nextLine.clientLineId && lineIdMap[nextLine.clientLineId]) nextLine.lineId = lineIdMap[nextLine.clientLineId];
+            return nextLine;
+          });
+        }
+        nextList.push(nextEntry);
+        return nextList;
+      }, []);
+    }
+
+    function reconcilePickupTicketServerIdentity_(snapshot, mutation, payload) {
+      const request = mutation && mutation.request ? mutation.request : {};
+      const clientTicketId = String((payload && payload.clientTicketId) || request.clientTicketId || "").trim();
+      const serverTicket = payload && payload.ticket ? Object.assign({}, payload.ticket) : null;
+      const serverTicketId = String(serverTicket && serverTicket.ticketId || "").trim();
+      if (!clientTicketId || !serverTicketId) return null;
+
+      const currentDetail = snapshot.pickupTicketDetails && snapshot.pickupTicketDetails[clientTicketId]
+        ? clonePickupTicketDetail(snapshot.pickupTicketDetails[clientTicketId])
+        : null;
+      const serverLines = Array.isArray(payload && payload.lines) ? payload.lines.map(function(line) { return Object.assign({}, line); }) : [];
+      const lineMappings = Array.isArray(payload && payload.lineMappings) ? payload.lineMappings : [];
+      const lineIdMap = {};
+      lineMappings.forEach(function(entry, index) {
+        const clientLineId = String(entry && (entry.clientLineId || entry.localLineId) || "").trim();
+        const serverLineId = String(entry && (entry.lineId || entry.serverLineId) || "").trim();
+        if (clientLineId && serverLineId) {
+          lineIdMap[clientLineId] = serverLineId;
+          return;
+        }
+        if (!clientLineId && serverLineId) {
+          const requestLine = Array.isArray(request.lines) ? request.lines[index] : null;
+          if (requestLine && requestLine.clientLineId) lineIdMap[String(requestLine.clientLineId)] = serverLineId;
+        }
+      });
+
+      const localLines = currentDetail && Array.isArray(currentDetail.lines) ? currentDetail.lines : [];
+      const mergedLines = (localLines.length ? localLines : serverLines).map(function(line, index) {
+        const localLine = Object.assign({}, line);
+        const mappedLineId = lineIdMap[String(localLine.lineId || "")] || "";
+        const serverLine = mappedLineId
+          ? serverLines.find(function(entry) { return String(entry && entry.lineId || "") === mappedLineId; })
+          : (serverLines[index] || null);
+        const nextLine = Object.assign({}, serverLine || {}, localLine);
+        nextLine.ticketId = serverTicketId;
+        if (mappedLineId) nextLine.lineId = mappedLineId;
+        return nextLine;
+      });
+
+      const counters = computePickupTicketCounters(mergedLines);
+      const localTicket = currentDetail && currentDetail.ticket ? currentDetail.ticket : null;
+      const mergedTicket = Object.assign({}, serverTicket || {}, localTicket || {});
+      mergedTicket.ticketId = serverTicketId;
+      mergedTicket.ticketNumber = String(serverTicket && serverTicket.ticketNumber || mergedTicket.ticketNumber || "").trim();
+      mergedTicket.createdAt = String(serverTicket && serverTicket.createdAt || mergedTicket.createdAt || "").trim();
+      mergedTicket.updatedAt = String(serverTicket && serverTicket.updatedAt || mergedTicket.updatedAt || "").trim();
+      mergedTicket.version = Number(serverTicket && serverTicket.version || mergedTicket.version || 0);
+      mergedTicket.lineCount = counters.lineCount;
+      mergedTicket.resolvedLineCount = counters.resolvedLineCount;
+      mergedTicket.blockedLineCount = counters.blockedLineCount;
+      mergedTicket.status = derivePickupTicketStatus(mergedTicket, mergedLines);
+
+      const mergedEvents = renamePickupTicketEventIds(
+        currentDetail && Array.isArray(currentDetail.events) && currentDetail.events.length ? currentDetail.events : (Array.isArray(payload && payload.events) ? payload.events : []),
+        { clientTicketId: clientTicketId, ticketId: serverTicketId, lineIdMap: lineIdMap }
+      );
+
+      let nextTickets = removePickupTicketFromList(snapshot.pickupTickets, clientTicketId);
+      nextTickets = replacePickupTicketInList(nextTickets, mergedTicket, serverTicketId);
+      let nextDetails = removePickupTicketDetail(snapshot.pickupTicketDetails, clientTicketId);
+      nextDetails = upsertPickupTicketDetail(nextDetails, serverTicketId, {
+        ticket: mergedTicket,
+        lines: mergedLines,
+        events: mergedEvents
+      });
+      const nextPendingMutations = rewritePendingTicketMutations_(snapshot.pendingMutations, {
+        clientTicketId: clientTicketId,
+        ticketId: serverTicketId,
+        lineIdMap: lineIdMap
+      }, mutation && mutation.id);
+
+      return {
+        snapshot: {
+          items: snapshot.items.slice(),
+          historyItems: snapshot.historyItems.slice(),
+          pickupTickets: nextTickets,
+          pickupTicketDetails: nextDetails,
+          pendingMutations: nextPendingMutations,
+          syncStatus: "idle",
+          lastSyncAt: typeof payload.generatedAt === "string" ? payload.generatedAt : snapshot.lastSyncAt,
+          dataSource: nextPendingMutations.length ? "local-pending" : "remote-cache"
+        },
+        mapping: {
+          clientTicketId: clientTicketId,
+          ticketId: serverTicketId,
+          ticketNumber: mergedTicket.ticketNumber,
+          lineIdMap: lineIdMap
+        }
+      };
+    }
+
     function computePickupTicketCounters(lines) {
       const safeLines = Array.isArray(lines) ? lines : [];
       const resolvedLineCount = safeLines.filter(function(line) {
@@ -262,12 +405,45 @@
       return "in_progress";
     }
 
-    function buildTempPickupTicketNumber() {
-      const now = new Date();
-      const day = String(now.getDate()).padStart(2, "0");
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const year = String(now.getFullYear());
-      return day + month + year + "-...";
+    function isOptimisticPickupTicketId_(ticketId) {
+      return /^tmp_pt_/i.test(String(ticketId || "").trim());
+    }
+
+    function getTicketNumberPrefixForDate(createdAt) {
+      const date = createdAt ? new Date(createdAt) : new Date();
+      const safeDate = isNaN(date.getTime()) ? new Date() : date;
+      const day = String(safeDate.getDate()).padStart(2, "0");
+      const month = String(safeDate.getMonth() + 1).padStart(2, "0");
+      const year = String(safeDate.getFullYear());
+      return day + month + year + "-";
+    }
+
+    function getNextLocalPickupTicketSequenceForDay_(snapshot, createdAt) {
+      const prefix = getTicketNumberPrefixForDate(createdAt);
+      const pattern = new RegExp("^" + prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(\\d{3})(?:\\*)?$");
+      return (Array.isArray(snapshot && snapshot.pickupTickets) ? snapshot.pickupTickets : []).reduce(function(maxValue, ticket) {
+        const match = String(ticket && ticket.ticketNumber || "").trim().match(pattern);
+        if (!match) return maxValue;
+        return Math.max(maxValue, Number(match[1] || 0));
+      }, 0) + 1;
+    }
+
+    function buildTempPickupTicketNumber(snapshot, createdAt) {
+      const prefix = getTicketNumberPrefixForDate(createdAt);
+      const sequence = getNextLocalPickupTicketSequenceForDay_(snapshot, createdAt);
+      return prefix + String(sequence).padStart(3, "0") + "*";
+    }
+
+    function buildPendingTicketMutation_(type, request, extra) {
+      const nextExtra = extra || {};
+      return {
+        id: "mut_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+        type: String(type || "").trim(),
+        createdAt: new Date().toISOString(),
+        ticketId: String(nextExtra.ticketId || "").trim(),
+        lineId: String(nextExtra.lineId || "").trim(),
+        request: cloneRequestPayload(request)
+      };
     }
 
     function buildPickupTicketEventMessage(eventType) {
@@ -277,6 +453,38 @@
       if (eventType === "ticket_validated") return "Ticket validé";
       if (eventType === "ticket_cancelled") return "Ticket annulé";
       return "Ligne confirmée";
+    }
+
+    function collectPendingTicketIds_(pendingMutations) {
+      return (Array.isArray(pendingMutations) ? pendingMutations : []).reduce(function(map, mutation) {
+        if (!mutation || !/^create_pickup_ticket$|^resolve_pickup_ticket_line$|^validate_pickup_ticket$|^cancel_pickup_ticket$/i.test(String(mutation.type || ""))) {
+          return map;
+        }
+        const directTicketId = String(mutation.ticketId || "").trim();
+        const requestTicketId = String(mutation.request && mutation.request.ticketId || "").trim();
+        if (directTicketId) map[directTicketId] = true;
+        if (requestTicketId) map[requestTicketId] = true;
+        return map;
+      }, {});
+    }
+
+    function preserveLocalPendingTickets_(remoteTickets, remoteDetails, snapshot, pendingMutations) {
+      const pendingTicketIds = collectPendingTicketIds_(pendingMutations);
+      let nextTickets = Array.isArray(remoteTickets) ? remoteTickets.slice() : [];
+      let nextDetails = remoteDetails && typeof remoteDetails === "object" ? Object.assign({}, remoteDetails) : {};
+      (Array.isArray(snapshot && snapshot.pickupTickets) ? snapshot.pickupTickets : []).forEach(function(ticket) {
+        const ticketId = String(ticket && ticket.ticketId || "").trim();
+        if (!ticketId) return;
+        if (!isOptimisticPickupTicketId_(ticketId) && !pendingTicketIds[ticketId]) return;
+        nextTickets = replacePickupTicketInList(nextTickets, ticket, ticketId);
+        if (snapshot.pickupTicketDetails && snapshot.pickupTicketDetails[ticketId]) {
+          nextDetails[ticketId] = clonePickupTicketDetail(snapshot.pickupTicketDetails[ticketId]);
+        }
+      });
+      return {
+        pickupTickets: nextTickets,
+        pickupTicketDetails: nextDetails
+      };
     }
 
     function loadPickupTickets() {
@@ -435,6 +643,12 @@
         nextPickupTickets = replacePickupTicketInList(nextPickupTickets, payload.pickupTicket.ticket, payload.pickupTicket.ticket.ticketId);
       }
 
+      if (Array.isArray(payload.pickupTickets) || (payload.pickupTicketDetails && typeof payload.pickupTicketDetails === "object")) {
+        const preservedTickets = preserveLocalPendingTickets_(nextPickupTickets, nextPickupTicketDetails, snapshot, nextPendingMutations);
+        nextPickupTickets = preservedTickets.pickupTickets;
+        nextPickupTicketDetails = preservedTickets.pickupTicketDetails;
+      }
+
       const replayedSnapshot = applyPendingMutations({
         items: nextItems,
         historyItems: nextHistoryItems
@@ -463,6 +677,20 @@
       const snapshot = readSnapshot();
       const nextPayload = payload || {};
       const mutationId = String(nextPayload.mutationId || "");
+      const mutation = nextPayload.mutation || null;
+      if (mutation && mutation.type === "create_pickup_ticket") {
+        const reconciled = reconcilePickupTicketServerIdentity_(snapshot, mutation, nextPayload);
+        if (reconciled && reconciled.snapshot) {
+          writeSnapshot(reconciled.snapshot);
+          return {
+            items: reconciled.snapshot.items.slice(),
+            historyItems: reconciled.snapshot.historyItems.slice(),
+            pickupTickets: reconciled.snapshot.pickupTickets.slice(),
+            meta: getMeta(reconciled.snapshot),
+            ticketIdentityMapping: reconciled.mapping
+          };
+        }
+      }
       const nextPendingMutations = (Array.isArray(snapshot.pendingMutations) ? snapshot.pendingMutations : []).filter(function(entry) {
         return String(entry && entry.id || "") !== mutationId;
       });
@@ -484,7 +712,7 @@
         nextPickupTickets = nextPayload.pickupTickets.slice();
       }
 
-      if (nextPayload.pickupTicket && nextPayload.pickupTicket.ticket) {
+      if (nextPayload.pickupTicket && nextPayload.pickupTicket.ticket && (!mutation || !/^resolve_pickup_ticket_line$|^validate_pickup_ticket$|^cancel_pickup_ticket$/i.test(String(mutation.type || "")))) {
         nextPickupTicketDetails = upsertPickupTicketDetail(nextPickupTicketDetails, nextPayload.pickupTicket.ticket.ticketId, nextPayload.pickupTicket);
         nextPickupTickets = replacePickupTicketInList(nextPickupTickets, nextPayload.pickupTicket.ticket, nextPayload.pickupTicket.ticket.ticketId);
       }
@@ -504,6 +732,7 @@
       return {
         items: nextSnapshot.items.slice(),
         historyItems: nextSnapshot.historyItems.slice(),
+        pickupTickets: nextSnapshot.pickupTickets.slice(),
         meta: getMeta(nextSnapshot)
       };
     }
@@ -515,8 +744,9 @@
       const lines = (Array.isArray(request && request.lines) ? request.lines : []).map(function(line, index) {
         const quantity = line && line.requestQuantity != null ? Number(line.requestQuantity || 0) : null;
         const unit = String(line && line.requestUnit || "").trim();
+        const lineId = "tmp_ptl_" + Date.now() + "_" + index + "_" + Math.random().toString(36).slice(2, 5);
         return {
-          lineId: "tmp_ptl_" + Date.now() + "_" + index + "_" + Math.random().toString(36).slice(2, 5),
+          lineId: lineId,
           ticketId: ticketId,
           lineNumber: index + 1,
           reference: deps.normalizeReference(line && line.reference),
@@ -539,7 +769,7 @@
       const counters = computePickupTicketCounters(lines);
       const ticket = {
         ticketId: ticketId,
-        ticketNumber: buildTempPickupTicketNumber(),
+        ticketNumber: buildTempPickupTicketNumber(snapshot, createdAt),
         status: "in_progress",
         createdAt: createdAt,
         createdBy: String(request && request.createdBy || "").trim(),
@@ -568,15 +798,30 @@
           message: buildPickupTicketEventMessage("ticket_created")
         }]
       };
+      const pendingMutation = buildPendingTicketMutation_("create_pickup_ticket", {
+        clientTicketId: ticketId,
+        title: String(request && request.title || "").trim(),
+        requestTextRaw: String(request && request.requestTextRaw || "").trim(),
+        globalNote: String(request && request.globalNote || "").trim(),
+        createdBy: String(request && request.createdBy || "").trim(),
+        lines: lines.map(function(line) {
+          return {
+            clientLineId: line.lineId,
+            reference: line.reference,
+            requestUnit: line.requestUnit,
+            requestQuantity: line.requestQuantity
+          };
+        })
+      }, { ticketId: ticketId });
       const nextSnapshot = {
         items: snapshot.items.slice(),
         historyItems: snapshot.historyItems.slice(),
         pickupTickets: replacePickupTicketInList(snapshot.pickupTickets, ticket, ticketId),
         pickupTicketDetails: upsertPickupTicketDetail(snapshot.pickupTicketDetails, ticketId, detail),
-        pendingMutations: snapshot.pendingMutations.slice(),
-        syncStatus: snapshot.syncStatus,
+        pendingMutations: snapshot.pendingMutations.slice().concat(pendingMutation),
+        syncStatus: "idle",
         lastSyncAt: snapshot.lastSyncAt,
-        dataSource: snapshot.dataSource
+        dataSource: "local-pending"
       };
       writeSnapshot(nextSnapshot);
       return {
@@ -584,6 +829,7 @@
         lines: lines,
         events: detail.events,
         items: nextSnapshot.pickupTickets.slice(),
+        mutation: pendingMutation,
         meta: getMeta(nextSnapshot)
       };
     }
@@ -638,18 +884,20 @@
       };
     }
 
-    function saveOptimisticPickupTicketDetail(detail) {
+    function saveOptimisticPickupTicketDetail(detail, pendingMutation) {
       const snapshot = readSnapshot();
       if (!detail || !detail.ticket || !detail.ticket.ticketId) return null;
+      const nextPendingMutations = snapshot.pendingMutations.slice();
+      if (pendingMutation) nextPendingMutations.push(cloneRequestPayload(pendingMutation));
       const nextSnapshot = {
         items: snapshot.items.slice(),
         historyItems: snapshot.historyItems.slice(),
         pickupTickets: replacePickupTicketInList(snapshot.pickupTickets, detail.ticket, detail.ticket.ticketId),
         pickupTicketDetails: upsertPickupTicketDetail(snapshot.pickupTicketDetails, detail.ticket.ticketId, detail),
-        pendingMutations: snapshot.pendingMutations.slice(),
-        syncStatus: snapshot.syncStatus,
+        pendingMutations: nextPendingMutations,
+        syncStatus: "idle",
         lastSyncAt: snapshot.lastSyncAt,
-        dataSource: snapshot.dataSource
+        dataSource: pendingMutation ? "local-pending" : snapshot.dataSource
       };
       writeSnapshot(nextSnapshot);
       return {
@@ -669,11 +917,17 @@
         if (!detail || !detail.ticket) return;
         nextDetails[String(ticketId)] = clonePickupTicketDetail(detail);
       });
+      const preservedTickets = preserveLocalPendingTickets_(
+        Array.isArray(safePayload.items) ? safePayload.items.slice() : snapshot.pickupTickets.slice(),
+        nextDetails,
+        snapshot,
+        snapshot.pendingMutations
+      );
       const nextSnapshot = {
         items: snapshot.items.slice(),
         historyItems: snapshot.historyItems.slice(),
-        pickupTickets: Array.isArray(safePayload.items) ? safePayload.items.slice() : snapshot.pickupTickets.slice(),
-        pickupTicketDetails: nextDetails,
+        pickupTickets: preservedTickets.pickupTickets,
+        pickupTicketDetails: preservedTickets.pickupTicketDetails,
         pendingMutations: snapshot.pendingMutations.slice(),
         syncStatus: snapshot.syncStatus,
         lastSyncAt: typeof safePayload.generatedAt === "string" ? safePayload.generatedAt : snapshot.lastSyncAt,
