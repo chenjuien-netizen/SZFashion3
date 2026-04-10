@@ -286,6 +286,17 @@
       });
     }
 
+    function findSnapshotInventoryItemByReference_(snapshot, reference) {
+      const normalizedReference = deps.normalizeReference(reference);
+      if (!normalizedReference) return null;
+      const items = Array.isArray(snapshot && snapshot.items) ? snapshot.items : [];
+      for (let index = 0; index < items.length; index++) {
+        const item = items[index];
+        if (deps.normalizeReference(item && item.reference) === normalizedReference) return item;
+      }
+      return null;
+    }
+
     function clonePickupTicketDetail(detail) {
       if (!detail) return null;
       return {
@@ -814,11 +825,13 @@
         const quantity = line && line.requestQuantity != null ? Number(line.requestQuantity || 0) : null;
         const unit = String(line && line.requestUnit || "").trim();
         const lineId = "tmp_ptl_" + Date.now() + "_" + index + "_" + Math.random().toString(36).slice(2, 5);
+        const reference = deps.normalizeReference(line && line.reference);
+        const snapshotItem = findSnapshotInventoryItemByReference_(snapshot, reference);
         return {
           lineId: lineId,
           ticketId: ticketId,
           lineNumber: index + 1,
-          reference: deps.normalizeReference(line && line.reference),
+          reference: reference,
           status: "to_confirm",
           requestUnit: unit,
           requestQuantity: quantity,
@@ -826,9 +839,10 @@
           pickedUnit: "",
           pickedQuantity: null,
           pickedDisplay: "",
-          stockAvailablePiecesSnapshot: null,
-          warehouseHelpDisplay: "",
-          arrivalNoteSnapshot: "",
+          stockAvailablePiecesSnapshot: snapshotItem ? deps.stateModelToPieces(snapshotItem) : null,
+          stockAvailableDisplaySnapshot: snapshotItem ? String(snapshotItem.stockDisplay || "").trim() : "",
+          warehouseHelpDisplay: snapshotItem ? String(snapshotItem.warehouse || "").trim() : "",
+          arrivalNoteSnapshot: snapshotItem ? String(snapshotItem.arrivalNote || "").trim() : "",
           lineNote: "",
           stockMutationId: "",
           createdAt: createdAt,

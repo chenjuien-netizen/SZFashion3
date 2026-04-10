@@ -602,7 +602,15 @@ function applyPickupTicketIdentityMapping_(mapping) {
   const clientTicketId = String(safeMapping.clientTicketId || "").trim();
   const serverTicketId = String(safeMapping.ticketId || "").trim();
   if (!clientTicketId || !serverTicketId) return;
+  const currentRoute = parseCurrentRoute();
+  const wasActiveTicket = state.pickupTicket === clientTicketId
+    || (currentRoute.view === "tickets" && String(currentRoute.ref || "") === clientTicketId);
   const lineIdMap = safeMapping.lineIdMap || {};
+  console.info("[applyPickupTicketIdentityMapping_] start", {
+    clientTicketId: clientTicketId,
+    serverTicketId: serverTicketId,
+    wasActiveTicket: wasActiveTicket
+  });
   if (state.pickupTicket === clientTicketId) state.pickupTicket = serverTicketId;
   if (state.lastTicketsView && state.lastTicketsView.ticketId === clientTicketId) {
     state.lastTicketsView = Object.assign({}, state.lastTicketsView, { ticketId: serverTicketId });
@@ -617,10 +625,17 @@ function applyPickupTicketIdentityMapping_(mapping) {
   });
   state.ticketLineDraftsById = nextDrafts;
   applyLocalPickupTicketsState(serverTicketId);
-  const currentRoute = parseCurrentRoute();
   if (currentRoute.view === "tickets" && String(currentRoute.ref || "") === clientTicketId) {
     window.history.replaceState(null, "", buildHashRoute("tickets", serverTicketId));
   }
+  if (wasActiveTicket) {
+    console.info("[applyPickupTicketIdentityMapping_] active ticket remapped, reload detail", {
+      serverTicketId: serverTicketId
+    });
+    loadPickupTicketData(serverTicketId, { includeDetail: true });
+    return;
+  }
+  renderPickupTicketsPage();
 }
 
 function getPickupTicketViewModel(ticketId) {
