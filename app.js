@@ -30,6 +30,7 @@ const state = {
   currentView: "inventory",
   previousView: "inventory",
   detailOrigin: "inventory",
+  nextDetailOrigin: "",
   lastInventoryView: { view: "inventory", ref: "" },
   lastTicketsView: { view: "tickets", ticketId: "" },
   ticketsSubview: "list",
@@ -450,6 +451,7 @@ function getLastInventoryRoute() {
 
 function navigateToInventoryContext() {
   const route = getLastInventoryRoute();
+  if (route.view === "detail" && route.ref) state.nextDetailOrigin = "inventory";
   navigateTo(route.view, route.ref ? { ref: route.ref } : null);
 }
 
@@ -636,12 +638,20 @@ function navigateTo(view, options) {
 function handleRouteChange() {
   const route = parseCurrentRoute();
   if (route.view === "detail") {
-    const fromHistory = state.currentView === "history" || (state.currentView === "detail" && state.detailOrigin === "history");
-    state.detailOrigin = fromHistory ? "history" : "inventory";
+    const forcedOrigin = String(state.nextDetailOrigin || "").trim();
+    if (forcedOrigin === "history" || forcedOrigin === "inventory") {
+      state.detailOrigin = forcedOrigin;
+    } else {
+      const fromHistory = state.currentView === "history" || (state.currentView === "detail" && state.detailOrigin === "history");
+      state.detailOrigin = fromHistory ? "history" : "inventory";
+    }
+    state.nextDetailOrigin = "";
     state.previousView = state.detailOrigin;
   } else if (route.view === "imports" || route.view === "tickets" || route.view === "tickets_new") {
+    state.nextDetailOrigin = "";
     state.previousView = "inventory";
   } else {
+    state.nextDetailOrigin = "";
     state.previousView = route.view;
     if (route.view === "inventory" || route.view === "history") state.detailOrigin = route.view;
   }
@@ -4566,6 +4576,11 @@ function bindInventoryEvents() {
     });
   }
   inventoryGrid.addEventListener("click", function(event) {
+    const detailTrigger = event.target.closest(".reference-detail-trigger");
+    if (detailTrigger) {
+      state.nextDetailOrigin = "inventory";
+      return;
+    }
     const toggle = event.target.closest('[data-action="toggle-arrival-meta"]');
     if (toggle) {
       state.inventoryArrivalMetaExpanded = !state.inventoryArrivalMetaExpanded;
@@ -4582,6 +4597,7 @@ function bindHistoryEvents() {
   const searchInput = document.getElementById("historySearchInput");
   const actionTypeFilter = document.getElementById("historyActionTypeFilter");
   const periodFilter = document.getElementById("historyPeriodFilter");
+  const historyList = document.getElementById("historyList");
   if (!searchInput || !actionTypeFilter) return;
   searchInput.addEventListener("input", function(event) {
     state.historyQuery = String(event.target.value || "").trim();
@@ -4595,6 +4611,13 @@ function bindHistoryEvents() {
     periodFilter.addEventListener("change", function(event) {
       state.historyPeriod = String(event.target.value || "all").trim() || "all";
       renderHistoryPage();
+    });
+  }
+  if (historyList) {
+    historyList.addEventListener("click", function(event) {
+      const detailLink = event.target.closest('a[href^="#detail/"]');
+      if (!detailLink) return;
+      state.nextDetailOrigin = "history";
     });
   }
 }
