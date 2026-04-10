@@ -1775,6 +1775,7 @@ function applyCreatePickupTicketMutation_(mutation) {
   const requestLines = Array.isArray(request.lines) ? request.lines : [];
   const clientTicketId = String(request.clientTicketId || "").trim();
   const lineMappings = [];
+  console.log("[applyCreatePickupTicketMutation_] start mutationId=%s clientTicketId=%s requestLines=%s title=%s", String(mutation && mutation.id || ""), clientTicketId, String(requestLines.length || 0), String(request.title || "").trim());
 
   ticketsSheet.appendRow([
     ticketId,
@@ -1793,6 +1794,7 @@ function applyCreatePickupTicketMutation_(mutation) {
     requestLines.length,
     1
   ]);
+  console.log("[applyCreatePickupTicketMutation_] ticket written ticketId=%s ticketNumber=%s status=%s", ticketId, ticketNumber, "in_progress");
 
   if (requestLines.length) {
     linesSheet.getRange(linesSheet.getLastRow() + 1, 1, requestLines.length, 18).setValues(requestLines.map(function(line, index) {
@@ -1823,6 +1825,7 @@ function applyCreatePickupTicketMutation_(mutation) {
         createdAt
       ];
     }));
+    console.log("[applyCreatePickupTicketMutation_] lines written ticketId=%s count=%s", ticketId, String(requestLines.length || 0));
   }
 
   appendPickupTicketEvent_(eventsSheet, {
@@ -1834,7 +1837,7 @@ function applyCreatePickupTicketMutation_(mutation) {
     message: "Ticket créé"
   });
 
-  return {
+  const responsePayload = {
     ok: true,
     mutationId: String(mutation.id || ""),
     clientTicketId: clientTicketId,
@@ -1845,6 +1848,8 @@ function applyCreatePickupTicketMutation_(mutation) {
     generatedAt: new Date().toISOString(),
     source: "google_sheets"
   };
+  console.log("[applyCreatePickupTicketMutation_] success mutationId=%s clientTicketId=%s ticketId=%s ticketNumber=%s lineMappings=%s", String(mutation && mutation.id || ""), clientTicketId, ticketId, ticketNumber, String(lineMappings.length || 0));
+  return responsePayload;
 }
 
 function generatePickupTicketNumber_(sheet) {

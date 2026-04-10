@@ -335,6 +335,9 @@ function syncPendingMutations(options) {
       queueLength: state.pendingMutations.length,
       mutation: describePendingMutation_(mutation)
     });
+    console.info("[syncPendingMutations] pushMutation dispatch", {
+      mutation: describePendingMutation_(mutation)
+    });
     return remoteDataSource.pushMutation(mutation).then(function(result) {
       const committed = dataSource.commitSyncedMutation({
         mutationId: mutation.id,
@@ -359,6 +362,11 @@ function syncPendingMutations(options) {
       state.historyItems = Array.isArray(committed.historyItems) ? committed.historyItems : state.historyItems;
       state.pickupTickets = Array.isArray(committed.pickupTickets) ? committed.pickupTickets : state.pickupTickets;
       applyDataMeta(committed.meta);
+      console.info("[syncPendingMutations] commit applied", {
+        mutation: describePendingMutation_(mutation),
+        remainingQueue: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0,
+        ticketIdentityMapping: committed.ticketIdentityMapping || null
+      });
       if (/^create_pickup_ticket$|^resolve_pickup_ticket_line$|^validate_pickup_ticket$|^cancel_pickup_ticket$/i.test(String(mutation.type || ""))) {
         processedTicketMutation = true;
       }
@@ -523,6 +531,7 @@ function applyLocalPickupTicketsState(ticketId) {
   if (!dataSource || !dataSource.loadPickupTickets) return;
   const ticketsResult = dataSource.loadPickupTickets();
   state.pickupTickets = Array.isArray(ticketsResult.items) ? ticketsResult.items : [];
+  applyDataMeta(ticketsResult.meta);
   state.pickupTicketsLoaded = true;
   if (ticketId && dataSource.loadPickupTicket) {
     const detailResult = dataSource.loadPickupTicket(ticketId);
@@ -5205,7 +5214,13 @@ function createPickupTicketFromDraft() {
     : null;
   if (optimisticResult) {
     hasLocalWritesThisSession = true;
+    console.info("[createPickupTicketFromDraft] local ticket created", {
+      ticketId: optimisticResult.ticket && optimisticResult.ticket.ticketId ? optimisticResult.ticket.ticketId : "",
+      ticketNumber: optimisticResult.ticket && optimisticResult.ticket.ticketNumber ? optimisticResult.ticket.ticketNumber : "",
+      mutation: describePendingMutation_(optimisticResult.mutation || null)
+    });
     state.pickupTickets = optimisticResult.items;
+    applyDataMeta(optimisticResult.meta);
     state.pickupTicket = optimisticResult.ticket.ticketId;
     state.ticketCreationDraft = {
       title: "",
@@ -5274,6 +5289,7 @@ function updatePickupTicketLine(ticketId, lineId, request) {
       const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail, pendingMutation);
       hasLocalWritesThisSession = true;
       state.pickupTickets = saved.items;
+      applyDataMeta(saved.meta);
     }
     applyLocalPickupTicketsState(ticketId);
     seedPickupTicketLineDrafts(ticketId);
@@ -5391,6 +5407,7 @@ function handleValidateTicket(ticketId) {
     const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail, pendingMutation);
     hasLocalWritesThisSession = true;
     state.pickupTickets = saved.items;
+    applyDataMeta(saved.meta);
     applyLocalPickupTicketsState(ticketId);
     renderPickupTicketsPage();
     if (navigator.onLine) syncPendingMutations({ silent: true });
