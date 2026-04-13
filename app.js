@@ -151,9 +151,21 @@ function applyDataMeta(meta) {
 }
 
 function isRemoteReadAllowed(options) {
-  if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) return false;
-  if (!navigator.onLine) return false;
-  return !(options && options.disabled);
+  const remotePresent = Boolean(remoteDataSource);
+  const remoteConfigured = Boolean(remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured());
+  const debugInfo = remoteDataSource && remoteDataSource.getDebugInfo ? remoteDataSource.getDebugInfo() : {};
+  const disabled = Boolean(options && options.disabled);
+  const allowed = remotePresent && remoteConfigured && navigator.onLine && !disabled;
+  if (!allowed) {
+    bootLog_("remote read blocked", {
+      online: navigator.onLine,
+      remoteDataSourcePresent: remotePresent,
+      remoteConfigured: remoteConfigured,
+      disabled: disabled,
+      reason: debugInfo && debugInfo.reason ? debugInfo.reason : ""
+    });
+  }
+  return allowed;
 }
 
 function getSyncStatusLabel(defaultLabel) {
@@ -5623,6 +5635,23 @@ function registerServiceWorker() {
 function registerVueBridge() {
   window.__szAppState = state;
   window.__szBootDiagnostics = getBootDiagnostics_;
+  window.__szRemoteDebug = function() {
+    const remoteDebug = remoteDataSource && remoteDataSource.getDebugInfo ? remoteDataSource.getDebugInfo() : {};
+    return {
+      online: navigator.onLine,
+      remoteDataSourcePresent: Boolean(remoteDataSource),
+      configured: Boolean(remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured()),
+      apiBaseUrl: remoteDebug && remoteDebug.apiBaseUrl ? remoteDebug.apiBaseUrl : "",
+      reason: remoteDebug && remoteDebug.reason ? remoteDebug.reason : "",
+      refreshRemoteSnapshotCallable: typeof refreshRemoteSnapshot === "function",
+      refreshRemotePickupTicketsBootstrapCallable: typeof refreshRemotePickupTicketsBootstrap === "function",
+      itemsCount: Array.isArray(state.items) ? state.items.length : 0,
+      historyCount: Array.isArray(state.historyItems) ? state.historyItems.length : 0,
+      ticketsCount: Array.isArray(state.pickupTickets) ? state.pickupTickets.length : 0,
+      lastSyncAt: String(state.lastSyncAt || ""),
+      syncStatus: String(state.syncStatus || "")
+    };
+  };
   window.__szAppApi = {
     state: state,
     adoptReactiveState: adoptReactiveState,
@@ -5746,6 +5775,11 @@ function initApp() {
     buildStateFromPieces: buildStateFromPieces
   });
   remoteDataSource = window.createRemoteDataSource ? window.createRemoteDataSource() : null;
+  bootLog_("remote data source created", remoteDataSource && remoteDataSource.getDebugInfo ? remoteDataSource.getDebugInfo() : {
+    remoteDataSourcePresent: Boolean(remoteDataSource),
+    configured: Boolean(remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured()),
+    reason: remoteDataSource ? "" : "createRemoteDataSource unavailable"
+  });
   const inventoryResult = dataSource.loadInventory();
   const historyResult = dataSource.loadHistory();
   const pickupTicketsResult = dataSource.loadPickupTickets ? dataSource.loadPickupTickets() : { items: [] };

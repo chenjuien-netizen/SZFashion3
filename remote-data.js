@@ -1,10 +1,32 @@
 (function() {
-  function getBaseUrl(config) {
+  function remoteLog_(stage, payload) {
+    console.info("[remote] " + stage, payload || {});
+  }
+
+  function getBaseUrlInfo(config) {
     if (config && typeof config.baseUrl === "string" && config.baseUrl.trim()) {
-      return config.baseUrl.trim();
+      return {
+        apiBaseUrl: config.baseUrl.trim(),
+        configured: true,
+        source: "config.baseUrl",
+        reason: "Configured via createRemoteDataSource(config.baseUrl)."
+      };
     }
     const meta = document.querySelector('meta[name="szfashion-pull-url"]');
-    return meta && meta.content ? String(meta.content).trim() : "";
+    if (meta && meta.content && String(meta.content).trim()) {
+      return {
+        apiBaseUrl: String(meta.content).trim(),
+        configured: true,
+        source: "meta",
+        reason: "Configured via meta[name=\"szfashion-pull-url\"]."
+      };
+    }
+    return {
+      apiBaseUrl: "",
+      configured: false,
+      source: "missing",
+      reason: 'Source Google Sheets non configurée: meta szfashion-pull-url absente.'
+    };
   }
 
   function buildUrl(baseUrl, route, params) {
@@ -18,25 +40,54 @@
     return url.toString();
   }
 
-  function fetchJson(url) {
+  function fetchJson(url, context) {
+    remoteLog_("fetch start", {
+      method: "GET",
+      route: context && context.route ? context.route : "",
+      url: url
+    });
     return fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
       cache: "no-store"
     }).then(function(response) {
       if (!response.ok) {
+        remoteLog_("fetch failed", {
+          method: "GET",
+          route: context && context.route ? context.route : "",
+          url: url,
+          status: response.status
+        });
         throw new Error("Lecture distante impossible (" + response.status + ").");
       }
       return response.json().then(function(payload) {
         if (payload && payload.error) {
+          remoteLog_("fetch payload error", {
+            method: "GET",
+            route: context && context.route ? context.route : "",
+            url: url,
+            status: response.status,
+            message: String(payload.message || "Lecture distante impossible.")
+          });
           throw new Error(String(payload.message || "Lecture distante impossible."));
         }
+        remoteLog_("fetch success", {
+          method: "GET",
+          route: context && context.route ? context.route : "",
+          url: url,
+          status: response.status
+        });
         return payload;
       });
     });
   }
 
-  function postJson(url, body) {
+  function postJson(url, body, context) {
+    remoteLog_("fetch start", {
+      method: "POST",
+      route: context && context.route ? context.route : "",
+      url: url
+    });
     return fetch(url, {
       method: "POST",
       headers: {
@@ -45,12 +96,31 @@
       body: JSON.stringify(body || {})
     }).then(function(response) {
       if (!response.ok) {
+        remoteLog_("fetch failed", {
+          method: "POST",
+          route: context && context.route ? context.route : "",
+          url: url,
+          status: response.status
+        });
         throw new Error("Ecriture distante impossible (" + response.status + ").");
       }
       return response.json().then(function(payload) {
         if (payload && payload.error) {
+          remoteLog_("fetch payload error", {
+            method: "POST",
+            route: context && context.route ? context.route : "",
+            url: url,
+            status: response.status,
+            message: String(payload.message || "Ecriture distante impossible.")
+          });
           throw new Error(String(payload.message || "Ecriture distante impossible."));
         }
+        remoteLog_("fetch success", {
+          method: "POST",
+          route: context && context.route ? context.route : "",
+          url: url,
+          status: response.status
+        });
         return payload;
       });
     });
@@ -112,55 +182,66 @@
   }
 
   window.createRemoteDataSource = function createRemoteDataSource(config) {
-    const baseUrl = getBaseUrl(config);
+    const debugInfo = getBaseUrlInfo(config);
+    const baseUrl = debugInfo.apiBaseUrl;
 
     function ensureConfigured() {
       if (!baseUrl) {
-        throw new Error("Source Google Sheets non configurée.");
+        throw new Error(debugInfo.reason || "Source Google Sheets non configurée.");
       }
     }
 
+    function buildRequestUrl(route, params) {
+      ensureConfigured();
+      return buildUrl(baseUrl, route, params);
+    }
+
+    remoteLog_("data source created", debugInfo);
+
     return {
       isConfigured: function() {
-        return !!baseUrl;
+        return !!debugInfo.configured;
+      },
+      getDebugInfo: function() {
+        return Object.assign({}, debugInfo);
       },
       fetchInventory: function() {
-        ensureConfigured();
-        return fetchJson(buildUrl(baseUrl, "inventory")).then(normalizeInventoryPayload);
+        const url = buildRequestUrl("inventory");
+        return fetchJson(url, { route: "inventory" }).then(normalizeInventoryPayload);
       },
       fetchHistory: function() {
-        ensureConfigured();
-        return fetchJson(buildUrl(baseUrl, "history")).then(normalizeHistoryPayload);
+        const url = buildRequestUrl("history");
+        return fetchJson(url, { route: "history" }).then(normalizeHistoryPayload);
       },
       fetchDetail: function(reference) {
-        ensureConfigured();
-        return fetchJson(buildUrl(baseUrl, "detail", { reference: reference })).then(function(payload) {
+        const url = buildRequestUrl("detail", { reference: reference });
+        return fetchJson(url, { route: "detail" }).then(function(payload) {
           return normalizeDetailPayload(payload, reference);
         });
       },
       fetchReferenceImportBatches: function() {
-        ensureConfigured();
-        return fetchJson(buildUrl(baseUrl, "reference_import_batches"));
+        const url = buildRequestUrl("reference_import_batches");
+        return fetchJson(url, { route: "reference_import_batches" });
       },
       fetchReferenceImportBatch: function(batchId) {
-        ensureConfigured();
-        return fetchJson(buildUrl(baseUrl, "reference_import_batch", { batch_id: batchId }));
+        const url = buildRequestUrl("reference_import_batch", { batch_id: batchId });
+        return fetchJson(url, { route: "reference_import_batch" });
       },
       fetchPickupTickets: function() {
-        ensureConfigured();
-        return fetchJson(buildUrl(baseUrl, "pickup_tickets"));
+        const url = buildRequestUrl("pickup_tickets");
+        return fetchJson(url, { route: "pickup_tickets" });
       },
       fetchPickupTicketsBootstrap: function() {
-        ensureConfigured();
-        return fetchJson(buildUrl(baseUrl, "pickup_tickets_bootstrap")).then(normalizePickupTicketsBootstrapPayload);
+        const url = buildRequestUrl("pickup_tickets_bootstrap");
+        return fetchJson(url, { route: "pickup_tickets_bootstrap" }).then(normalizePickupTicketsBootstrapPayload);
       },
       fetchPickupTicket: function(ticketId) {
-        ensureConfigured();
-        return fetchJson(buildUrl(baseUrl, "pickup_ticket", { ticket_id: ticketId }));
+        const url = buildRequestUrl("pickup_ticket", { ticket_id: ticketId });
+        return fetchJson(url, { route: "pickup_ticket" });
       },
       pushMutation: function(mutation) {
-        ensureConfigured();
-        return postJson(buildUrl(baseUrl, "mutate"), { mutation: mutation }).then(normalizeMutationPayload);
+        const url = buildRequestUrl("mutate");
+        return postJson(url, { mutation: mutation }, { route: "mutate" }).then(normalizeMutationPayload);
       }
     };
   };
