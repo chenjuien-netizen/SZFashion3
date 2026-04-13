@@ -1,8 +1,33 @@
 (function() {
   const vue = window.Vue;
-  const state = window.__szAppState;
+  function bootLog_(stage, payload) {
+    console.info("[boot] " + stage, payload || {});
+  }
+
+  function ensureVueStateBridge_() {
+    const api = window.__szAppApi;
+    const rawState = window.__szAppState;
+    if (!vue || !api || !rawState) return rawState || null;
+    if (rawState && rawState.__v_isReactive === true) return rawState;
+    if (typeof api.adoptReactiveState !== "function") return rawState;
+    return api.adoptReactiveState(vue.reactive(rawState));
+  }
+
+  if (!vue) {
+    console.error("[boot] Vue missing before app-vue bootstrap");
+    return;
+  }
+
+  const state = ensureVueStateBridge_();
   const api = window.__szAppApi;
-  if (!vue || !state || !api) return;
+  if (!state || !api) {
+    console.error("[boot] Vue bootstrap prerequisites missing", {
+      vueLoaded: Boolean(vue),
+      statePresent: Boolean(state),
+      apiPresent: Boolean(api)
+    });
+    return;
+  }
 
   window.SZVueModules = window.SZVueModules || {};
 
@@ -228,13 +253,38 @@
 
   window.SZVueModules.InventoryScreen = InventoryScreen;
 
-  function mountRoot() {
-    if (!window.SZVueModules.AppRoot) return;
+  function mountRoot(attempt) {
+    const modules = window.SZVueModules || {};
     const root = document.getElementById("app");
-    if (!root) return;
+    if (!window.Vue || !window.__szAppState || !window.__szAppApi || !modules.AppRoot || !root) {
+      if ((attempt || 0) < 20) {
+        window.setTimeout(function() {
+          mountRoot((attempt || 0) + 1);
+        }, 50);
+      } else {
+        console.error("[boot] Vue root mount aborted", {
+          vueLoaded: Boolean(window.Vue),
+          statePresent: Boolean(window.__szAppState),
+          apiPresent: Boolean(window.__szAppApi),
+          modulesPresent: Boolean(window.SZVueModules),
+          appRootPresent: Boolean(modules.AppRoot),
+          rootPresent: Boolean(root)
+        });
+      }
+      return;
+    }
+    if (window.__szRootVueMounted === true) return;
+    bootLog_("before root mount", window.__szAppApi.getBootDiagnostics ? window.__szAppApi.getBootDiagnostics() : {});
     window.__szRootVueMounted = true;
-    vue.createApp(window.SZVueModules.AppRoot).mount(root);
+    vue.createApp(modules.AppRoot).mount(root);
+    bootLog_("after root mount", window.__szAppApi.getBootDiagnostics ? window.__szAppApi.getBootDiagnostics() : {});
   }
 
-  document.addEventListener("DOMContentLoaded", mountRoot);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function() {
+      mountRoot(0);
+    });
+  } else {
+    mountRoot(0);
+  }
 })();

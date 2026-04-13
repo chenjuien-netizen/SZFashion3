@@ -94,9 +94,54 @@ const baseState = {
   quickExitForm: null
 };
 
-const state = window.Vue && typeof window.Vue.reactive === "function"
-  ? window.Vue.reactive(baseState)
-  : baseState;
+let state = baseState;
+
+function isStateReactive_(value) {
+  return !!(value && value.__v_isReactive === true);
+}
+
+function isVueRootModeEnabled_() {
+  return typeof document !== "undefined" && !!document.getElementById("app");
+}
+
+function bootLog_(stage, payload) {
+  console.info("[boot] " + stage, payload || {});
+}
+
+function getBootDiagnostics_() {
+  return {
+    vueLoaded: Boolean(window.Vue),
+    stateReactive: isStateReactive_(state),
+    bridgeRegistered: Boolean(window.__szAppApi),
+    rootMounted: Boolean(window.__szRootVueMounted),
+    currentView: String(state && state.currentView || ""),
+    itemsCount: Array.isArray(state && state.items) ? state.items.length : 0,
+    historyCount: Array.isArray(state && state.historyItems) ? state.historyItems.length : 0,
+    ticketsCount: Array.isArray(state && state.pickupTickets) ? state.pickupTickets.length : 0,
+    pendingMutations: Array.isArray(state && state.pendingMutations) ? state.pendingMutations.length : 0,
+    syncStatus: String(state && state.syncStatus || "")
+  };
+}
+
+function adoptReactiveState(nextState) {
+  if (!nextState || nextState === state) {
+    if (window.__szAppState !== state) window.__szAppState = state;
+    if (window.__szAppApi) window.__szAppApi.state = state;
+    return state;
+  }
+  state = nextState;
+  window.__szAppState = state;
+  if (window.__szAppApi) window.__szAppApi.state = state;
+  bootLog_("state adopted", {
+    vueLoaded: Boolean(window.Vue),
+    stateReactive: isStateReactive_(state)
+  });
+  return state;
+}
+
+if (window.Vue && typeof window.Vue.reactive === "function") {
+  adoptReactiveState(window.Vue.reactive(baseState));
+}
 
 function applyDataMeta(meta) {
   state.pendingMutations = meta && Array.isArray(meta.pendingMutations) ? meta.pendingMutations : [];
@@ -121,6 +166,10 @@ function getSyncStatusLabel(defaultLabel) {
 function refreshRemoteSnapshot(options) {
   if (!isRemoteReadAllowed(options)) {
     if (navigator.onLine === false) state.syncStatus = "offline";
+    bootLog_("remote snapshot skipped", {
+      online: navigator.onLine,
+      configured: Boolean(remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured())
+    });
     return Promise.resolve(false);
   }
   if (remoteRefreshPromise) return remoteRefreshPromise;
@@ -145,11 +194,22 @@ function refreshRemoteSnapshot(options) {
     state.items = Array.isArray(snapshotResult.items) ? snapshotResult.items : state.items;
     state.historyItems = Array.isArray(snapshotResult.historyItems) ? snapshotResult.historyItems : state.historyItems;
     applyDataMeta(snapshotResult.meta);
+    bootLog_("after remote snapshot", {
+      itemsCount: state.items.length,
+      historyCount: state.historyItems.length,
+      ticketsCount: Array.isArray(state.pickupTickets) ? state.pickupTickets.length : 0,
+      pendingMutations: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0,
+      syncStatus: state.syncStatus
+    });
     renderAll();
     return true;
   }).catch(function(error) {
     console.warn("Remote read-only refresh failed", error);
     state.syncStatus = navigator.onLine ? "error" : "offline";
+    bootLog_("remote snapshot failed", {
+      message: error && error.message ? error.message : String(error || ""),
+      syncStatus: state.syncStatus
+    });
     renderAll();
     return false;
   }).finally(function() {
@@ -237,6 +297,10 @@ function refreshRemotePickupTickets(options) {
 function refreshRemotePickupTicketsBootstrap(options) {
   if (!isRemoteReadAllowed(options) || !remoteDataSource.fetchPickupTicketsBootstrap) {
     if (navigator.onLine === false) state.syncStatus = "offline";
+    bootLog_("remote tickets bootstrap skipped", {
+      online: navigator.onLine,
+      configured: Boolean(remoteDataSource && remoteDataSource.fetchPickupTicketsBootstrap)
+    });
     return Promise.resolve(false);
   }
   if (remotePickupTicketsRefreshPromise) return remotePickupTicketsRefreshPromise;
@@ -253,10 +317,19 @@ function refreshRemotePickupTicketsBootstrap(options) {
         });
       }
     }
+    bootLog_("after remote tickets bootstrap", {
+      ticketsCount: Array.isArray(state.pickupTickets) ? state.pickupTickets.length : 0,
+      pendingMutations: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0,
+      syncStatus: state.syncStatus
+    });
     if (!options || !options.silent) renderPickupTicketsPage();
     return true;
   }).catch(function(error) {
     console.warn("Pickup tickets bootstrap refresh failed", error);
+    bootLog_("remote tickets bootstrap failed", {
+      message: error && error.message ? error.message : String(error || ""),
+      syncStatus: navigator.onLine ? "error" : "offline"
+    });
     if (!options || !options.silent) {
       state.syncStatus = navigator.onLine ? "error" : "offline";
       renderAll();
@@ -3040,7 +3113,7 @@ function buildQuickExitPacksHintMarkup(colisage, packsPerBox) {
 }
 
 function renderQuickEdit() {
-  if (window.__szRootVueMounted === true) return;
+  if (isVueRootModeEnabled_()) return;
   const els = getQuickEditElements();
   const isOpen = !!state.quickEditOpen && !!state.quickEditItem;
   els.quickEditOverlay.classList.toggle("hidden", !isOpen);
@@ -3380,6 +3453,7 @@ function handleQuickEditSave() {
 }
 
 function bindQuickEditEvents() {
+  if (isVueRootModeEnabled_()) return;
   const els = getQuickEditElements();
   if (!els.quickEditOverlay) return;
   els.quickEditTabQuickExit.addEventListener("click", function() {
@@ -3561,7 +3635,7 @@ function bindQuickEditEvents() {
 }
 
 function renderInventoryPage() {
-  if (window.__szInventoryVueMounted === true) return;
+  if (isVueRootModeEnabled_() || window.__szInventoryVueMounted === true) return;
   const searchInput = document.getElementById("searchInput");
   const stockFilter = document.getElementById("inventoryStockFilter");
   const arrivalFilter = document.getElementById("inventoryArrivalFilter");
@@ -3605,7 +3679,7 @@ function renderInventoryPage() {
 }
 
 function renderHistoryPage() {
-  if (window.__szRootVueMounted === true) return;
+  if (isVueRootModeEnabled_()) return;
   const searchInput = document.getElementById("historySearchInput");
   const actionTypeFilter = document.getElementById("historyActionTypeFilter");
   const periodFilter = document.getElementById("historyPeriodFilter");
@@ -3636,7 +3710,7 @@ function renderHistoryPage() {
 }
 
 function renderDetailPage() {
-  if (window.__szRootVueMounted === true) return;
+  if (isVueRootModeEnabled_()) return;
   const detailReference = document.getElementById("detailReference");
   const detailSubline = document.getElementById("detailSubline");
   const detailPrimaryReference = document.getElementById("detailPrimaryReference");
@@ -3702,7 +3776,7 @@ function renderDetailPage() {
 }
 
 function renderReferenceImportsPage() {
-  if (window.__szRootVueMounted === true) return;
+  if (isVueRootModeEnabled_()) return;
   const status = document.getElementById("referenceImportsStatus");
   const content = document.getElementById("referenceImportsContent");
   if (!content) return;
@@ -4527,7 +4601,7 @@ function renderPickupTicketDetailLoadingView(ticketId) {
 }
 
 function renderPickupTicketsPage() {
-  if (window.__szRootVueMounted === true) return;
+  if (isVueRootModeEnabled_()) return;
   const status = document.getElementById("pickupTicketsStatus");
   const content = document.getElementById("pickupTicketsContent");
   const backButton = document.getElementById("pickupTicketsBackButton");
@@ -4568,7 +4642,7 @@ function renderPickupTicketsPage() {
 }
 
 function renderAll() {
-  if (window.__szRootVueMounted === true) return;
+  if (isVueRootModeEnabled_()) return;
   renderInventoryPage();
   renderHistoryPage();
   renderDetailPage();
@@ -4578,7 +4652,7 @@ function renderAll() {
 }
 
 function syncActiveShell() {
-  if (window.__szRootVueMounted === true) return;
+  if (isVueRootModeEnabled_()) return;
   const inventoryShell = document.getElementById("inventoryAppShell");
   const historyShell = document.getElementById("historyAppShell");
   const detailShell = document.getElementById("detailAppShell");
@@ -4620,6 +4694,7 @@ function syncColumnLayout(force) {
 }
 
 function bindInventoryEvents() {
+  if (isVueRootModeEnabled_()) return;
   const searchInput = document.getElementById("searchInput");
   const stockFilter = document.getElementById("inventoryStockFilter");
   const arrivalFilter = document.getElementById("inventoryArrivalFilter");
@@ -4710,6 +4785,7 @@ function bindInventoryEvents() {
 }
 
 function bindHistoryEvents() {
+  if (isVueRootModeEnabled_()) return;
   const searchInput = document.getElementById("historySearchInput");
   const actionTypeFilter = document.getElementById("historyActionTypeFilter");
   const periodFilter = document.getElementById("historyPeriodFilter");
@@ -4739,6 +4815,7 @@ function bindHistoryEvents() {
 }
 
 function bindDetailEvents() {
+  if (isVueRootModeEnabled_()) return;
   const detailBackButton = document.getElementById("detailBackButton");
   const detailQuickEditButton = document.getElementById("detailQuickEditButton");
   const detailRemarkEditButton = document.getElementById("detailRemarkEditButton");
@@ -4765,6 +4842,7 @@ function bindDetailEvents() {
 }
 
 function bindReferenceImportsEvents() {
+  if (isVueRootModeEnabled_()) return;
   const backButton = document.getElementById("referenceImportsBackButton");
   const refreshButton = document.getElementById("referenceImportsRefreshButton");
   const uploadButton = document.getElementById("referenceImportUploadButton");
@@ -4808,6 +4886,7 @@ function bindReferenceImportsEvents() {
 }
 
 function bindPickupTicketsEvents() {
+  if (isVueRootModeEnabled_()) return;
   const backButton = document.getElementById("pickupTicketsBackButton");
   const refreshButton = document.getElementById("pickupTicketsRefreshButton");
   const newButton = document.getElementById("pickupTicketNewButton");
@@ -5543,8 +5622,11 @@ function registerServiceWorker() {
 
 function registerVueBridge() {
   window.__szAppState = state;
+  window.__szBootDiagnostics = getBootDiagnostics_;
   window.__szAppApi = {
     state: state,
+    adoptReactiveState: adoptReactiveState,
+    getBootDiagnostics: getBootDiagnostics_,
     getDetailViewModel: getDetailViewModel,
     filterInventoryItems: filterInventoryItems,
     filterHistoryItems: filterHistoryItems,
@@ -5671,6 +5753,7 @@ function initApp() {
   state.historyItems = Array.isArray(historyResult.items) ? historyResult.items : [];
   state.pickupTickets = Array.isArray(pickupTicketsResult.items) ? pickupTicketsResult.items : [];
   applyDataMeta(inventoryResult.meta);
+  bootLog_("after local load", getBootDiagnostics_());
   state.columnCount = getColumnCount();
   const route = parseCurrentRoute();
   state.currentView = route.view === "tickets_new" ? "tickets" : route.view;
@@ -5712,6 +5795,7 @@ function initApp() {
     }
     return false;
   }).then(function() {
+    bootLog_("after initial boot sync", getBootDiagnostics_());
     renderAll();
     return true;
   });
@@ -5740,6 +5824,7 @@ function initApp() {
   });
   window.addEventListener("online", function() {
     renderAll();
+    bootLog_("online event", getBootDiagnostics_());
     Promise.all([
       refreshRemoteSnapshot({ silent: true }),
       refreshRemotePickupTicketsBootstrap({ silent: true })
@@ -5767,6 +5852,7 @@ function initApp() {
   });
   window.addEventListener("offline", function() {
     state.syncStatus = "offline";
+    bootLog_("offline event", getBootDiagnostics_());
     renderAll();
   });
   window.addEventListener("hashchange", handleRouteChange);

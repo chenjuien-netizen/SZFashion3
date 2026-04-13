@@ -57,16 +57,20 @@
       }
     </style>
     <link rel="stylesheet" href="./style.css" />
+    <!-- Vue must be available before app.js can adopt the shared reactive state. -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js" defer></script>
     <script src="./local-data.js" defer></script>
     <script src="./remote-data.js" defer></script>
+    <!-- app.js stays the business engine and registers the state/API bridge. -->
     <script src="./app.js" defer></script>
+    <!-- app-vue.js upgrades the shared state bridge before domain modules capture it. -->
+    <script src="./app-vue.js" defer></script>
     <script src="./app-vue-history.js" defer></script>
     <script src="./app-vue-detail.js" defer></script>
     <script src="./app-vue-imports.js" defer></script>
     <script src="./app-vue-tickets.js" defer></script>
     <script src="./app-vue-quick-edit.js" defer></script>
-    <script src="./app-vue.js" defer></script>
+    <!-- app-vue-root.js only registers the final root component; mounting stays in app-vue.js. -->
     <script src="./app-vue-root.js" defer></script>
   </head>
   <body class="h-[100dvh] max-h-[100dvh] overflow-hidden bg-background text-on-surface antialiased" data-page="app">
