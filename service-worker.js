@@ -1,10 +1,11 @@
-const CACHE_NAME = "szfashion-shell-v1";
+const CACHE_NAME = "szfashion-shell-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./local-data.js",
   "./remote-data.js",
   "./app.js",
+  "./app-vue.js",
   "./style.css",
   "./manifest.webmanifest",
   "./icon.svg",
@@ -12,6 +13,7 @@ const APP_SHELL = [
   "./detail.html"
 ];
 const EXTERNAL_ASSETS = [
+  "https://unpkg.com/vue@3/dist/vue.global.prod.js",
   "https://cdn.tailwindcss.com?plugins=forms,container-queries",
   "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
   "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
@@ -70,6 +72,7 @@ self.addEventListener("fetch", function(event) {
   }
 
   const shouldRuntimeCache = url.origin === self.location.origin
+    || /unpkg\.com$/.test(url.hostname)
     || /cdn\.tailwindcss\.com$/.test(url.hostname)
     || /fonts\.googleapis\.com$/.test(url.hostname)
     || /fonts\.gstatic\.com$/.test(url.hostname);

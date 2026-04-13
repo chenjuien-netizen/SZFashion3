@@ -7,7 +7,7 @@ let remotePickupTicketRefreshPromises = Object.create(null);
 let remoteMutationSyncPromise = null;
 let hasLocalWritesThisSession = false;
 
-const state = {
+const baseState = {
   items: [],
   historyItems: [],
   pendingMutations: [],
@@ -78,6 +78,10 @@ const state = {
   quickEditForm: null,
   quickExitForm: null
 };
+
+const state = window.Vue && typeof window.Vue.reactive === "function"
+  ? window.Vue.reactive(baseState)
+  : baseState;
 
 function applyDataMeta(meta) {
   state.pendingMutations = meta && Array.isArray(meta.pendingMutations) ? meta.pendingMutations : [];
@@ -3530,6 +3534,7 @@ function bindQuickEditEvents() {
 }
 
 function renderInventoryPage() {
+  if (window.__szInventoryVueMounted === true) return;
   const searchInput = document.getElementById("searchInput");
   const stockFilter = document.getElementById("inventoryStockFilter");
   const arrivalFilter = document.getElementById("inventoryArrivalFilter");
@@ -4592,35 +4597,6 @@ function bindInventoryEvents() {
   const navHistoryButton = document.getElementById("navHistoryButton");
   const navTicketsButton = document.getElementById("navTicketsButton");
   const openReferenceImportsButton = document.getElementById("openReferenceImportsButton");
-  if (!searchInput || !inventoryGrid) return;
-  searchInput.addEventListener("input", function(event) {
-    state.query = String(event.target.value || "").trim();
-    renderInventoryPage();
-  });
-  if (stockFilter) {
-    stockFilter.addEventListener("change", function(event) {
-      state.inventoryStockFilter = String(event.target.value || "").trim();
-      renderInventoryPage();
-    });
-  }
-  if (arrivalFilter) {
-    arrivalFilter.addEventListener("change", function(event) {
-      state.inventoryArrivalFilter = String(event.target.value || "").trim();
-      renderInventoryPage();
-    });
-  }
-  if (tailFilter) {
-    tailFilter.addEventListener("change", function(event) {
-      state.inventoryTailFilter = String(event.target.value || "").trim();
-      renderInventoryPage();
-    });
-  }
-  if (sortSelect) {
-    sortSelect.addEventListener("change", function(event) {
-      state.inventorySort = String(event.target.value || "reference").trim() || "reference";
-      renderInventoryPage();
-    });
-  }
   if (navInventoryButton) {
     navInventoryButton.addEventListener("click", function() {
       navigateToInventoryContext();
@@ -4651,6 +4627,35 @@ function bindInventoryEvents() {
   if (openReferenceImportsButton) {
     openReferenceImportsButton.addEventListener("click", function() {
       navigateTo("imports");
+    });
+  }
+  if (!searchInput || !inventoryGrid || window.__szInventoryVueMounted === true) return;
+  searchInput.addEventListener("input", function(event) {
+    state.query = String(event.target.value || "").trim();
+    renderInventoryPage();
+  });
+  if (stockFilter) {
+    stockFilter.addEventListener("change", function(event) {
+      state.inventoryStockFilter = String(event.target.value || "").trim();
+      renderInventoryPage();
+    });
+  }
+  if (arrivalFilter) {
+    arrivalFilter.addEventListener("change", function(event) {
+      state.inventoryArrivalFilter = String(event.target.value || "").trim();
+      renderInventoryPage();
+    });
+  }
+  if (tailFilter) {
+    tailFilter.addEventListener("change", function(event) {
+      state.inventoryTailFilter = String(event.target.value || "").trim();
+      renderInventoryPage();
+    });
+  }
+  if (sortSelect) {
+    sortSelect.addEventListener("change", function(event) {
+      state.inventorySort = String(event.target.value || "reference").trim() || "reference";
+      renderInventoryPage();
     });
   }
   inventoryGrid.addEventListener("click", function(event) {
@@ -5501,6 +5506,35 @@ function registerServiceWorker() {
   });
 }
 
+function registerVueBridge() {
+  window.__szAppState = state;
+  window.__szAppApi = {
+    state: state,
+    filterInventoryItems: filterInventoryItems,
+    getInventorySummary: getInventorySummary,
+    getItemById: getItemById,
+    normalizeReference: normalizeReference,
+    getSyncStatusLabel: getSyncStatusLabel,
+    refreshRemoteSnapshot: refreshRemoteSnapshot,
+    navigateToInventoryContext: navigateToInventoryContext,
+    navigateToHistoryContext: navigateToHistoryContext,
+    navigateToTicketsContext: navigateToTicketsContext,
+    navigateTo: navigateTo,
+    forceInventoryListView: forceInventoryListView,
+    openQuickEdit: openQuickEdit,
+    syncActiveShell: syncActiveShell,
+    formatMetricNumber: formatMetricNumber,
+    getArrivalNote: getArrivalNote,
+    getInventoryArrivalMeta: getInventoryArrivalMeta,
+    splitInventoryArrivalNoteLines: splitInventoryArrivalNoteLines,
+    getArrivalGroupMeta: getArrivalGroupMeta,
+    formatArrivalGroupLabel: formatArrivalGroupLabel,
+    formatInventoryShortDate: formatInventoryShortDate,
+    buildColumnLayout: buildColumnLayout_,
+    getColumnCount: getColumnCount
+  };
+}
+
 function initApp() {
   dataSource = window.createLocalDataSource({
     hydrateItem: hydrateItem,
@@ -5620,4 +5654,5 @@ function initApp() {
   window.addEventListener("hashchange", handleRouteChange);
 }
 
+registerVueBridge();
 document.addEventListener("DOMContentLoaded", initApp);
