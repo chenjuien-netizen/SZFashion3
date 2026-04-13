@@ -1,132 +1,59 @@
 <!DOCTYPE html>
-<html class="light" lang="fr">
+<html lang="fr">
   <head>
-    <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport" />
-    <meta name="theme-color" content="#f7f9fb" />
-    <meta name="szfashion-pull-url" content="https://script.google.com/macros/s/AKfycbyHXo25txLTBZVPR97R2UazHTklIhIhU0k3ni8PtU34_RgEU8hxkpbL666_ezIX9CMA/exec" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>SZFASHION | Inventaire</title>
+    <meta name="apple-mobile-web-app-title" content="SZFashion" />
+    <meta name="theme-color" content="#f8fafc" />
+    <title>SZFashion Stock Mobile</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="./icon.svg" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script>
       tailwind.config = {
-        darkMode: "class",
         theme: {
           extend: {
             colors: {
-              "on-secondary-fixed-variant": "#4e5c71",
-              "inverse-on-surface": "#9a9d9f",
-              "on-secondary-fixed": "#324053",
-              "background": "#f7f9fb",
-              "tertiary-container": "#dad6f7",
-              "surface-variant": "#d9e4ea",
-              "on-surface-variant": "#566166",
-              "on-tertiary-fixed": "#393751",
-              "on-tertiary-container": "#4b4a65",
-              "on-tertiary": "#fcf7ff",
-              "surface-bright": "#f7f9fb",
+              background: "#f3f4f6",
+              surface: "#f8fafc",
               "surface-container-lowest": "#ffffff",
-              "error-dim": "#4e0309",
-              "primary-fixed-dim": "#ccd4ee",
-              "surface-tint": "#565e74",
-              "outline": "#717c82",
-              "tertiary-fixed": "#dad6f7",
-              "secondary-fixed-dim": "#c7d5ed",
-              "primary-fixed": "#dae2fd",
-              "primary-container": "#dae2fd",
-              "tertiary-fixed-dim": "#ccc9e9",
-              "inverse-surface": "#0b0f10",
-              "on-background": "#2a3439",
-              "on-surface": "#2a3439",
-              "on-primary-fixed": "#373f54",
-              "on-primary-fixed-variant": "#535b71",
-              "tertiary": "#5e5c78",
-              "surface-container-highest": "#d9e4ea",
-              "secondary-container": "#d5e3fc",
-              "surface-container": "#e8eff3",
-              "surface": "#f7f9fb",
-              "secondary-fixed": "#d5e3fc",
-              "secondary": "#526074",
-              "error-container": "#fe8983",
-              "tertiary-dim": "#52506b",
-              "on-secondary-container": "#455367",
-              "on-error-container": "#752121",
-              "inverse-primary": "#dae2fd",
-              "surface-container-low": "#f0f4f7",
-              "on-primary-container": "#4a5167",
-              "surface-dim": "#cfdce3",
-              "outline-variant": "#a9b4b9",
-              "on-primary": "#f7f7ff",
-              "surface-container-high": "#e1e9ee",
-              "on-error": "#fff7f6",
-              "on-secondary": "#f8f8ff",
-              "secondary-dim": "#465468",
-              "on-tertiary-fixed-variant": "#55536f",
-              "primary-dim": "#4a5268",
-              "error": "#9f403d",
-              "primary": "#565e74"
-            },
-            fontFamily: {
-              headline: ["Inter", "sans-serif"],
-              body: ["Inter", "sans-serif"],
-              label: ["Inter", "sans-serif"]
-            },
-            borderRadius: {
-              DEFAULT: "0px",
-              lg: "0px",
-              xl: "0px",
-              full: "9999px"
+              "surface-container-low": "#f8fafc",
+              "surface-container": "#e5e7eb",
+              "surface-container-high": "#d1d5db",
+              "surface-container-highest": "#cbd5e1",
+              "surface-tint": "#0f766e",
+              primary: "#0f766e",
+              "primary-dim": "#115e59",
+              "primary-container": "#ccfbf1",
+              "on-primary": "#f8fafc",
+              "on-primary-container": "#134e4a",
+              "on-surface": "#111827",
+              "on-surface-variant": "#475569",
+              outline: "#64748b",
+              "outline-variant": "#cbd5e1",
+              error: "#dc2626",
+              "error-container": "#fee2e2",
+              "on-error-container": "#7f1d1d",
+              "on-background": "#0f172a"
             },
             boxShadow: {
-              ledger: "0 1px 0 rgba(113, 124, 130, 0.12)"
+              ledger: "0 1px 0 rgba(15, 23, 42, 0.06)"
             }
           }
         }
       };
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
     <style>
-      .material-symbols-outlined {
-        font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 20;
-        font-size: 18px;
-      }
-
-      html,
-      body {
-        height: 100%;
-        min-height: 100dvh;
-        max-height: 100dvh;
-        overflow: hidden;
-        overscroll-behavior: none;
-      }
-
-      body {
-        min-height: 100dvh;
-        font-family: "Inter", sans-serif;
-        background-color: #f7f9fb;
+      html, body {
+        font-family: Inter, sans-serif;
       }
 
       .inventory-scroll {
         -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
-      }
-
-      @supports (-webkit-touch-callout: none) {
-        @media (hover: none) and (pointer: coarse) {
-          input,
-          select {
-            font-size: 16px !important;
-          }
-
-          #searchInput {
-            line-height: 1.3;
-          }
-        }
       }
     </style>
     <link rel="stylesheet" href="./style.css" />
@@ -134,397 +61,15 @@
     <script src="./local-data.js" defer></script>
     <script src="./remote-data.js" defer></script>
     <script src="./app.js" defer></script>
+    <script src="./app-vue-history.js" defer></script>
+    <script src="./app-vue-detail.js" defer></script>
+    <script src="./app-vue-imports.js" defer></script>
+    <script src="./app-vue-tickets.js" defer></script>
+    <script src="./app-vue-quick-edit.js" defer></script>
     <script src="./app-vue.js" defer></script>
+    <script src="./app-vue-root.js" defer></script>
   </head>
   <body class="h-[100dvh] max-h-[100dvh] overflow-hidden bg-background text-on-surface antialiased" data-page="app">
-    <div class="fixed inset-x-0 top-0 bottom-16 overflow-hidden bg-background" id="inventoryAppShell">
-      <div class="h-full min-h-0" id="inventoryVueRoot"></div>
-    </div>
-
-    <div class="fixed inset-x-0 top-0 bottom-16 hidden overflow-hidden bg-background" id="historyAppShell">
-      <main class="flex h-full min-h-0 flex-col overflow-hidden">
-        <div class="sticky top-0 z-40 shrink-0 bg-background">
-          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
-            <div class="flex items-center gap-3">
-              <div>
-                <h1 class="text-lg font-extrabold uppercase tracking-tight text-slate-900">Historique</h1>
-              </div>
-            </div>
-            <button aria-label="Rafraîchir" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="historyRefreshButton" type="button">
-              <span class="material-symbols-outlined">refresh</span>
-            </button>
-          </header>
-
-          <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
-              <input autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" id="historySearchInput" placeholder="RECHERCHE RÉFÉRENCE / TYPE / REMARQUE..." type="search" />
-            </div>
-            <div class="mt-2 grid grid-cols-[1fr_1fr_auto] items-center gap-2">
-              <label class="min-w-0">
-                <select class="w-full border-outline-variant/30 bg-surface-container-lowest text-[12px] font-medium text-on-surface" id="historyPeriodFilter">
-                  <option value="week">Cette semaine</option>
-                  <option value="month">Ce mois</option>
-                  <option value="all">Tout</option>
-                </select>
-              </label>
-              <label class="min-w-0 flex-1">
-                <select class="w-full border-outline-variant/30 bg-surface-container-lowest text-[12px] font-medium text-on-surface" id="historyActionTypeFilter">
-                  <option value="">Tous types</option>
-                  <option value="entry">entrée</option>
-                  <option value="exit">sortie</option>
-                  <option value="adjustment">ajustement</option>
-                </select>
-              </label>
-              <div class="shrink-0 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" id="historyStatus">Pret</div>
-            </div>
-          </section>
-        </div>
-
-        <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-outline-variant/20" id="historyScroll">
-          <div class="flex flex-col gap-px bg-outline-variant/20" id="historyList"></div>
-          <div class="hidden border-t border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center" id="historyEmptyState">
-            <p class="text-[12px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant" id="historyEmptyTitle">Aucun historique</p>
-            <p class="mt-1 text-[12px] text-on-surface-variant" id="historyEmptyMessage">Aucun mouvement à afficher.</p>
-          </div>
-        </section>
-      </main>
-    </div>
-
-    <div class="fixed inset-x-0 top-0 bottom-16 hidden overflow-hidden bg-background" id="detailAppShell">
-      <main class="flex h-full min-h-0 flex-col overflow-hidden">
-        <div class="sticky top-0 z-40 shrink-0 bg-background">
-          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
-            <div class="flex min-w-0 items-center gap-3">
-              <button aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="detailBackButton" type="button">
-                <span class="material-symbols-outlined">arrow_back</span>
-              </button>
-              <div class="min-w-0">
-                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900" id="detailReference">Fiche produit</h1>
-                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="detailSubline"></p>
-              </div>
-            </div>
-            <button class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="detailQuickEditButton" type="button">Modifier</button>
-          </header>
-        </div>
-
-        <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface px-4 py-4" id="detailScroll">
-          <div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
-            <div class="hidden border border-error/20 bg-error-container/15 px-4 py-3 text-[12px] font-medium text-on-error-container" id="detailNotFoundBanner">
-              Référence introuvable dans le stock courant.
-            </div>
-
-            <section class="border border-outline-variant/20 bg-surface-container-lowest p-4" id="detailMainSection">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Référence</div>
-                  <div class="mt-1 truncate text-2xl font-black tracking-tight text-on-surface" id="detailPrimaryReference">-</div>
-                  <div class="hidden" id="detailStockDisplay">-</div>
-                </div>
-                <div class="shrink-0 text-right text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="detailStockState">-</div>
-              </div>
-              <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
-                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">到货单</div>
-                  <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailSummary">-</div>
-                </div>
-                <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
-                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Entrepot</div>
-                  <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailWarehouse">-</div>
-                </div>
-                <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
-                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Création</div>
-                  <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailCreatedAt">-</div>
-                </div>
-                <div class="border border-outline-variant/20 bg-surface-container-low px-3 py-2">
-                  <div class="text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Dernier mouvement</div>
-                  <div class="mt-1 text-[12px] font-medium text-on-surface" id="detailLastMovement">-</div>
-                </div>
-              </div>
-            </section>
-
-            <section class="border border-outline-variant/20 bg-surface-container-lowest" id="detailStockStateSection">
-              <div class="border-b border-outline-variant/20 px-4 py-3">
-                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">État du stock</div>
-              </div>
-              <div id="detailStockStateTable">-</div>
-            </section>
-
-            <section class="border border-outline-variant/20 bg-surface-container-lowest p-4" id="detailRemarkSection">
-              <div class="flex items-center justify-between gap-3">
-                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Remarque</div>
-                <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="detailRemarkEditButton" type="button">Modifier</button>
-              </div>
-              <div class="mt-2 whitespace-pre-wrap text-[12px] leading-5 text-on-surface" id="detailRemark">-</div>
-            </section>
-
-            <section class="border border-outline-variant/20 bg-surface-container-lowest">
-              <div class="border-b border-outline-variant/20 px-4 py-3">
-                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Historique récent</div>
-              </div>
-              <div class="flex flex-col gap-px bg-outline-variant/20" id="detailHistoryList"></div>
-              <div class="hidden px-4 py-5 text-center" id="detailHistoryEmpty">
-                <p class="text-[12px] font-semibold uppercase tracking-[0.18em] text-on-surface-variant">Aucun historique</p>
-              </div>
-            </section>
-          </div>
-        </section>
-      </main>
-    </div>
-
-    <div class="fixed inset-x-0 top-0 bottom-16 hidden overflow-hidden bg-background" id="referenceImportsAppShell">
-      <main class="flex h-full min-h-0 flex-col overflow-hidden">
-        <div class="sticky top-0 z-40 shrink-0 bg-background">
-          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
-            <div class="flex min-w-0 items-center gap-3">
-              <button aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="referenceImportsBackButton" type="button">
-                <span class="material-symbols-outlined">arrow_back</span>
-              </button>
-              <div class="min-w-0">
-                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">Import références</h1>
-                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="referenceImportsStatus">Import Excel / ODS</p>
-              </div>
-            </div>
-            <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="referenceImportsRefreshButton" type="button">Rafraîchir</button>
-          </header>
-          <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">
-            <div class="grid gap-2">
-              <input class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="referenceImportFileInput" type="file" accept=".xlsx,.xls,.ods" />
-              <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" id="referenceImportSheetNameInput" placeholder="Nom de feuille (optionnel)" type="text" />
-              <div class="grid grid-cols-2 gap-2">
-                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingReference" placeholder="Colonne Réf" type="text" value="货号" />
-                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingWarehouse" placeholder="Colonne Entrepôt" type="text" value="仓库" />
-                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingArrival" placeholder="Colonne 到货单" type="text" value="到货单" />
-                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingRemark" placeholder="Colonne Remarque" type="text" value="放位/提醒" />
-                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingTail" placeholder="Colonne 尾箱" type="text" value="尾箱" />
-                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingUnits" placeholder="Colonne 件/箱" type="text" value="件/箱" />
-                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingBoxes" placeholder="Colonne 箱数" type="text" value="箱数" />
-                <input autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" id="referenceImportMappingPackNotation" placeholder="Colonne 包 notation" type="text" value="Notation paquets" />
-              </div>
-              <button class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="referenceImportUploadButton" type="button">Créer brouillon import</button>
-            </div>
-          </section>
-        </div>
-        <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-outline-variant/20" id="referenceImportsScroll">
-          <div class="flex flex-col gap-3 px-3 py-3" id="referenceImportsContent"></div>
-        </section>
-      </main>
-    </div>
-
-    <div class="fixed inset-x-0 top-0 bottom-16 hidden overflow-hidden bg-background" id="pickupTicketsAppShell">
-      <main class="flex h-full min-h-0 flex-col overflow-hidden">
-        <div class="sticky top-0 z-40 shrink-0 bg-background">
-          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
-            <div class="flex min-w-0 items-center gap-3">
-              <button aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" id="pickupTicketsBackButton" type="button">
-                <span class="material-symbols-outlined">arrow_back</span>
-              </button>
-              <div class="min-w-0">
-                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">Tickets sortie</h1>
-                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="pickupTicketsStatus">Sorties entrepôt</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button class="hidden border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="pickupTicketNewButton" type="button">Nouveau ticket</button>
-              <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="pickupTicketsRefreshButton" type="button">Rafraîchir</button>
-            </div>
-          </header>
-        </div>
-        <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-outline-variant/20" id="pickupTicketsScroll">
-          <div class="flex flex-col gap-3 px-3 py-3" id="pickupTicketsContent"></div>
-        </section>
-      </main>
-    </div>
-
-    <nav class="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch justify-around border-t border-slate-200 bg-slate-50">
-      <button class="flex flex-1 flex-col items-center justify-center bg-slate-200 px-2 py-1 text-slate-900" id="navInventoryButton" type="button" aria-current="page">
-        <span class="material-symbols-outlined">inventory_2</span>
-        <span class="mt-1 text-[10px] font-bold uppercase tracking-widest">Inventaire</span>
-      </button>
-      <button class="flex flex-1 flex-col items-center justify-center px-2 py-1 text-slate-400" id="navHistoryButton" type="button">
-        <span class="material-symbols-outlined">history</span>
-        <span class="mt-1 text-[10px] font-bold uppercase tracking-widest">Historique</span>
-      </button>
-      <button class="flex flex-1 flex-col items-center justify-center px-2 py-1 text-slate-400" id="navTicketsButton" type="button">
-        <span class="material-symbols-outlined">local_shipping</span>
-        <span class="mt-1 text-[10px] font-bold uppercase tracking-widest">Tickets</span>
-      </button>
-    </nav>
-
-    <div class="quick-edit-overlay fixed inset-0 z-[60] hidden items-center justify-center bg-on-background/35 px-3 py-6" id="quickEditOverlay" role="presentation">
-      <div aria-modal="true" class="relative max-h-[calc(100dvh-2.5rem)] w-full max-w-3xl overflow-hidden border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_48px_rgba(11,15,16,0.18)]" id="quickEditModal" role="dialog" aria-labelledby="quickEditReference">
-        <div class="border-b border-outline-variant/20 px-4 py-3">
-          <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-              <div class="truncate text-lg font-black tracking-tight text-on-surface" id="quickEditReference">-</div>
-            </div>
-            <div class="text-right">
-              <div class="text-[0.625rem] font-bold uppercase tracking-[0.2em] text-on-surface-variant">STOCK ACTUEL</div>
-              <div class="text-sm font-bold text-primary" id="quickEditStockDisplay">-</div>
-            </div>
-          </div>
-        </div>
-        <div class="border-b border-outline-variant/20 bg-surface-container-low px-4 py-2">
-          <div class="grid grid-cols-2 gap-2">
-            <button class="border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="quickEditTabQuickExit" type="button">Sortie rapide</button>
-            <button class="border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" id="quickEditTabEdit" type="button">Ajustement</button>
-          </div>
-        </div>
-        <div class="quick-edit-body max-h-[calc(100dvh-12.5rem)] overflow-y-auto px-4 py-3" id="quickEditBody">
-          <div class="space-y-4">
-            <p class="hidden overflow-hidden whitespace-nowrap text-[10px] text-on-surface-variant" id="quickExitPacksHint"></p>
-            <div class="relative overflow-visible" id="quickExitPanelWrap">
-              <section id="quickExitPanel">
-                <div class="rounded border border-outline-variant/20 bg-surface-container-low px-3 py-2">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Stock actuel</div>
-                    <button class="shrink-0 rounded border border-outline-variant/30 px-2 py-1 text-[10px] font-bold tracking-[0.12em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickExitClearButton" type="button">清空库存</button>
-                  </div>
-                  <div class="mt-2 w-full overflow-x-auto" id="quickExitCurrentStockScroll">
-                    <div class="flex justify-center">
-                      <div class="inline-flex min-w-fit flex-nowrap gap-2 text-sm font-semibold text-primary" id="quickExitCurrentStock">-</div>
-                    </div>
-                  </div>
-                  <div class="mt-2 hidden text-[11px] text-on-surface-variant" id="quickExitPreviewWrap">
-                    <span class="font-bold uppercase tracking-[0.16em] text-on-surface-variant">Apres sortie</span>
-                    <span class="ml-2 font-semibold text-on-surface" id="quickExitPreview">-</span>
-                  </div>
-                </div>
-                <div class="mt-3 w-full overflow-visible" id="quickExitSegmentFormsScroll">
-                  <div class="flex justify-center">
-                    <div class="inline-flex min-w-fit flex-nowrap items-start gap-6" id="quickExitSegmentForms"></div>
-                  </div>
-                </div>
-              </section>
-              <div class="pointer-events-none absolute inset-0 z-[90] hidden overflow-visible" id="quickExitDropdownLayer"></div>
-            </div>
-
-            <form class="hidden space-y-3" id="quickEditForm" novalidate>
-              <div class="space-y-2">
-                <div class="w-full" id="quickEditExpressionCenterWrap">
-                  <div class="overflow-x-auto" id="quickEditExpressionScroll">
-                    <div class="w-max min-w-0" id="quickEditExpressionMeasure">
-                      <div class="relative flex items-end gap-x-2 gap-y-2 whitespace-nowrap pb-1" id="quickEditExpressionLine">
-                        <div class="flex-none" id="quickEditTailSlot">
-                          <button aria-label="Ajouter 尾箱" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditTailToggle" type="button">
-                            <span class="material-symbols-outlined !text-[15px]" id="quickEditTailToggleIcon">add</span>
-                          </button>
-                          <div class="hidden" id="quickEditTailGroup">
-                            <label class="block" id="quickEditTailSegment">
-                              <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</span>
-                              <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditTail" inputmode="numeric" maxlength="16" placeholder="(85p)" type="text" />
-                            </label>
-                          </div>
-                        </div>
-                        <div class="pointer-events-none hidden flex-none w-4 self-stretch" id="quickEditTailJoinSlot">
-                          <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
-                            <span aria-hidden="true" class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
-                            <span aria-hidden="true" class="block text-sm font-medium opacity-0">+</span>
-                          </div>
-                          <span aria-hidden="true" class="pointer-events-none absolute text-sm font-medium text-on-surface-variant/80" id="quickEditTailJoin">+</span>
-                        </div>
-                        <div class="flex-none" id="quickEditUnitsPerBoxSlot">
-                          <label class="block" id="quickEditUnitsPerBoxField">
-                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</span>
-                            <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-semibold text-on-surface md:text-sm" id="quickEditUnitsPerBox" inputmode="numeric" maxlength="16" placeholder="144p" type="text" />
-                          </label>
-                        </div>
-                        <div class="pointer-events-none flex-none w-4 self-stretch" id="quickEditMultiplyJoinSlot">
-                          <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
-                            <span aria-hidden="true" class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
-                            <span aria-hidden="true" class="block text-sm font-medium opacity-0">×</span>
-                          </div>
-                          <span aria-hidden="true" class="pointer-events-none absolute text-sm font-medium text-on-surface-variant/80" id="quickEditMultiplyJoin">×</span>
-                        </div>
-                        <div class="flex-none" id="quickEditItemBoxesSlot">
-                          <label class="block" id="quickEditItemBoxesField">
-                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</span>
-                            <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-semibold text-on-surface md:text-sm" id="quickEditItemBoxes" inputmode="numeric" min="0" step="1" type="number" />
-                          </label>
-                        </div>
-                        <div class="flex-none" id="quickEditPartialSlot">
-                          <button aria-label="Ajouter bloc partiel" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditPartialToggle" type="button">
-                            <span class="material-symbols-outlined !text-[15px]" id="quickEditPartialToggleIcon">add</span>
-                          </button>
-                          <div class="hidden" id="quickEditPartialGroup">
-                            <div class="flex items-end gap-x-2 gap-y-2" id="quickEditPartialSegment">
-                              <label class="block" id="quickEditSignField">
-                                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
-                                <select class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditSign">
-                                  <option value="+">+</option>
-                                  <option value="×">×</option>
-                                </select>
-                              </label>
-                              <label class="block" id="quickEditFractionTextField">
-                                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">分数</span>
-                                <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditFractionText" inputmode="decimal" maxlength="10" placeholder="1/2" type="text" />
-                              </label>
-                              <label class="block" id="quickEditPackSignField">
-                                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
-                                <select class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditPackNotationSign">
-                                  <option value="+">+</option>
-                                  <option value="-">-</option>
-                                </select>
-                              </label>
-                              <label class="block" id="quickEditPackCountField">
-                                <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">包</span>
-                                <input class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" id="quickEditPackNotationCount" inputmode="numeric" min="0" step="1" type="number" />
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="hidden w-full" id="quickEditRemoveCenterWrap">
-                  <div class="overflow-x-auto" id="quickEditRemoveScroll">
-                    <div class="w-max min-w-0" id="quickEditRemoveMeasure">
-                      <div class="flex items-start gap-x-2 gap-y-1 whitespace-nowrap" id="quickEditRemoveLine">
-                        <div class="flex-none" id="quickEditTailRemoveSlot">
-                          <button aria-label="Retirer 尾箱" class="hidden inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditTailRemove" type="button">
-                            <span class="material-symbols-outlined !text-[15px]">remove</span>
-                          </button>
-                        </div>
-                        <div aria-hidden="true" class="hidden flex-none w-4" id="quickEditTailRemoveJoinSlot">
-                          <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
-                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
-                            <span class="flex items-center justify-center text-sm font-medium opacity-0" id="quickEditTailRemoveJoin">+</span>
-                          </div>
-                        </div>
-                        <span aria-hidden="true" class="flex-none opacity-0" id="quickEditUnitsPerBoxRemoveSpacer"></span>
-                        <div aria-hidden="true" class="flex-none w-4" id="quickEditMultiplyRemoveSpacerSlot">
-                          <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
-                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
-                            <span class="flex items-center justify-center text-sm font-medium opacity-0" id="quickEditMultiplyRemoveSpacer">×</span>
-                          </div>
-                        </div>
-                        <span aria-hidden="true" class="flex-none opacity-0" id="quickEditItemBoxesRemoveSpacer"></span>
-                        <div class="flex-none hidden" id="quickEditPartialRemoveSlot">
-                          <button aria-label="Retirer bloc partiel" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditPartialRemove" type="button">
-                            <span class="material-symbols-outlined !text-[15px]">remove</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </form>
-
-            <label class="block">
-              <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Commentaire mouvement</span>
-              <textarea class="min-h-[7rem] w-full border-outline-variant/30 bg-surface-container-low text-[16px] leading-tight text-on-surface md:text-sm" id="quickEditRemark" maxlength="240" placeholder="Commentaire pour l'historique"></textarea>
-            </label>
-
-            <p class="hidden rounded border border-error/20 bg-error-container/20 px-3 py-2 text-[11px] font-medium text-on-error-container" id="quickEditMessage"></p>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3 border-t border-outline-variant/20 bg-surface-container-low px-4 py-4" id="quickEditFooter">
-          <button class="border border-outline-variant/30 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" id="quickEditCancel" type="button">ANNULER</button>
-          <button class="bg-surface-tint py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" id="quickEditSave" type="button">APPLIQUER LA SORTIE</button>
-        </div>
-      </div>
-    </div>
+    <div class="h-full min-h-0" id="app"></div>
   </body>
 </html>

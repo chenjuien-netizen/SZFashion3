@@ -38,6 +38,21 @@ const baseState = {
   detailReference: "",
   referenceImportBatches: [],
   referenceImportBatch: null,
+  referenceImportDraft: {
+    file: null,
+    fileName: "",
+    sheetName: "",
+    mapping: {
+      reference: "货号",
+      warehouse: "仓库",
+      arrivalNote: "到货单",
+      remark: "放位/提醒",
+      tail: "尾箱",
+      unitsPerBox: "件/箱",
+      boxes: "箱数",
+      packNotation: "Notation paquets"
+    }
+  },
   pickupTickets: [],
   pickupTicket: null,
   pickupTicketData: null,
@@ -1502,6 +1517,17 @@ function getInventoryByReference(reference) {
   return state.items.find(function(item) {
     return item.reference === normalized;
   }) || null;
+}
+
+function getDetailViewModel(reference) {
+  const normalizedReference = normalizeReference(reference || state.detailReference);
+  const detailResult = dataSource ? dataSource.loadDetail(normalizedReference) : { item: null, history: [], notFoundInStock: true };
+  return {
+    reference: normalizedReference,
+    item: detailResult && detailResult.item ? detailResult.item : null,
+    history: detailResult && Array.isArray(detailResult.history) ? detailResult.history : [],
+    notFoundInStock: Boolean(detailResult && detailResult.notFoundInStock)
+  };
 }
 
 function getItemById(id) {
@@ -3014,6 +3040,7 @@ function buildQuickExitPacksHintMarkup(colisage, packsPerBox) {
 }
 
 function renderQuickEdit() {
+  if (window.__szRootVueMounted === true) return;
   const els = getQuickEditElements();
   const isOpen = !!state.quickEditOpen && !!state.quickEditItem;
   els.quickEditOverlay.classList.toggle("hidden", !isOpen);
@@ -3578,6 +3605,7 @@ function renderInventoryPage() {
 }
 
 function renderHistoryPage() {
+  if (window.__szRootVueMounted === true) return;
   const searchInput = document.getElementById("historySearchInput");
   const actionTypeFilter = document.getElementById("historyActionTypeFilter");
   const periodFilter = document.getElementById("historyPeriodFilter");
@@ -3608,6 +3636,7 @@ function renderHistoryPage() {
 }
 
 function renderDetailPage() {
+  if (window.__szRootVueMounted === true) return;
   const detailReference = document.getElementById("detailReference");
   const detailSubline = document.getElementById("detailSubline");
   const detailPrimaryReference = document.getElementById("detailPrimaryReference");
@@ -3673,6 +3702,7 @@ function renderDetailPage() {
 }
 
 function renderReferenceImportsPage() {
+  if (window.__szRootVueMounted === true) return;
   const status = document.getElementById("referenceImportsStatus");
   const content = document.getElementById("referenceImportsContent");
   if (!content) return;
@@ -4497,6 +4527,7 @@ function renderPickupTicketDetailLoadingView(ticketId) {
 }
 
 function renderPickupTicketsPage() {
+  if (window.__szRootVueMounted === true) return;
   const status = document.getElementById("pickupTicketsStatus");
   const content = document.getElementById("pickupTicketsContent");
   const backButton = document.getElementById("pickupTicketsBackButton");
@@ -4537,6 +4568,7 @@ function renderPickupTicketsPage() {
 }
 
 function renderAll() {
+  if (window.__szRootVueMounted === true) return;
   renderInventoryPage();
   renderHistoryPage();
   renderDetailPage();
@@ -4546,6 +4578,7 @@ function renderAll() {
 }
 
 function syncActiveShell() {
+  if (window.__szRootVueMounted === true) return;
   const inventoryShell = document.getElementById("inventoryAppShell");
   const historyShell = document.getElementById("historyAppShell");
   const detailShell = document.getElementById("detailAppShell");
@@ -5090,19 +5123,17 @@ function seedPickupTicketLineDrafts(ticketId) {
 }
 
 function getReferenceImportMappingFromForm() {
-  function value(id) {
-    const element = document.getElementById(id);
-    return element ? String(element.value || "").trim() : "";
-  }
+  const draft = state.referenceImportDraft || {};
+  const mapping = draft.mapping || {};
   return {
-    reference: value("referenceImportMappingReference"),
-    warehouse: value("referenceImportMappingWarehouse"),
-    arrivalNote: value("referenceImportMappingArrival"),
-    remark: value("referenceImportMappingRemark"),
-    tail: value("referenceImportMappingTail"),
-    unitsPerBox: value("referenceImportMappingUnits"),
-    boxes: value("referenceImportMappingBoxes"),
-    packNotation: value("referenceImportMappingPackNotation")
+    reference: String(mapping.reference || "").trim(),
+    warehouse: String(mapping.warehouse || "").trim(),
+    arrivalNote: String(mapping.arrivalNote || "").trim(),
+    remark: String(mapping.remark || "").trim(),
+    tail: String(mapping.tail || "").trim(),
+    unitsPerBox: String(mapping.unitsPerBox || "").trim(),
+    boxes: String(mapping.boxes || "").trim(),
+    packNotation: String(mapping.packNotation || "").trim()
   };
 }
 
@@ -5122,9 +5153,8 @@ function readFileAsBase64(file) {
 }
 
 function createReferenceImportBatchFromForm() {
-  const input = document.getElementById("referenceImportFileInput");
-  const sheetNameInput = document.getElementById("referenceImportSheetNameInput");
-  const file = input && input.files && input.files[0] ? input.files[0] : null;
+  const draft = state.referenceImportDraft || {};
+  const file = draft.file || null;
   if (!file) {
     window.alert("Sélectionne un fichier Excel / ODS.");
     return;
@@ -5137,7 +5167,7 @@ function createReferenceImportBatchFromForm() {
         sourceFileType: file.name.split(".").pop().toLowerCase(),
         mimeType: file.type || "",
         fileBase64: fileBase64,
-        sourceSheetName: sheetNameInput ? String(sheetNameInput.value || "").trim() : "",
+        sourceSheetName: String(draft.sheetName || "").trim(),
         mapping: getReferenceImportMappingFromForm(),
         createdBy: "webapp"
       }
@@ -5145,6 +5175,11 @@ function createReferenceImportBatchFromForm() {
   }).then(function(result) {
     if (!result || !result.batch) return;
     state.referenceImportBatch = result.batch.batchId;
+    state.referenceImportDraft = Object.assign({}, state.referenceImportDraft, {
+      file: null,
+      fileName: "",
+      sheetName: ""
+    });
     return loadReferenceImportData(result.batch.batchId);
   }).catch(function(error) {
     window.alert(error && error.message ? error.message : "Import impossible.");
@@ -5510,20 +5545,59 @@ function registerVueBridge() {
   window.__szAppState = state;
   window.__szAppApi = {
     state: state,
+    getDetailViewModel: getDetailViewModel,
     filterInventoryItems: filterInventoryItems,
+    filterHistoryItems: filterHistoryItems,
+    filterPickupTickets: filterPickupTickets,
     getInventorySummary: getInventorySummary,
     getItemById: getItemById,
+    getInventoryByReference: getInventoryByReference,
+    getHistoryForReference: getHistoryForReference,
+    saveProductRemark: saveProductRemark,
     normalizeReference: normalizeReference,
     getSyncStatusLabel: getSyncStatusLabel,
+    parseCurrentRoute: parseCurrentRoute,
+    buildHashRoute: buildHashRoute,
+    handleRouteChange: handleRouteChange,
     refreshRemoteSnapshot: refreshRemoteSnapshot,
+    refreshRemoteDetail: refreshRemoteDetail,
+    refreshRemotePickupTicketsBootstrap: refreshRemotePickupTicketsBootstrap,
+    refreshRemotePickupTicket: refreshRemotePickupTicket,
     navigateToInventoryContext: navigateToInventoryContext,
     navigateToHistoryContext: navigateToHistoryContext,
     navigateToTicketsContext: navigateToTicketsContext,
     navigateTo: navigateTo,
     forceInventoryListView: forceInventoryListView,
+    forceHistoryListView: forceHistoryListView,
+    forceTicketsListView: forceTicketsListView,
     openQuickEdit: openQuickEdit,
+    closeQuickEdit: closeQuickEdit,
+    handleQuickEditSave: handleQuickEditSave,
+    handleQuickEditFieldChange: handleQuickEditFieldChange,
+    toggleQuickEditSegment: toggleQuickEditSegment,
+    normalizeQuickEditFieldOnBlur: normalizeQuickEditFieldOnBlur,
+    getQuickExitSegments: getQuickExitSegments_,
+    getQuickExitSelectionConfig: getQuickExitSelectionConfig_,
+    updateQuickExitSegmentConfig: updateQuickExitSegmentConfig_,
+    setQuickExitSegmentConfig: setQuickExitSegmentConfig_,
+    buildQuickExitSuggestions: buildQuickExitSuggestions_,
+    applyQuickExitSuggestionSelection: applyQuickExitSuggestionSelection_,
+    setQuickExitClearSelected: setQuickExitClearSelected_,
+    computeQuickExitPreview: computeQuickExitPreview,
+    buildQuickExitPacksHintMarkup: buildQuickExitPacksHintMarkup,
+    buildCurrentEditStateModel: buildCurrentEditStateModel,
+    validateQuickExitPayload: validateQuickExitPayload,
+    validateEditPayload: validateEditPayload,
     syncActiveShell: syncActiveShell,
     formatMetricNumber: formatMetricNumber,
+    formatDateLabel: formatDateLabel,
+    formatDateTimeLabel: formatDateTimeLabel,
+    formatHistoryJournalDateTime: formatHistoryJournalDateTime,
+    formatHistoryMovement: formatHistoryMovement,
+    getHistoryBeforeDateTime: getHistoryBeforeDateTime,
+    getHistoryDateGroupLabel: getHistoryDateGroupLabel,
+    getActionBadgeClass: getActionBadgeClass,
+    getActionLabel: getActionLabel,
     getArrivalNote: getArrivalNote,
     getInventoryArrivalMeta: getInventoryArrivalMeta,
     splitInventoryArrivalNoteLines: splitInventoryArrivalNoteLines,
@@ -5531,7 +5605,51 @@ function registerVueBridge() {
     formatArrivalGroupLabel: formatArrivalGroupLabel,
     formatInventoryShortDate: formatInventoryShortDate,
     buildColumnLayout: buildColumnLayout_,
-    getColumnCount: getColumnCount
+    getColumnCount: getColumnCount,
+    renderDetailStockStateMarkup: renderDetailStockStateMarkup,
+    getPickupTicketViewModel: getPickupTicketViewModel,
+    getPickupTicketUiStatus: getPickupTicketUiStatus,
+    getPickupTicketTone: getPickupTicketTone,
+    formatPickupTicketNumberForDisplay: formatPickupTicketNumberForDisplay,
+    getPickupLineUiStatus: getPickupLineUiStatus,
+    getPickupLineTone: getPickupLineTone,
+    getPickupTicketEventLabel: getPickupTicketEventLabel,
+    compactPickupTicketEventsForDisplay: compactPickupTicketEventsForDisplay,
+    getPickupTicketEventReference: getPickupTicketEventReference,
+    canEditPickupTicket: canEditPickupTicket,
+    isPickupLineLocked: isPickupLineLocked,
+    buildRequestedDisplayFromDraftLine: buildRequestedDisplayFromDraftLine,
+    getPickupLineDraft: getPickupLineDraft,
+    getPickupLineAvailableStockDisplay: getPickupLineAvailableStockDisplay,
+    getPickupTicketTitleNoteLabel: getPickupTicketTitleNoteLabel,
+    formatTicketLineCountLabel: formatTicketLineCountLabel,
+    formatTicketResolvedCountLabel: formatTicketResolvedCountLabel,
+    getPickupTicketDateGroupLabel: getPickupTicketDateGroupLabel,
+    getTicketRefsPreview: getTicketRefsPreview,
+    buildTicketQuantityDisplay: buildTicketQuantityDisplay,
+    parsePickupQuantityInput: parsePickupQuantityInput,
+    resolvePickupParsedQuantityForLine: resolvePickupParsedQuantityForLine,
+    buildPickupTicketEmptyResolution: buildPickupTicketEmptyResolution_,
+    loadPickupTicketData: loadPickupTicketData,
+    applyLocalPickupTicketsState: applyLocalPickupTicketsState,
+    createPickupTicketFromDraft: createPickupTicketFromDraft,
+    addPickupTicketDraftLineFromFields: addPickupTicketDraftLineFromFields,
+    addPickupTicketDraftLinesFromText: addPickupTicketDraftLinesFromText,
+    removePickupTicketDraftLine: removePickupTicketDraftLine,
+    updatePickupTicketLine: updatePickupTicketLine,
+    handleSavePickupTicketLine: handleSavePickupTicketLine,
+    handleMarkPickupTicketLineNotFound: handleMarkPickupTicketLineNotFound,
+    handleEditPickupTicketLine: handleEditPickupTicketLine,
+    handleEmptyPickupTicketLine: handleEmptyPickupTicketLine,
+    handleValidateTicket: handleValidateTicket,
+    openTicketQuantityDropdown: openTicketQuantityDropdown_,
+    closeTicketQuantityDropdown: closeTicketQuantityDropdown_,
+    moveTicketQuantityDropdownSelection: moveTicketQuantityDropdownSelection_,
+    applyTicketQuantitySuggestionSelection: applyTicketQuantitySuggestionSelection_,
+    loadReferenceImportData: loadReferenceImportData,
+    createReferenceImportBatchFromForm: createReferenceImportBatchFromForm,
+    handleFinalizeImportLine: handleFinalizeImportLine,
+    getReferenceImportMappingFromForm: getReferenceImportMappingFromForm
   };
 }
 
