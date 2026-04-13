@@ -288,6 +288,96 @@
       });
     }
 
+    function normalizePickupTicketStatusRank_(ticket) {
+      const status = String(ticket && ticket.status || "").trim();
+      if (status === "validated") return 3;
+      if (status === "cancelled") return 2;
+      if (status === "in_progress") return 1;
+      return 0;
+    }
+
+    function toComparableTimestamp_(value) {
+      const parsed = new Date(value || 0).getTime();
+      return isNaN(parsed) ? 0 : parsed;
+    }
+
+    function chooseMoreAdvancedPickupTicket_(localTicket, remoteTicket) {
+      if (localTicket && !remoteTicket) {
+        return { ticket: localTicket, reason: "local-only" };
+      }
+      if (remoteTicket && !localTicket) {
+        return { ticket: remoteTicket, reason: "remote-only" };
+      }
+      if (!localTicket && !remoteTicket) {
+        return { ticket: null, reason: "missing-both" };
+      }
+
+      const localStatusRank = normalizePickupTicketStatusRank_(localTicket);
+      const remoteStatusRank = normalizePickupTicketStatusRank_(remoteTicket);
+      if (localStatusRank !== remoteStatusRank) {
+        return localStatusRank > remoteStatusRank
+          ? { ticket: localTicket, reason: "status-local" }
+          : { ticket: remoteTicket, reason: "status-remote" };
+      }
+
+      const localResolved = Number(localTicket && localTicket.resolvedLineCount || 0);
+      const remoteResolved = Number(remoteTicket && remoteTicket.resolvedLineCount || 0);
+      if (localResolved !== remoteResolved) {
+        return localResolved > remoteResolved
+          ? { ticket: localTicket, reason: "resolved-local" }
+          : { ticket: remoteTicket, reason: "resolved-remote" };
+      }
+
+      const localValidatedAt = toComparableTimestamp_(localTicket && localTicket.validatedAt);
+      const remoteValidatedAt = toComparableTimestamp_(remoteTicket && remoteTicket.validatedAt);
+      if (localValidatedAt !== remoteValidatedAt) {
+        return localValidatedAt > remoteValidatedAt
+          ? { ticket: localTicket, reason: "validatedAt-local" }
+          : { ticket: remoteTicket, reason: "validatedAt-remote" };
+      }
+
+      const localUpdatedAt = toComparableTimestamp_(localTicket && localTicket.updatedAt);
+      const remoteUpdatedAt = toComparableTimestamp_(remoteTicket && remoteTicket.updatedAt);
+      if (localUpdatedAt !== remoteUpdatedAt) {
+        return localUpdatedAt > remoteUpdatedAt
+          ? { ticket: localTicket, reason: "updatedAt-local" }
+          : { ticket: remoteTicket, reason: "updatedAt-remote" };
+      }
+
+      const localVersion = Number(localTicket && localTicket.version || 0);
+      const remoteVersion = Number(remoteTicket && remoteTicket.version || 0);
+      if (localVersion !== remoteVersion) {
+        return localVersion > remoteVersion
+          ? { ticket: localTicket, reason: "version-local" }
+          : { ticket: remoteTicket, reason: "version-remote" };
+      }
+
+      return { ticket: remoteTicket, reason: "remote-default" };
+    }
+
+    function upsertMoreAdvancedPickupTicket_(list, localTicket, remoteTicket, details, localDetail) {
+      const choice = chooseMoreAdvancedPickupTicket_(localTicket, remoteTicket);
+      const chosenTicket = choice.ticket;
+      console.info("[pickupTickets.merge] ticket choice", {
+        localStatus: String(localTicket && localTicket.status || ""),
+        remoteStatus: String(remoteTicket && remoteTicket.status || ""),
+        localResolvedLineCount: Number(localTicket && localTicket.resolvedLineCount || 0),
+        remoteResolvedLineCount: Number(remoteTicket && remoteTicket.resolvedLineCount || 0),
+        chosenStatus: String(chosenTicket && chosenTicket.status || ""),
+        reason: choice.reason
+      });
+      const ticketId = String(chosenTicket && chosenTicket.ticketId || remoteTicket && remoteTicket.ticketId || localTicket && localTicket.ticketId || "").trim();
+      let nextList = removePickupTicketFromList(list, ticketId);
+      if (chosenTicket) nextList = replacePickupTicketInList(nextList, chosenTicket, ticketId);
+      if (chosenTicket && localDetail && choice.ticket === localTicket) {
+        details[ticketId] = clonePickupTicketDetail(localDetail);
+      }
+      return {
+        pickupTickets: nextList,
+        pickupTicketDetails: details
+      };
+    }
+
     function findSnapshotInventoryItemByReference_(snapshot, reference) {
       const normalizedReference = deps.normalizeReference(reference);
       if (!normalizedReference) return null;
@@ -557,11 +647,20 @@
       (Array.isArray(snapshot && snapshot.pickupTickets) ? snapshot.pickupTickets : []).forEach(function(ticket) {
         const ticketId = String(ticket && ticket.ticketId || "").trim();
         if (!ticketId) return;
-        if (!isOptimisticPickupTicketId_(ticketId) && !pendingTicketIds[ticketId]) return;
-        nextTickets = replacePickupTicketInList(nextTickets, ticket, ticketId);
-        if (snapshot.pickupTicketDetails && snapshot.pickupTicketDetails[ticketId]) {
-          nextDetails[ticketId] = clonePickupTicketDetail(snapshot.pickupTicketDetails[ticketId]);
-        }
+        const localDetail = snapshot.pickupTicketDetails && snapshot.pickupTicketDetails[ticketId]
+          ? snapshot.pickupTicketDetails[ticketId]
+          : null;
+        const remoteTicket = nextTickets.find(function(entry) {
+          return String(entry && entry.ticketId || "").trim() === ticketId;
+        }) || null;
+        const shouldPreserve = isOptimisticPickupTicketId_(ticketId)
+          || !!pendingTicketIds[ticketId]
+          || normalizePickupTicketStatusRank_(ticket) > normalizePickupTicketStatusRank_(remoteTicket)
+          || Number(ticket && ticket.resolvedLineCount || 0) > Number(remoteTicket && remoteTicket.resolvedLineCount || 0);
+        if (!shouldPreserve) return;
+        const merged = upsertMoreAdvancedPickupTicket_(nextTickets, ticket, remoteTicket, nextDetails, localDetail);
+        nextTickets = merged.pickupTickets;
+        nextDetails = merged.pickupTicketDetails;
       });
       return {
         pickupTickets: nextTickets,
@@ -794,9 +893,35 @@
         nextPickupTickets = nextPayload.pickupTickets.slice();
       }
 
-      if (nextPayload.pickupTicket && nextPayload.pickupTicket.ticket && (!mutation || !/^resolve_pickup_ticket_line$|^validate_pickup_ticket$|^cancel_pickup_ticket$/i.test(String(mutation.type || "")))) {
-        nextPickupTicketDetails = upsertPickupTicketDetail(nextPickupTicketDetails, nextPayload.pickupTicket.ticket.ticketId, nextPayload.pickupTicket);
-        nextPickupTickets = replacePickupTicketInList(nextPickupTickets, nextPayload.pickupTicket.ticket, nextPayload.pickupTicket.ticket.ticketId);
+      if (nextPayload.pickupTicket && nextPayload.pickupTicket.ticket) {
+        const serverTicketId = String(nextPayload.pickupTicket.ticket.ticketId || "").trim();
+        const localDetail = serverTicketId && nextPickupTicketDetails[serverTicketId] ? nextPickupTicketDetails[serverTicketId] : null;
+        const localTicket = localDetail && localDetail.ticket
+          ? localDetail.ticket
+          : (nextPickupTickets.find(function(entry) {
+            return String(entry && entry.ticketId || "").trim() === serverTicketId;
+          }) || null);
+        const mergedTicketChoice = chooseMoreAdvancedPickupTicket_(localTicket, nextPayload.pickupTicket.ticket);
+        const mergedTicket = Object.assign({}, nextPayload.pickupTicket.ticket, mergedTicketChoice.ticket || {});
+        const mergedDetail = {
+          ticket: mergedTicket,
+          lines: Array.isArray(nextPayload.pickupTicket.lines) && nextPayload.pickupTicket.lines.length
+            ? nextPayload.pickupTicket.lines
+            : (localDetail && Array.isArray(localDetail.lines) ? localDetail.lines : []),
+          events: Array.isArray(nextPayload.pickupTicket.events) && nextPayload.pickupTicket.events.length
+            ? nextPayload.pickupTicket.events
+            : (localDetail && Array.isArray(localDetail.events) ? localDetail.events : [])
+        };
+        console.info("[commitSyncedMutation] ticket merged", {
+          mutationType: String(mutation && mutation.type || ""),
+          ticketId: serverTicketId,
+          localStatus: String(localTicket && localTicket.status || ""),
+          serverStatus: String(nextPayload.pickupTicket.ticket && nextPayload.pickupTicket.ticket.status || ""),
+          retainedStatus: String(mergedTicket && mergedTicket.status || ""),
+          reason: mergedTicketChoice.reason
+        });
+        nextPickupTicketDetails = upsertPickupTicketDetail(nextPickupTicketDetails, serverTicketId, mergedDetail);
+        nextPickupTickets = replacePickupTicketInList(nextPickupTickets, mergedTicket, serverTicketId);
       }
 
       const nextSnapshot = {
@@ -985,6 +1110,11 @@
         applyPendingValidatePickupTicketMutation_(projected, pendingMutation);
         nextItems = projected.items;
         nextHistoryItems = projected.historyItems;
+        console.info("[saveOptimisticPickupTicketDetail] validate projection applied", {
+          ticketId: String(detail && detail.ticket && detail.ticket.ticketId || ""),
+          itemsCount: nextItems.length,
+          historyCount: nextHistoryItems.length
+        });
       }
       const nextSnapshot = {
         items: nextItems,
@@ -998,6 +1128,8 @@
       };
       writeSnapshot(nextSnapshot);
       return {
+        inventoryItems: nextSnapshot.items.slice(),
+        historyItems: nextSnapshot.historyItems.slice(),
         items: nextSnapshot.pickupTickets.slice(),
         detail: clonePickupTicketDetail(detail),
         meta: getMeta(nextSnapshot)
@@ -1020,6 +1152,11 @@
         snapshot,
         snapshot.pendingMutations
       );
+      console.info("[savePickupTicketsBootstrap] merge complete", {
+        remoteTicketCount: Array.isArray(safePayload.items) ? safePayload.items.length : 0,
+        resultingTicketCount: preservedTickets.pickupTickets.length,
+        pendingMutations: snapshot.pendingMutations.length
+      });
       const nextSnapshot = {
         items: snapshot.items.slice(),
         historyItems: snapshot.historyItems.slice(),

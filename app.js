@@ -443,6 +443,14 @@ function syncPendingMutations(options) {
       mutation: describePendingMutation_(mutation)
     });
     return remoteDataSource.pushMutation(mutation).then(function(result) {
+      const localTicketBeforeCommit = mutation && mutation.ticketId ? getPickupTicketDetail(mutation.ticketId) : null;
+      console.info("[syncPendingMutations] ticket payload received", {
+        mutation: describePendingMutation_(mutation),
+        localTicketStatusBeforeCommit: String(localTicketBeforeCommit && localTicketBeforeCommit.ticket && localTicketBeforeCommit.ticket.status || ""),
+        serverTicketStatus: String(result && result.ticket && result.ticket.status || ""),
+        serverResolvedLineCount: Number(result && result.ticket && result.ticket.resolvedLineCount || 0),
+        processedTicketMutation: processedTicketMutation
+      });
       const committed = dataSource.commitSyncedMutation({
         mutationId: mutation.id,
         mutation: mutation,
@@ -5566,6 +5574,13 @@ function handleValidateTicket(ticketId) {
       lineNote: String(line.lineNote || "").trim()
     };
   });
+  console.info("[handleValidateTicket] start", {
+    ticketId: ticketId,
+    currentStatus: String(currentDetail.ticket && currentDetail.ticket.status || ""),
+    readyLineCount: readyLines.length,
+    inventoryCountBefore: Array.isArray(state.items) ? state.items.length : 0,
+    historyCountBefore: Array.isArray(state.historyItems) ? state.historyItems.length : 0
+  });
   if (dataSource && dataSource.saveOptimisticPickupTicketDetail) {
     const nowIso = new Date().toISOString();
     const optimisticDetail = {
@@ -5601,7 +5616,14 @@ function handleValidateTicket(ticketId) {
     const saved = dataSource.saveOptimisticPickupTicketDetail(optimisticDetail, pendingMutation);
     hasLocalWritesThisSession = true;
     state.pickupTickets = saved.items;
+    state.items = Array.isArray(saved.inventoryItems) ? saved.inventoryItems : state.items;
+    state.historyItems = Array.isArray(saved.historyItems) ? saved.historyItems : state.historyItems;
     applyDataMeta(saved.meta);
+    console.info("[handleValidateTicket] local projection applied", {
+      ticketId: ticketId,
+      inventoryCountAfter: Array.isArray(state.items) ? state.items.length : 0,
+      historyCountAfter: Array.isArray(state.historyItems) ? state.historyItems.length : 0
+    });
     applyLocalPickupTicketsState(ticketId);
     renderPickupTicketsPage();
     if (navigator.onLine) syncPendingMutations({ silent: true });
