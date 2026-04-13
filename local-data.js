@@ -264,16 +264,18 @@
 
     function replacePickupTicketInList(list, nextTicket, matchId) {
       const ticketId = String(matchId || (nextTicket && nextTicket.ticketId) || "").trim();
-      const nextList = Array.isArray(list) ? list.slice() : [];
-      let replaced = false;
-      for (let index = 0; index < nextList.length; index++) {
-        if (String(nextList[index] && nextList[index].ticketId || "").trim() === ticketId) {
-          nextList[index] = nextTicket;
-          replaced = true;
-          break;
+      const canonicalNumber = String(nextTicket && nextTicket.ticketNumber || "").trim().replace(/\*$/, "");
+      const filtered = (Array.isArray(list) ? list : []).filter(function(entry) {
+        const entryTicketId = String(entry && entry.ticketId || "").trim();
+        if (ticketId && entryTicketId === ticketId) return false;
+        if (canonicalNumber) {
+          const entryNumber = String(entry && entry.ticketNumber || "").trim().replace(/\*$/, "");
+          if (entryNumber && entryNumber === canonicalNumber) return false;
         }
-      }
-      if (!replaced && nextTicket) nextList.unshift(nextTicket);
+        return true;
+      });
+      const nextList = filtered.slice();
+      if (nextTicket) nextList.unshift(nextTicket);
       nextList.sort(function(a, b) {
         return new Date((b && b.createdAt) || 0) - new Date((a && a.createdAt) || 0);
       });

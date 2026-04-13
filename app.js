@@ -3990,10 +3990,10 @@ function buildTicketQuantitySuggestions_(item, entry) {
     baseSuggestions: [],
     allowBoxes: true,
     allowPacks: true,
-    allowPieces: true,
+    allowPieces: false,
     boxLimit: item ? Math.max(0, Math.floor(totalPieces / Math.max(1, unitsPerBox))) : 3,
     packLimit: item ? Math.max(0, Math.floor(totalPieces / Math.max(1, colisage))) : 3,
-    pieceLimit: item ? Math.min(totalPieces, 12) : 12,
+    pieceLimit: 0,
     allowedFractions: item ? getTicketAllowedFractions_(item) : genericFractions
   });
   return rawSuggestions.filter(function(suggestion) {
@@ -4139,6 +4139,25 @@ function resolvePickupParsedQuantityForLine(line, parsedQuantity) {
     pickedUnit: "piece",
     pickedQuantity: pieces
   };
+}
+
+function buildPickupTicketEmptyResolution_(line) {
+  const reference = normalizeReference(line && line.reference);
+  const item = (Array.isArray(state.items) ? state.items : []).find(function(entry) {
+    return normalizeReference(entry && entry.reference) === reference;
+  }) || null;
+  if (!item) return { ok: false, error: "Référence introuvable dans l'inventaire local." };
+  const totalPieces = Math.max(0, Math.round(stateModelToPieces(item)));
+  if (!(totalPieces > 0)) return { ok: false, error: "Aucun stock disponible à vider." };
+  const unitsPerBox = Math.max(0, toInt(item.unitsPerBox));
+  const colisage = Math.max(0, toInt(item.colisage));
+  if (unitsPerBox > 0 && totalPieces % unitsPerBox === 0) {
+    return { ok: true, status: "ready", pickedUnit: "box", pickedQuantity: totalPieces / unitsPerBox };
+  }
+  if (colisage > 0 && totalPieces % colisage === 0) {
+    return { ok: true, status: "ready", pickedUnit: "pack", pickedQuantity: totalPieces / colisage };
+  }
+  return { ok: true, status: "ready", pickedUnit: "piece", pickedQuantity: totalPieces };
 }
 
 function getTicketRefsPreview(ticket) {
@@ -4430,11 +4449,12 @@ function renderPickupTicketDetailView(selectedTicket) {
           + (editable ? '<button class="shrink-0 border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" data-action="edit-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button">Modifier</button>' : '')
           + '</div>'
         : '<div class="mt-2 grid gap-2">'
-          + '<div class="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto_auto] items-center gap-2">'
-          + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" data-role="ticket-line-picked-input" data-line-id="' + escapeHtml(line.lineId || "") + '" inputmode="decimal" placeholder="2箱 / 1/2" type="text" value="' + escapeHtml(draft.pickedInput || "") + '" />'
+          + '<div class="grid grid-cols-[minmax(0,5.75rem)_minmax(0,1fr)_auto_auto_auto] items-center gap-2">'
+          + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" data-role="ticket-line-picked-input" data-line-id="' + escapeHtml(line.lineId || "") + '" inputmode="decimal" placeholder="2箱" type="text" value="' + escapeHtml(draft.pickedInput || "") + '" />'
           + '<input autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" data-role="ticket-line-note-input" data-line-id="' + escapeHtml(line.lineId || "") + '" placeholder="' + escapeHtml(line.status === "not_found" ? "Précision introuvable..." : "Commentaire") + '" type="text" value="' + escapeHtml(draft.lineNote || "") + '" />'
           + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="save-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button">Confirmer</button>'
           + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="mark-ticket-line-not-found" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button">Introuvable</button>'
+          + '<button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant disabled:opacity-40" data-action="empty-ticket-line" data-ticket-id="' + escapeHtml(ticket.ticketId || "") + '" data-line-id="' + escapeHtml(line.lineId || "") + '" type="button">Vider</button>'
           + '</div>'
           + (draft.error ? '<div class="text-[11px] font-medium text-error">' + escapeHtml(draft.error) + '</div>' : '')
           + '</div>')
@@ -4948,6 +4968,14 @@ function bindPickupTicketsEvents() {
         );
         return;
       }
+      const emptyTrigger = event.target.closest('[data-action="empty-ticket-line"]');
+      if (emptyTrigger) {
+        handleEmptyPickupTicketLine(
+          emptyTrigger.getAttribute("data-ticket-id"),
+          emptyTrigger.getAttribute("data-line-id")
+        );
+        return;
+      }
       const validateTrigger = event.target.closest('[data-action="validate-ticket"]');
       if (validateTrigger) {
         handleValidateTicket(validateTrigger.getAttribute("data-ticket-id"));
@@ -5370,6 +5398,26 @@ function handleSavePickupTicketLine(ticketId, lineId) {
     pickedUnit: resolvedQuantity.pickedUnit,
     pickedQuantity: resolvedQuantity.pickedQuantity,
     lineNote: String(draft.lineNote || "").trim()
+  });
+}
+
+function handleEmptyPickupTicketLine(ticketId, lineId) {
+  if (!ticketId || !lineId) return;
+  const detail = getPickupTicketDetail(ticketId);
+  const line = Array.isArray(detail.lines)
+    ? detail.lines.find(function(entry) { return String(entry.lineId || "") === String(lineId); })
+    : null;
+  const resolution = buildPickupTicketEmptyResolution_(line);
+  if (!resolution.ok) {
+    window.alert(resolution.error || "Vidage impossible.");
+    return;
+  }
+  const draft = state.ticketLineDraftsById[lineId] || {};
+  return updatePickupTicketLine(ticketId, lineId, {
+    status: resolution.status,
+    pickedUnit: resolution.pickedUnit,
+    pickedQuantity: resolution.pickedQuantity,
+    lineNote: String(draft.lineNote || (line && line.lineNote) || "").trim()
   });
 }
 
