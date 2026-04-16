@@ -57,6 +57,7 @@ const baseState = {
   pickupTicket: null,
   pickupTicketData: null,
   pickupTicketsLoaded: false,
+  pickupTicketsBootstrapReady: false,
   pickupTicketLoading: false,
   pickupTicketMissingConfirmed: false,
   pickupTicketCreatePending: false,
@@ -389,6 +390,7 @@ function refreshRemotePickupTicketsBootstrap(options) {
         });
       }
     }
+    state.pickupTicketsBootstrapReady = true;
     bootLog_("after remote tickets bootstrap", {
       ticketsCount: Array.isArray(state.pickupTickets) ? state.pickupTickets.length : 0,
       pendingMutations: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0,
@@ -398,6 +400,7 @@ function refreshRemotePickupTicketsBootstrap(options) {
     return true;
   }).catch(function(error) {
     console.warn("Pickup tickets bootstrap refresh failed", error);
+    state.pickupTicketsBootstrapReady = true;
     bootLog_("remote tickets bootstrap failed", {
       message: error && error.message ? error.message : String(error || ""),
       syncStatus: navigator.onLine ? "error" : "offline"
@@ -6011,6 +6014,7 @@ function initApp() {
   state.items = Array.isArray(inventoryResult.items) ? inventoryResult.items : [];
   state.historyItems = Array.isArray(historyResult.items) ? historyResult.items : [];
   state.pickupTickets = Array.isArray(pickupTicketsResult.items) ? pickupTicketsResult.items : [];
+  state.pickupTicketsBootstrapReady = !(remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured());
   applyDataMeta(inventoryResult.meta);
   bootLog_("after local load", getBootDiagnostics_());
   state.columnCount = getColumnCount();

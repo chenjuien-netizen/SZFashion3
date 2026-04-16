@@ -178,7 +178,7 @@
             </template>
 
             <template v-else-if="state.ticketsSubview === 'detail'">
-              <template v-if="selectedVm && selectedVm.ticket">
+              <template v-if="selectedVm && selectedVm.hasDetail">
                 <section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
@@ -266,6 +266,16 @@
             </template>
 
             <template v-else>
+              <template v-if="!state.pickupTicketsBootstrapReady">
+                <section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">
+                  <div class="mt-1 flex flex-col gap-2">
+                    <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
+                    <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
+                    <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
+                  </div>
+                </section>
+              </template>
+              <template v-else>
               <section class="sticky top-0 z-20 border-b border-outline-variant/20 bg-surface-container-low px-3 py-2 shadow-ledger">
                 <div class="flex items-center gap-2">
                   <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
@@ -324,6 +334,7 @@
                 </template>
                 <div v-else class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Aucun ticket sortie pour le moment.</div>
               </section>
+              </template>
             </template>
           </div>
         </section>
