@@ -6,58 +6,52 @@
 - Mutations optimistes locales.
 - Petite file pending pour micro-coupures.
 - Pas de mode offline prolonge prioritaire.
-- `Notation paquets` retiree de la web app.
+- `Notation paquets` retiree de la logique active web app.
 - `SortKey` retire de la logique active web app.
-- Securite cible: authentification Google + autorisation explicite.
+- Securite/authentification reportee a un chantier separe.
 
-## Lots prioritaires
+## Priorites immediates
 
-### Lot 0. Audit et cadrage
-- Document de verite code/produit: [AUDIT_SZFASHION_PWA.md](/Users/julien/Desktop/GoogleAppsScript/SZFashion3/AUDIT_SZFASHION_PWA.md)
-- Position officielle:
-  - online-first
-  - Google login
-  - Inventory + History = socle terrain
-  - Tickets = flux operationnel
-  - Imports = back-office
+### 1. Coherence online inter-appareils
+- Garder `serveur = verite durable`.
+- Garder `local = acceleration UX`.
+- Eviter qu'un refresh distant plus ancien retrograde un etat local plus avance.
+- Verifier la convergence sur :
+  - quick edit
+  - historique
+  - tickets
+  - validation ticket
 
-### Lot 1. Securite
-- Ajouter un vrai controle d'acces backend.
-- Authentifier les utilisateurs Google.
-- Restreindre par domaine ou liste blanche email.
-- Refuser lecture/ecriture aux non autorises.
+### 2. Simplification du modele stock
+- Ne plus dependre de `Notation paquets` dans les flux actifs.
+- Ne plus dependre de `SortKey` pour le tri applicatif.
+- Garder uniquement une compatibilite passive avec les colonnes heritagees dans Sheets.
 
-Risque:
-- Avec frontend GitHub Pages + Apps Script cross-origin, une bascule auth naive peut casser les appels.
-- Ce lot demande une decision d'architecture avant implementation finale.
+### 3. UX mobile
+- Tous les champs interactifs critiques a `16px` minimum sur mobile.
+- Bloquer le zoom iOS :
+  - au focus
+  - au double tap
+  - au triple tap
+- Conserver le scroll vertical et les raccourcis utiles de navigation.
+- Alleger les vues denses :
+  - Quick Edit
+  - Tickets
+  - Imports
 
-### Lot 2. Cohérence online
-- Stabiliser la convergence entre appareils.
-- Garder serveur = verite durable.
-- Garder local = acceleration UX.
-- Limiter l'ambition offline a des coupures courtes.
-
-### Lot 3. Simplification du modele stock
-- Retirer `Notation paquets` des ecrans et payloads web app.
-- Retirer `SortKey` du tri actif cote app.
-- Trier dans le code par regles explicites.
-
-### Lot 4. UX mobile
-- Tous les champs interactifs a `16px` minimum sur mobile.
-- Alleger visuellement Quick Edit et Tickets.
-- Rendre la saisie iPhone plus stable.
-
-### Lot 5. Autocompletion
-- Suggestions locales sur recherche inventaire.
-- Suggestions locales sur creation de ticket.
-- Source unique: `state.items`.
-- Aucun roundtrip reseau pour les suggestions de base.
+### 4. Autocompletion locale
+- Source unique : `state.items`.
+- Priorites :
+  - recherche inventaire
+  - creation ticket
+  - ensuite autres champs reference si necessaire
+- Aucune dependance reseau pour les suggestions.
 
 ## Critères d'acceptation
 
 ### Produit
 - L'app reste plus simple que Google Sheets pour l'entrepot.
-- Les usages clefs sont fluides:
+- Les usages clefs sont fluides :
   - recherche ref
   - sortie rapide
   - historique
@@ -65,15 +59,24 @@ Risque:
 
 ### Donnees
 - Une mutation online converge correctement entre deux appareils.
-- Les tickets n'ecrasent pas un etat local plus avance par un etat plus ancien.
-
-### Mobile
-- Plus de zoom Safari iPhone au focus.
-- Les champs principaux restent lisibles en saisie.
+- Les tickets n'ecrasent pas un etat plus avance par un etat plus ancien.
 
 ### Simplification
-- La web app fonctionne sans `Notation paquets`.
+- La web app fonctionne sans dependance active a `Notation paquets`.
 - Le tri principal ne depend plus de `SortKey`.
 
-### Securite
-- Un utilisateur non autorise ne peut plus lire ou muter la base via le backend final.
+### Mobile
+- Plus de zoom iPhone au focus.
+- Plus de zoom iPhone au double tap.
+- Plus de zoom iPhone au triple tap.
+- Les champs principaux restent lisibles en saisie.
+
+### Autocompletion
+- Suggestions locales rapides et utiles.
+- Aucune latence reseau pour les suggestions de base.
+
+## Hors scope du chantier courant
+- Authentification Google.
+- Autorisation backend.
+- Changement d'architecture de deploiement.
+- Vrai offline prolonge avec resolution de conflits.

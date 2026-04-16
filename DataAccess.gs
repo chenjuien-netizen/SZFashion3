@@ -268,8 +268,7 @@ function buildInventoryItem_(row, cols, rowIndex) {
       tail: tail,
       unitsPerBox: unitsPerBox,
       itemBoxes: itemBoxes,
-      fractionText: fractionText,
-      packNotation: ""
+      fractionText: fractionText
     })
   };
 }
@@ -409,14 +408,12 @@ function buildHistoryEntry_(displayRow, rawRow, cols) {
 function resolveInventoryColumns_(headers) {
   return {
     reference: findColumn_(headers, ["货号", "Reference", "Référence", "ref"]),
-    sortKey: findColumn_(headers, ["SortKey"]),
     tailRaw: findColumn_(headers, ["尾箱"]),
     unitsPerBoxRaw: findColumn_(headers, ["件/箱", "每箱件数2"]),
     boxesRaw: findColumn_(headers, ["箱数"]),
     signRaw: findColumn_(headers, ["当前signe"]),
     fractionRaw: findColumn_(headers, ["当前箱数分数"]),
     colisage: findColumn_(headers, ["Colisage"]),
-    packNotation: findColumn_(headers, ["Notation paquets"]),
     remark: findColumn_(headers, ["放位/提醒"]),
     warehouse: findColumn_(headers, ["仓库", "entrepot", "entrepôt"]),
     createdAt: findColumn_(headers, ["date de création", "修改日期", "进货"]),
@@ -607,15 +604,6 @@ function fractionToText_(value) {
     if (Math.abs(common[i][0] - numeric) < 0.0001) return common[i][1];
   }
   return String(numeric);
-}
-
-function normalizePackNotation_(value) {
-  const text = String(value || "").trim();
-  if (!text) return "";
-  const match = text.match(/^([+-])\s*(\d+)\s*包$/i);
-  if (!match) return "";
-  const count = Math.max(0, Math.trunc(Number(match[2]) || 0));
-  return count > 0 ? match[1] + count + "包" : "";
 }
 
 function buildStockDisplay_(stateInput) {
@@ -1483,7 +1471,6 @@ function buildEmptyStateForItem_(item) {
     fractionText: "",
     fractionValue: 0,
     colisage: Math.max(0, parseLooseInteger_(item && item.colisage)),
-    packNotation: "",
     stockDisplay: "-",
     remark: String(item && item.remark || "").trim()
   };
@@ -1569,7 +1556,7 @@ function applyCreateReferenceImportBatchFromFileMutation_(mutation) {
         String(line.mapped.boxes || "").trim(),
         String(line.mapped.sign || "").trim(),
         String(line.mapped.fractionText || "").trim(),
-        String(line.mapped.packNotation || "").trim(),
+        "",
         JSON.stringify(line.validationErrors || []),
         "",
         "",
@@ -2281,7 +2268,6 @@ function normalizeStateModelServer_(stateInput) {
     fractionText: normalizeFractionText_(stateInput && stateInput.fractionText),
     fractionValue: parseFractionValue_(stateInput && (stateInput.fractionValue || stateInput.fractionText)),
     colisage: Math.max(0, parseLooseInteger_(stateInput && stateInput.colisage)),
-    packNotation: normalizePackNotation_(stateInput && stateInput.packNotation),
     remark: String(stateInput && stateInput.remark || "").trim()
   };
   if (!(state.fractionValue > 0)) {
@@ -2337,7 +2323,6 @@ function buildSimpleStateFromPiecesServer_(totalPiecesInput, options) {
       fractionText: "",
       fractionValue: 0,
       colisage: colisage,
-      packNotation: "",
       remark: remark
     });
   }
@@ -2349,7 +2334,6 @@ function buildSimpleStateFromPiecesServer_(totalPiecesInput, options) {
     fractionText: fractionTextFromPiecesServer_(remainderPieces, unitsPerBox),
     fractionValue: remainderPieces / unitsPerBox,
     colisage: colisage,
-    packNotation: "",
     remark: remark
   });
 }
@@ -2374,7 +2358,6 @@ function buildPackFriendlyStateFromPiecesServer_(totalPiecesInput, options) {
       fractionText: packCount + "/" + packsPerBox,
       fractionValue: packCount / packsPerBox,
       colisage: colisage,
-      packNotation: "",
       remark: remark
     });
   }

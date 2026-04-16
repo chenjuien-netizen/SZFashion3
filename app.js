@@ -2139,12 +2139,8 @@ function getQuickEditElements() {
     quickEditPartialSegment: document.getElementById("quickEditPartialSegment"),
     quickEditSignField: document.getElementById("quickEditSignField"),
     quickEditFractionTextField: document.getElementById("quickEditFractionTextField"),
-    quickEditPackSignField: document.getElementById("quickEditPackSignField"),
-    quickEditPackCountField: document.getElementById("quickEditPackCountField"),
     quickEditSign: document.getElementById("quickEditSign"),
     quickEditFractionText: document.getElementById("quickEditFractionText"),
-    quickEditPackNotationSign: document.getElementById("quickEditPackNotationSign"),
-    quickEditPackNotationCount: document.getElementById("quickEditPackNotationCount"),
     quickEditRemoveCenterWrap: document.getElementById("quickEditRemoveCenterWrap"),
     quickEditRemoveScroll: document.getElementById("quickEditRemoveScroll"),
     quickEditRemoveMeasure: document.getElementById("quickEditRemoveMeasure"),
@@ -2183,12 +2179,8 @@ function getQuickEditElements() {
   els.itemBoxes = els.quickEditItemBoxes;
   els.sign = els.quickEditSign;
   els.fractionText = els.quickEditFractionText;
-  els.packNotationSign = els.quickEditPackNotationSign;
-  els.packNotationCount = els.quickEditPackNotationCount;
   els.signField = els.quickEditSignField;
   els.fractionTextField = els.quickEditFractionTextField;
-  els.packSignField = els.quickEditPackSignField;
-  els.packCountField = els.quickEditPackCountField;
   els.remark = els.quickEditRemark;
   els.message = els.quickEditMessage;
   els.cancel = els.quickEditCancel;

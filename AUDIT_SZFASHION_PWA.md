@@ -1,23 +1,31 @@
 # Audit produit + technique — SZFashion PWA
 
-## 1. Données réellement utilisées
+## Position retenue
+- L'app doit etre traitee comme **online-first avec optimisme local**.
+- Le serveur reste la **verite durable inter-appareils**.
+- Le local sert surtout a accelerer l'UX et a absorber les micro-coupures.
+- La securite/authentification est **hors scope pour le chantier courant**.
 
-### Colonnes `STOCK` lues aujourd'hui
+## 1. Donnees `STOCK` reellement utilisees
+
+### Colonnes lues par l'app
 - `货号`
-- `SortKey`
 - `尾箱`
 - `件/箱`
 - `箱数`
 - `当前signe`
 - `当前箱数分数`
 - `Colisage`
-- `Notation paquets`
 - `放位/提醒`
 - `仓库`
 - `date de création`
 - `到货单`
 
-### Classement métier recommandé
+### Colonnes heritagees encore presentes dans Sheets
+- `SortKey`
+- `Notation paquets`
+
+### Classement metier recommande
 - Indispensables :
   - `货号`
   - `尾箱`
@@ -31,144 +39,134 @@
   - `到货单`
 - Utiles mais secondaires :
   - `date de création`
-- Héritage / à débrancher dans la web app :
+- Heritage / compatibilite passive :
   - `SortKey`
   - `Notation paquets`
 
-### Conclusions
-- `Notation paquets` etait branchee dans la web app historique, surtout dans Quick Edit, certains calculs de completude et l'import.
-- La dependance active a ete retiree de l'UI et des payloads web app; la colonne peut encore exister temporairement dans Sheets a titre de compatibilite.
-- `SortKey` servait a piloter l'ordre depuis Sheets.
-- La web app a maintenant vocation a trier dans le code afin de supprimer cette dependance metier.
+### Conclusion
+- `Notation paquets` n'a plus de role metier dans la web app cible.
+- La dependance active a ete retiree des flux web app; la colonne peut rester quelque temps dans Sheets sans piloter le comportement applicatif.
+- `SortKey` ne doit plus piloter le tri de la web app.
+- Le tri doit etre gere par le code selon les besoins metier.
 
-## 2. Feuilles réellement utilisées
+## 2. Feuilles reellement utilisees
 
 - `STOCK` : source principale de l'inventaire.
-- `STOCK_HISTORY` : journal métier des mouvements stock.
-- `ARRIVAGES_DB` : enrichissement des références avec `到货单` et dates d'arrivage.
+- `STOCK_HISTORY` : journal des mouvements stock.
+- `ARRIVAGES_DB` : enrichissement des references avec `到货单` et dates d'arrivage.
 - `REFERENCE_IMPORT_BATCHES` : lots d'import.
-- `REFERENCE_IMPORT_LINES` : lignes d'un lot d'import.
-- `PICKUP_TICKETS` : résumé des tickets.
-- `PICKUP_TICKET_LINES` : lignes à préparer.
-- `PICKUP_TICKET_EVENTS` : événements et traçabilité des tickets.
+- `REFERENCE_IMPORT_LINES` : lignes d'import et suivi de resolution.
+- `PICKUP_TICKETS` : resume des tickets.
+- `PICKUP_TICKET_LINES` : lignes a preparer.
+- `PICKUP_TICKET_EVENTS` : tracabilite et historique des tickets.
 
 ### Pourquoi 3 feuilles pour Tickets
-- `PICKUP_TICKETS` porte la vue synthétique.
-- `PICKUP_TICKET_LINES` porte la structure ligne par ligne nécessaire à la préparation.
-- `PICKUP_TICKET_EVENTS` garde une traçabilité lisible et audit-able.
+- `PICKUP_TICKETS` porte la vue synthetique.
+- `PICKUP_TICKET_LINES` porte la preparation ligne par ligne.
+- `PICKUP_TICKET_EVENTS` garde une trace metier audit-able.
 
 ### Position
-- Cette structure est techniquement saine.
+- La structure est techniquement saine.
 - Elle est plus riche que le besoin terrain minimal.
-- Le vrai problème n'est pas la structure Sheets, mais la densité UX et la complexité de certains flux Tickets.
+- Le point a simplifier en priorite est l'UX Tickets, pas forcement le stockage Sheets.
 
 ## 3. Pertinence produit
 
-- L'app répond bien au besoin réel : simplifier l'usage entrepôt par rapport à Google Sheets.
+- L'app repond bien au besoin reel : etre plus simple et plus encadree que Google Sheets a l'entrepot.
 - Le socle le plus pertinent est :
   - `Inventory`
   - `History`
-- `Tickets` reste justifié comme flux opérationnel.
-- `Imports` est utile, mais doit être traité comme outil admin/back-office.
+- `Tickets` reste un vrai flux operationnel utile.
+- `Imports` doit rester pense comme outil admin/back-office.
 
 ### Zones encore trop ambitieuses
-- Quick Edit est trop riche pour un besoin terrain minimal.
-- Tickets a encore des zones de réconciliation et d'état trop complexes.
-- Imports ne doit pas dicter la complexité du produit principal.
+- Quick Edit reste dense pour un usage terrain rapide.
+- Tickets reste le flux le plus fragile en reconciliation et en charge mentale.
+- Imports ne doit pas dicter la complexite de l'app principale.
 
 ## 4. Robustesse technique
 
 ### Position retenue
-- L'app doit être traitée comme **online-first avec optimisme local**.
-- Le vrai offline prolongé doit être repoussé.
+- L'app doit etre stabilisee en **online-first**.
+- Le vrai offline prolonge doit etre repousse.
 
 ### Pourquoi
-- L'entrepôt a Internet.
+- L'entrepot a Internet.
 - Les vrais risques actuels sont :
-  - accès backend non sécurisé
-  - incohérences inter-appareils
-  - complexité Tickets
-  - UX mobile perfectible
+  - incoherences inter-appareils
+  - refresh qui retrograde des etats locaux plus avances
+  - complexite Tickets / Historique
+  - UX mobile encore trop dense
 
-### Conclusion d'exploitabilité
-- L'app peut devenir exploitable au quotidien.
-- Elle n'est pas encore assez stable pour un usage intensif sans prioriser :
-  1. cohérence inter-appareils
-  2. simplification du modèle stock
-  3. amélioration UX mobile
-  4. autocomplétion locale
+### Conclusion d'exploitabilite
+- L'app peut etre exploitable au quotidien avec prudence.
+- La priorite n'est pas un moteur de conflit offline complexe.
+- Les priorites court terme sont :
+  1. coherence online inter-appareils
+  2. simplification du modele stock
+  3. UX mobile
+  4. autocompletion locale
 
 ## 5. UX / design / PWA
 
 ### Constat
-- La PWA actuelle est un bon shell offline.
-- Ce n'est pas encore une PWA métier robuste avec stratégie de synchro forte.
+- La PWA actuelle est un bon shell applicatif.
+- Ce n'est pas une PWA offline complexe, et ce n'est plus l'objectif immediat.
 
-### Priorités UX
-- Corriger le zoom iPhone au focus.
-- Bloquer aussi le zoom iPhone au double/triple tap dans la web app.
-- Alléger visuellement les vues les plus denses :
+### Priorites UX
+- Bloquer le zoom iPhone :
+  - au focus clavier
+  - au double tap
+  - au triple tap
+- Alleger visuellement les vues les plus denses :
   - Tickets
   - Quick Edit
-- Ajouter l'autocomplétion locale :
+  - Imports
+- Rendre les retours metier plus evidents :
+  - preview de sortie
+  - stock restant projete
+  - statuts Tickets plus parlants
+- Ajouter l'autocompletion locale :
   - recherche inventaire
-  - saisie de références dans Tickets
+  - creation ticket
 
 ### Qualification design
-- Le design est déjà suffisant pour un prototype interne avancé.
-- Il manque encore du polissage pour devenir un outil pro interne très rassurant sur mobile étroit.
+- Le design est deja suffisant pour un prototype interne avance.
+- Il manque encore du polissage mobile pour etre vraiment rassurant sur iPhone et petits ecrans.
 
-## 6. Sécurité / contrôle d'accès
+## 6. Securite / controle d'acces
 
-### Constat actuel
-- Le backend Apps Script route `doGet` / `doPost` sans authentification métier.
-- Le manifest Apps Script actuel expose :
-  - `access: "ANYONE_ANONYMOUS"`
-- Toute personne avec l'URL peut potentiellement lire et muter la base.
+### Decision actuelle
+- La securite/authentification est **reportee volontairement** dans ce chantier.
+- L'audit conserve la recommandation cible :
+  - authentification Google
+  - autorisation explicite
+- Mais aucune bascule auth n'est a melanger avec la stabilisation online-first en cours.
 
-### Recommandation minimale sérieuse
-- Cible : authentification Google + autorisation explicite.
-- Option minimale acceptable :
-  - Apps Script non public
-  - accès limité aux comptes autorisés
-  - idéalement restriction domaine ou liste blanche email
+## 7. Roadmap priorisee
 
-### Important
-- Avec l'architecture actuelle `GitHub Pages -> fetch cross-origin -> Apps Script`, le passage à un vrai Google login demande une adaptation d'architecture.
-- Ce point doit être traité comme chantier prioritaire, pas comme simple flag à activer.
-
-### Décision actuelle
-- La sécurité/authentification est volontairement reportée.
-- Le chantier courant se concentre sur :
-  - cohérence online
-  - simplification du modèle stock
-  - UX mobile
-  - autocomplétion
-
-## 7. Roadmap priorisée
-
-1. Stabiliser la cohérence stock / historique / tickets entre appareils.
-2. Retirer `Notation paquets` de la web app.
-3. Sortir `SortKey` de la logique métier web app.
+1. Stabiliser la coherence stock / historique / tickets entre appareils.
+2. Finaliser la sortie active de `Notation paquets` de la web app.
+3. Finaliser la sortie active de `SortKey` du tri applicatif.
 4. Corriger les irritants iPhone, y compris le zoom au double/triple tap.
-5. Ajouter l'autocomplétion locale.
-6. Reprendre la sécurité/authentification à la fin.
+5. Renforcer l'autocompletion locale.
+6. Reprendre la securite/authentification dans un chantier separe.
 
 ## Risques si on pousse un vrai offline complet maintenant
 
-- une référence peut être modifiée ailleurs avant la synchro
-- un ticket peut être validé sur un autre appareil
-- l'historique local projeté peut diverger du serveur
-- la résolution de conflit demanderait :
+- une reference peut etre modifiee ailleurs avant la synchro
+- un ticket peut etre valide sur un autre appareil
+- l'historique local projete peut diverger du serveur
+- la resolution demanderait :
   - versionnement plus strict
-  - détection de stale writes
-  - règles de merge métier
+  - detection de stale writes
+  - regles de merge metier
   - potentiellement une UI de conflit
 
 ### Conclusion
-- Ce niveau de complexité n'est pas justifié maintenant.
+- Ce niveau de complexite n'est pas justifie maintenant.
 - La bonne cible court terme est :
   - lecture locale rapide
-  - écriture optimiste
+  - ecriture optimiste
   - queue pending simple
-  - vérité durable côté serveur
+  - verite durable cote serveur
