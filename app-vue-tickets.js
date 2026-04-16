@@ -208,14 +208,7 @@
             </template>
 
             <template v-else-if="state.ticketsSubview === 'detail'">
-              <section v-if="state.pickupTicketLoading" class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">
-                <div class="mt-3 flex flex-col gap-2">
-                  <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
-                  <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
-                  <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
-                </div>
-              </section>
-              <template v-else-if="selectedVm && selectedVm.ticket && selectedVm.hasDetail">
+              <template v-if="selectedVm && selectedVm.ticket">
                 <section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
