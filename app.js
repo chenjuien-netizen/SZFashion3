@@ -989,13 +989,14 @@ function normalizeSign(value) {
 function normalizePackNotation(value, strict) {
   const text = String(value || "").trim();
   if (!text) return "";
-  const match = text.match(/^([+-])\s*(\d+)\s*包$/i);
+  const match = text.match(/^([+-])?\s*(\d+)\s*(包)?$/i);
   if (!match) {
     if (strict) throw new Error("当前缺包 invalide. Utilise +N包 ou -N包.");
     return text;
   }
   const count = Math.max(0, Math.trunc(Number(match[2]) || 0));
-  return count > 0 ? match[1] + count + "包" : "";
+  const sign = match[1] === "-" ? "-" : "+";
+  return count > 0 ? sign + count + "包" : "";
 }
 
 function normalizeTailRelativeNotation(value) {
