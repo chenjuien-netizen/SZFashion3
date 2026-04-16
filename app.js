@@ -2340,7 +2340,10 @@ function getQuickExitSegments_(item) {
     if (unitsPerBox > 0) mainActions.push({ value: "fraction", label: "fraction" });
     segments.push({
       id: "main",
-      label: buildRawLocalStockDisplay(Object.assign({}, currentItem, { tail: 0 })),
+      label: buildLocalStockDisplay(Object.assign({}, currentItem, {
+        tail: 0,
+        packNotation: getMainPackNotationFromState(currentItem)
+      })),
       availablePieces: mainPieces,
       actions: mainActions
     });
@@ -2369,6 +2372,7 @@ function buildQuickExitEmptyMainState_(item, remark) {
     fractionText: "",
     fractionValue: 0,
     colisage: Math.max(0, Math.trunc(Number(item && item.colisage) || 0)),
+    packNotation: "",
     remark: String(remark || "").trim()
   };
 }
@@ -2384,6 +2388,7 @@ function buildQuickExitCurrentMainState_(item, remark) {
     fractionText: sanitizeFractionText(currentItem.fractionText),
     fractionValue: parseFractionValue(currentItem.fractionValue || currentItem.fractionText),
     colisage: Math.max(0, Math.trunc(Number(currentItem.colisage) || 0)),
+    packNotation: getMainPackNotationFromState(currentItem),
     remark: String(remark || currentItem.remark || "").trim()
   };
   return stateModelToPieces(mainState) > 0
@@ -2405,6 +2410,10 @@ function buildQuickExitCombinedState_(item, tailState, mainState, remark) {
     fractionText: sanitizeFractionText(resolvedMainState.fractionText),
     fractionValue: parseFractionValue(resolvedMainState.fractionValue || resolvedMainState.fractionText),
     colisage: Math.max(0, Math.trunc(Number(resolvedMainState.colisage) || 0)),
+    packNotation: buildCompositePackNotation(
+      resolvedTailState.tailNotation,
+      getMainPackNotationFromState(resolvedMainState)
+    ),
     remark: resolvedRemark
   };
 }
