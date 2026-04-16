@@ -49,8 +49,7 @@
     return fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
-      cache: "no-store",
-      credentials: "include"
+      cache: "no-store"
     }).then(function(response) {
       if (!response.ok) {
         remoteLog_("fetch failed", {
@@ -63,18 +62,14 @@
       }
       return response.json().then(function(payload) {
         if (payload && payload.error) {
-          const error = new Error(String(payload.message || "Lecture distante impossible."));
-          error.status = Number(payload.status || response.status || 500);
-          error.code = String(payload.code || "");
           remoteLog_("fetch payload error", {
             method: "GET",
             route: context && context.route ? context.route : "",
             url: url,
-            status: error.status,
-            code: error.code,
-            message: error.message
+            status: response.status,
+            message: String(payload.message || "Lecture distante impossible.")
           });
-          throw error;
+          throw new Error(String(payload.message || "Lecture distante impossible."));
         }
         remoteLog_("fetch success", {
           method: "GET",
@@ -98,8 +93,7 @@
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },
-      body: JSON.stringify(body || {}),
-      credentials: "include"
+      body: JSON.stringify(body || {})
     }).then(function(response) {
       if (!response.ok) {
         remoteLog_("fetch failed", {
@@ -112,18 +106,14 @@
       }
       return response.json().then(function(payload) {
         if (payload && payload.error) {
-          const error = new Error(String(payload.message || "Ecriture distante impossible."));
-          error.status = Number(payload.status || response.status || 500);
-          error.code = String(payload.code || "");
           remoteLog_("fetch payload error", {
             method: "POST",
             route: context && context.route ? context.route : "",
             url: url,
-            status: error.status,
-            code: error.code,
-            message: error.message
+            status: response.status,
+            message: String(payload.message || "Ecriture distante impossible.")
           });
-          throw error;
+          throw new Error(String(payload.message || "Ecriture distante impossible."));
         }
         remoteLog_("fetch success", {
           method: "POST",

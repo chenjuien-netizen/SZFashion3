@@ -133,15 +133,6 @@
   - accès limité aux comptes autorisés
   - idéalement restriction domaine ou liste blanche email
 
-### Mise en place preparatoire deja branchee
-- Le backend peut maintenant etre prepare en mode :
-  - `SZFASHION_AUTH_MODE=open`
-  - `SZFASHION_AUTH_MODE=google`
-- Les restrictions peuvent etre pilotees par :
-  - `SZFASHION_ALLOWED_EMAILS`
-  - `SZFASHION_ALLOWED_DOMAIN`
-- Le mode par defaut reste `open` tant que l'architecture finale d'acces Google n'est pas basculee.
-
 ### Important
 - Avec l'architecture actuelle `GitHub Pages -> fetch cross-origin -> Apps Script`, le passage à un vrai Google login demande une adaptation d'architecture.
 - Ce point doit être traité comme chantier prioritaire, pas comme simple flag à activer.

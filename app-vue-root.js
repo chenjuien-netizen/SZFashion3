@@ -38,10 +38,7 @@
     },
     template: `
       <div class="relative h-[100dvh] max-h-[100dvh] overflow-hidden bg-background">
-        <div v-if="state.remoteAccessError" class="fixed inset-x-0 top-0 z-[60] border-b border-error/20 bg-error-container px-3 py-2 text-[11px] font-medium text-on-error-container">
-          {{ state.remoteAccessError }}
-        </div>
-        <div :class="['fixed inset-x-0 bottom-16 overflow-hidden bg-background', state.remoteAccessError ? 'top-9' : 'top-0']">
+        <div class="fixed inset-x-0 top-0 bottom-16 overflow-hidden bg-background">
           <InventoryScreen v-show="state.currentView === 'inventory'" />
           <HistoryScreen v-show="state.currentView === 'history'" />
           <DetailScreen v-show="state.currentView === 'detail'" />

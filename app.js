@@ -13,7 +13,6 @@ const baseState = {
   historyItems: [],
   pendingMutations: [],
   syncStatus: "idle",
-  remoteAccessError: "",
   lastSyncAt: "",
   dataSource: "local",
   query: "",
@@ -230,26 +229,10 @@ function isRemoteReadAllowed(options) {
 }
 
 function getSyncStatusLabel(defaultLabel) {
-  if (state.remoteAccessError) return "Accès refusé";
   if (state.syncStatus === "refreshing") return "Refresh...";
   if (state.syncStatus === "offline") return "Hors ligne";
   if (state.syncStatus === "error") return "Erreur";
   return defaultLabel;
-}
-
-function clearRemoteAccessError_() {
-  state.remoteAccessError = "";
-}
-
-function setRemoteAccessError_(error) {
-  const status = Number(error && error.status || 0);
-  const code = String(error && error.code || "");
-  if (status === 401 || status === 403 || code === "AUTH_REQUIRED" || code === "AUTH_FORBIDDEN") {
-    state.remoteAccessError = String(error && error.message || "Accès refusé au backend SZFashion.");
-    state.syncStatus = "error";
-    return true;
-  }
-  return false;
 }
 
 function refreshRemoteSnapshot(options) {
@@ -270,7 +253,6 @@ function refreshRemoteSnapshot(options) {
     remoteDataSource.fetchInventory(),
     remoteDataSource.fetchHistory()
   ]).then(function(results) {
-    clearRemoteAccessError_();
     const inventoryPayload = results[0];
     const historyPayload = results[1];
     const pendingCount = state.pendingMutations.length;
@@ -295,7 +277,7 @@ function refreshRemoteSnapshot(options) {
     return true;
   }).catch(function(error) {
     console.warn("Remote read-only refresh failed", error);
-    if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
+    state.syncStatus = navigator.onLine ? "error" : "offline";
     bootLog_("remote snapshot failed", {
       message: error && error.message ? error.message : String(error || ""),
       syncStatus: state.syncStatus
@@ -322,7 +304,6 @@ function refreshRemoteDetail(reference, options) {
   }
 
   return remoteDataSource.fetchDetail(normalizedReference).then(function(payload) {
-    clearRemoteAccessError_();
     const snapshotResult = dataSource.mergeRemoteSnapshot({
       reference: normalizedReference,
       item: payload.item,
@@ -339,7 +320,7 @@ function refreshRemoteDetail(reference, options) {
   }).catch(function(error) {
     console.warn("Remote detail refresh failed", error);
     if (!options || !options.silent) {
-      if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
+      state.syncStatus = navigator.onLine ? "error" : "offline";
       renderAll();
     }
     return false;
@@ -365,7 +346,6 @@ function refreshRemotePickupTickets(options) {
   }
 
   remotePickupTicketsRefreshPromise = remoteDataSource.fetchPickupTickets().then(function(payload) {
-    clearRemoteAccessError_();
     mergeRemotePickupTicketsList(payload && payload.items, payload && payload.generatedAt);
     if (!options || !options.silent) {
       state.syncStatus = "idle";
@@ -375,7 +355,7 @@ function refreshRemotePickupTickets(options) {
   }).catch(function(error) {
     console.warn("Pickup tickets list refresh failed", error);
     if (!options || !options.silent) {
-      if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
+      state.syncStatus = navigator.onLine ? "error" : "offline";
       renderAll();
     }
     return false;
@@ -398,7 +378,6 @@ function refreshRemotePickupTicketsBootstrap(options) {
   if (remotePickupTicketsRefreshPromise) return remotePickupTicketsRefreshPromise;
 
   remotePickupTicketsRefreshPromise = remoteDataSource.fetchPickupTicketsBootstrap().then(function(payload) {
-    clearRemoteAccessError_();
     if (dataSource && dataSource.savePickupTicketsBootstrap) {
       dataSource.savePickupTicketsBootstrap(payload);
       applyLocalPickupTicketsState(state.pickupTicket);
@@ -424,7 +403,7 @@ function refreshRemotePickupTicketsBootstrap(options) {
       syncStatus: navigator.onLine ? "error" : "offline"
     });
     if (!options || !options.silent) {
-      if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
+      state.syncStatus = navigator.onLine ? "error" : "offline";
       renderAll();
     }
     return false;
@@ -448,7 +427,6 @@ function refreshRemotePickupTicket(ticketId, options) {
   }
 
   remotePickupTicketRefreshPromises[normalizedTicketId] = remoteDataSource.fetchPickupTicket(normalizedTicketId).then(function(payload) {
-    clearRemoteAccessError_();
     if (payload && payload.ticket) {
       mergeRemotePickupTicketDetail({
         ticket: payload.ticket,
@@ -467,7 +445,6 @@ function refreshRemotePickupTicket(ticketId, options) {
   }).catch(function(error) {
     console.warn("Pickup ticket detail refresh failed", error);
     if (state.pickupTicket === normalizedTicketId) {
-      setRemoteAccessError_(error);
       state.pickupTicketMissingConfirmed = false;
       renderPickupTicketsPage();
     }
@@ -526,7 +503,6 @@ function syncPendingMutations(options) {
       mutation: describePendingMutation_(mutation)
     });
     return remoteDataSource.pushMutation(mutation).then(function(result) {
-      clearRemoteAccessError_();
       const localTicketBeforeCommit = mutation && mutation.ticketId ? getPickupTicketDetail(mutation.ticketId) : null;
       console.info("[syncPendingMutations] ticket payload received", {
         mutation: describePendingMutation_(mutation),
@@ -589,7 +565,7 @@ function syncPendingMutations(options) {
       remainingQueue: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0,
       error: error && error.message ? error.message : String(error || "")
     });
-    if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
+    state.syncStatus = navigator.onLine ? "error" : "offline";
     renderAll();
     return false;
   }).finally(function() {
@@ -5834,14 +5810,6 @@ function registerVueBridge() {
       ticketsCount: Array.isArray(state.pickupTickets) ? state.pickupTickets.length : 0,
       lastSyncAt: String(state.lastSyncAt || ""),
       syncStatus: String(state.syncStatus || "")
-    };
-  };
-  window.__szSecurityDebug = function() {
-    return {
-      remoteAccessError: String(state.remoteAccessError || ""),
-      syncStatus: String(state.syncStatus || ""),
-      remoteConfigured: Boolean(remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured()),
-      remoteBaseUrl: remoteDataSource && remoteDataSource.getDebugInfo ? String(remoteDataSource.getDebugInfo().apiBaseUrl || "") : ""
     };
   };
   window.__szAppApi = {
