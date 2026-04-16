@@ -129,6 +129,10 @@
         return api.getPickupLineDraft(line);
       }
 
+      function linePreview(line) {
+        return api.buildPickupLinePreview(line, lineDraft(line));
+      }
+
       function getPreviewLines(ticket) {
         const vm = api.getPickupTicketViewModel(ticket.ticketId);
         const detailLines = vm && vm.lines && vm.lines.length ? vm.lines : [];
@@ -157,6 +161,7 @@
         isCreateQuantityActive: isCreateQuantityActive,
         isLineQuantityActive: isLineQuantityActive,
         lineDraft: lineDraft,
+        linePreview: linePreview,
         getPreviewLines: getPreviewLines
       };
     },
@@ -237,8 +242,8 @@
                       </div>
                       <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-on-surface-variant">
                         <span v-if="line.warehouseHelpDisplay || api.getPickupLineAvailableStockDisplay(line)" class="font-semibold text-on-surface-variant">{{ [String(line.warehouseHelpDisplay || '').trim(), api.getPickupLineAvailableStockDisplay(line)].filter(Boolean).join(' · ') }}</span>
-                        <span>{{ line.requestedDisplay || 'À confirmer' }}</span>
-                        <span v-if="line.pickedDisplay" class="font-semibold text-on-surface">{{ '→ ' + line.pickedDisplay }}</span>
+                        <span>{{ linePreview(line).requested }}</span>
+                        <span v-if="linePreview(line).pickedLabel" class="font-semibold text-on-surface">{{ linePreview(line).pickedLabel }}</span>
                       </div>
                     </div>
                     <div :class="['shrink-0 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em]', api.getPickupLineTone(line.status).badge]">{{ api.getPickupLineUiStatus(line.status) }}</div>
@@ -280,8 +285,8 @@
                   <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Historique ticket</div>
                   <div v-if="api.compactPickupTicketEventsForDisplay(selectedVm.events).length" class="mt-2 flex flex-col gap-2">
                     <div v-for="event in api.compactPickupTicketEventsForDisplay(selectedVm.events)" :key="event.eventId || event.createdAt" class="border-t border-outline-variant/10 pt-2 text-[11px] text-on-surface-variant">
-                      <div>{{ api.formatDateTimeLabel(event.createdAt) + ' · ' + (api.getPickupTicketEventReference(event, selectedVm.lines) ? (api.getPickupTicketEventReference(event, selectedVm.lines) + ' · ') : '') + api.getPickupTicketEventLabel(event) }}</div>
-                      <div v-if="event.message && event.message !== api.getPickupTicketEventLabel(event)" class="mt-0.5 text-[10px]">{{ event.message }}</div>
+                      <div>{{ api.formatDateTimeLabel(event.createdAt) + ' · ' + (api.getPickupTicketEventReference(event, selectedVm.lines) ? (api.getPickupTicketEventReference(event, selectedVm.lines) + ' · ') : '') + api.buildPickupTicketEventDisplayLabel(event, selectedVm.lines) }}</div>
+                      <div v-if="event.message && event.message !== api.getPickupTicketEventLabel(event) && event.message !== api.buildPickupTicketEventDisplayLabel(event, selectedVm.lines)" class="mt-0.5 text-[10px]">{{ event.message }}</div>
                     </div>
                   </div>
                   <div v-else class="mt-2 text-[11px] text-on-surface-variant">Aucun événement.</div>

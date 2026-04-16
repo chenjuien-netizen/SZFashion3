@@ -4537,6 +4537,55 @@ function getPickupLineDraft(line) {
   return state.ticketLineDraftsById[lineId];
 }
 
+function buildPickupLinePickedPreview(line, draft) {
+  const safeLine = line || {};
+  const safeDraft = draft || {};
+  if (String(safeLine.status || "").trim() === "not_found") return "introuvable";
+  const draftEntry = String(safeDraft.pickedInput || "").trim();
+  if (safeDraft.error) return String(safeLine.pickedDisplay || "").trim();
+  if (draftEntry) {
+    const parsedQuantity = parsePickupQuantityInput(draftEntry);
+    if (!parsedQuantity.ok) return String(safeLine.pickedDisplay || "").trim();
+    const resolvedQuantity = resolvePickupParsedQuantityForLine(safeLine, parsedQuantity);
+    if (!resolvedQuantity.ok) return String(safeLine.pickedDisplay || "").trim();
+    if (resolvedQuantity.status === "not_found") return "introuvable";
+    return buildTicketQuantityDisplay(resolvedQuantity.pickedUnit, resolvedQuantity.pickedQuantity);
+  }
+  return String(safeLine.pickedDisplay || "").trim();
+}
+
+function buildPickupLinePreview(line, draft) {
+  const requested = buildRequestedDisplayFromDraftLine(line) || "À confirmer";
+  const picked = buildPickupLinePickedPreview(line, draft);
+  return {
+    requested: requested,
+    picked: picked,
+    pickedLabel: picked ? ("→ " + picked) : ""
+  };
+}
+
+function buildPickupTicketEventDisplayLabel(event, lines) {
+  const label = getPickupTicketEventLabel(event);
+  const eventType = String(event && event.eventType || "").trim();
+  if (eventType === "line_marked_not_found") return "Ligne introuvable";
+  if (eventType !== "line_updated" && eventType !== "line_marked_partial") return label;
+
+  const lineId = String(event && event.lineId || "").trim();
+  const line = lineId && Array.isArray(lines)
+    ? lines.find(function(entry) { return String(entry && entry.lineId || "").trim() === lineId; })
+    : null;
+  const payload = event && event.payload ? event.payload : {};
+  let pickedDisplay = "";
+  if (line && line.pickedDisplay) {
+    pickedDisplay = String(line.pickedDisplay || "").trim();
+  } else if (String(payload.status || "").trim() === "not_found") {
+    pickedDisplay = "introuvable";
+  } else if (payload.pickedUnit && Object.prototype.hasOwnProperty.call(payload, "pickedQuantity")) {
+    pickedDisplay = buildTicketQuantityDisplay(String(payload.pickedUnit || ""), payload.pickedQuantity);
+  }
+  return pickedDisplay ? (label + " → " + pickedDisplay) : label;
+}
+
 function renderPickupTicketDetailView(selectedTicket) {
   const ticket = selectedTicket && selectedTicket.ticket ? selectedTicket.ticket : null;
   if (!ticket) {
@@ -4559,6 +4608,7 @@ function renderPickupTicketDetailView(selectedTicket) {
     + '</section>';
   markup += lines.map(function(line) {
     const draft = getPickupLineDraft(line);
+    const preview = buildPickupLinePreview(line, draft);
     const lineLocked = isPickupLineLocked(ticket, line);
     const tone = getPickupLineTone(line.status);
     const lineClass = (lineLocked
@@ -4575,8 +4625,8 @@ function renderPickupTicketDetailView(selectedTicket) {
       + '</div>'
       + '<div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-on-surface-variant">'
       + ((line.warehouseHelpDisplay || availableStock) ? ('<span class="font-semibold text-on-surface-variant">' + escapeHtml([String(line.warehouseHelpDisplay || "").trim(), availableStock].filter(Boolean).join(" · ")) + '</span>') : '')
-      + '<span>' + escapeHtml(line.requestedDisplay || "À confirmer") + '</span>'
-      + (line.pickedDisplay ? '<span class="font-semibold text-on-surface">' + escapeHtml("→ " + line.pickedDisplay) + '</span>' : '')
+      + '<span>' + escapeHtml(preview.requested) + '</span>'
+      + (preview.pickedLabel ? '<span class="font-semibold text-on-surface">' + escapeHtml(preview.pickedLabel) + '</span>' : '')
       + '</div>'
       + '</div>'
       + '<div class="shrink-0 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ' + escapeHtml(tone.badge) + '">' + escapeHtml(statusLabel) + '</div>'
@@ -4602,10 +4652,10 @@ function renderPickupTicketDetailView(selectedTicket) {
     + '<div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Historique ticket</div>'
     + (events.length ? '<div class="mt-2 flex flex-col gap-2">' + events.map(function(event) {
       const reference = getPickupTicketEventReference(event, lines);
-      const label = getPickupTicketEventLabel(event);
+      const label = buildPickupTicketEventDisplayLabel(event, lines);
       return '<div class="border-t border-outline-variant/10 pt-2 text-[11px] text-on-surface-variant">'
         + '<div>' + escapeHtml(formatDateTimeLabel(event.createdAt) + " · " + (reference ? reference + " · " : "") + label) + '</div>'
-        + (event.message && event.message !== label ? '<div class="mt-0.5 text-[10px]">' + escapeHtml(event.message) + '</div>' : '')
+        + (event.message && event.message !== getPickupTicketEventLabel(event) && event.message !== label ? '<div class="mt-0.5 text-[10px]">' + escapeHtml(event.message) + '</div>' : '')
         + '</div>';
     }).join("") + '</div>' : '<div class="mt-2 text-[11px] text-on-surface-variant">Aucun événement.</div>')
     + '</section>';
@@ -5756,12 +5806,14 @@ function registerVueBridge() {
     getPickupLineUiStatus: getPickupLineUiStatus,
     getPickupLineTone: getPickupLineTone,
     getPickupTicketEventLabel: getPickupTicketEventLabel,
+    buildPickupTicketEventDisplayLabel: buildPickupTicketEventDisplayLabel,
     compactPickupTicketEventsForDisplay: compactPickupTicketEventsForDisplay,
     getPickupTicketEventReference: getPickupTicketEventReference,
     canEditPickupTicket: canEditPickupTicket,
     isPickupLineLocked: isPickupLineLocked,
     buildRequestedDisplayFromDraftLine: buildRequestedDisplayFromDraftLine,
     getPickupLineDraft: getPickupLineDraft,
+    buildPickupLinePreview: buildPickupLinePreview,
     getPickupLineAvailableStockDisplay: getPickupLineAvailableStockDisplay,
     getPickupTicketTitleNoteLabel: getPickupTicketTitleNoteLabel,
     formatTicketLineCountLabel: formatTicketLineCountLabel,
