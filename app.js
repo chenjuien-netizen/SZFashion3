@@ -3370,6 +3370,18 @@ function handleQuickEditFieldChange(field, value) {
   renderQuickEdit();
 }
 
+function handleQuickEditFieldFocus(field) {
+  if (!state.quickEditForm) return;
+  if (field === "tailInput") {
+    const parsed = parseStyledIntegerInput(state.quickEditForm.tailInput, { mode: "tail" });
+    if (parsed.valid) state.quickEditForm.tailInput = parsed.value > 0 ? String(parsed.value) : "";
+  } else if (field === "unitsPerBoxInput") {
+    const parsed = parseStyledIntegerInput(state.quickEditForm.unitsPerBoxInput, { mode: "units" });
+    if (parsed.valid) state.quickEditForm.unitsPerBoxInput = parsed.value > 0 ? String(parsed.value) : "";
+  }
+  renderQuickEdit();
+}
+
 function normalizeQuickEditFieldOnBlur(field) {
   if (!state.quickEditForm) return;
   if (field === "tailInput") {
@@ -5895,6 +5907,7 @@ function registerVueBridge() {
     closeQuickEdit: closeQuickEdit,
     handleQuickEditSave: handleQuickEditSave,
     handleQuickEditFieldChange: handleQuickEditFieldChange,
+    handleQuickEditFieldFocus: handleQuickEditFieldFocus,
     toggleQuickEditSegment: toggleQuickEditSegment,
     normalizeQuickEditFieldOnBlur: normalizeQuickEditFieldOnBlur,
     getQuickExitSegments: getQuickExitSegments_,
