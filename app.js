@@ -721,9 +721,13 @@ function applyPickupTicketIdentityMapping_(mapping) {
   console.info("[applyPickupTicketIdentityMapping_] start", {
     clientTicketId: clientTicketId,
     serverTicketId: serverTicketId,
-    wasActiveTicket: wasActiveTicket
+    wasActiveTicket: wasActiveTicket,
+    mappedLineCount: Object.keys(lineIdMap).length
   });
   if (state.pickupTicket === clientTicketId) state.pickupTicket = serverTicketId;
+  if (state.pickupTicketData && state.pickupTicketData.ticket && String(state.pickupTicketData.ticket.ticketId || "") === clientTicketId) {
+    state.pickupTicketData = null;
+  }
   if (state.lastTicketsView && state.lastTicketsView.ticketId === clientTicketId) {
     state.lastTicketsView = Object.assign({}, state.lastTicketsView, { ticketId: serverTicketId });
   }
@@ -736,6 +740,11 @@ function applyPickupTicketIdentityMapping_(mapping) {
     nextDrafts[lineIdMap[lineId] || lineId] = state.ticketLineDraftsById[lineId];
   });
   state.ticketLineDraftsById = nextDrafts;
+  console.info("[applyPickupTicketIdentityMapping_] local ticket replaced", {
+    clientTicketId: clientTicketId,
+    serverTicketId: serverTicketId,
+    draftKeys: Object.keys(state.ticketLineDraftsById || {}).length
+  });
   applyLocalPickupTicketsState(serverTicketId);
   if (currentRoute.view === "tickets" && String(currentRoute.ref || "") === clientTicketId) {
     window.history.replaceState(null, "", buildHashRoute("tickets", serverTicketId));

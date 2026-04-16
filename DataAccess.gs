@@ -1179,6 +1179,7 @@ function getOrCreatePickupTicketsSheet_() {
     "line_count",
     "resolved_line_count",
     "blocked_line_count",
+    "client_ticket_id",
     "version"
   ]);
 }
@@ -1312,11 +1313,37 @@ function readPickupTickets_(sheet) {
       lineCount: Number(row.line_count || 0),
       resolvedLineCount: Number(row.resolved_line_count || 0),
       blockedLineCount: Number(row.blocked_line_count || 0),
+      clientTicketId: String(row.client_ticket_id || "").trim(),
       version: Number(row.version || 0),
       _rowIndex: row._rowIndex
     };
   }).sort(function(a, b) {
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+  });
+}
+
+function findExistingPickupTicketByClientTicketId_(sheet, clientTicketId) {
+  const normalizedClientTicketId = String(clientTicketId || "").trim();
+  if (!normalizedClientTicketId) return null;
+  return readPickupTickets_(sheet).find(function(ticket) {
+    return String(ticket.clientTicketId || "").trim() === normalizedClientTicketId;
+  }) || null;
+}
+
+function buildExistingPickupTicketLineMappings_(linesSheet, ticketId, requestLines) {
+  const existingLines = readPickupTicketLines_(linesSheet, ticketId);
+  return (Array.isArray(requestLines) ? requestLines : []).map(function(line, index) {
+    const clientLineId = String(line && line.clientLineId || "").trim();
+    const expectedLineNumber = index + 1;
+    const existingLine = existingLines.find(function(entry) {
+      return Number(entry && entry.lineNumber || 0) === expectedLineNumber;
+    }) || existingLines[index] || null;
+    return {
+      clientLineId: clientLineId,
+      lineId: String(existingLine && existingLine.lineId || "").trim()
+    };
+  }).filter(function(entry) {
+    return entry.clientLineId && entry.lineId;
   });
 }
 
@@ -1769,13 +1796,32 @@ function applyCreatePickupTicketMutation_(mutation) {
   const ticketsSheet = getOrCreatePickupTicketsSheet_();
   const linesSheet = getOrCreatePickupTicketLinesSheet_();
   const eventsSheet = getOrCreatePickupTicketEventsSheet_();
+  const requestLines = Array.isArray(request.lines) ? request.lines : [];
+  const clientTicketId = String(request.clientTicketId || "").trim();
+  console.log("[applyCreatePickupTicketMutation_] start mutationId=%s clientTicketId=%s requestLines=%s title=%s", String(mutation && mutation.id || ""), clientTicketId, String(requestLines.length || 0), String(request.title || "").trim());
+
+  const existingTicket = clientTicketId ? findExistingPickupTicketByClientTicketId_(ticketsSheet, clientTicketId) : null;
+  if (existingTicket) {
+    const existingPayload = getPickupTicketPayload_(existingTicket.ticketId);
+    const existingLineMappings = buildExistingPickupTicketLineMappings_(linesSheet, existingTicket.ticketId, requestLines);
+    console.log("[applyCreatePickupTicketMutation_] dedupe hit mutationId=%s clientTicketId=%s ticketId=%s ticketNumber=%s", String(mutation && mutation.id || ""), clientTicketId, existingTicket.ticketId, existingTicket.ticketNumber);
+    return {
+      ok: true,
+      mutationId: String(mutation && mutation.id || ""),
+      clientTicketId: clientTicketId,
+      lineMappings: existingLineMappings,
+      ticket: existingPayload.ticket,
+      lines: existingPayload.lines,
+      events: existingPayload.events,
+      generatedAt: new Date().toISOString(),
+      source: "google_sheets"
+    };
+  }
+
   const ticketId = buildGeneratedId_("pt");
   const ticketNumber = generatePickupTicketNumber_(ticketsSheet);
   const createdAt = new Date().toISOString();
-  const requestLines = Array.isArray(request.lines) ? request.lines : [];
-  const clientTicketId = String(request.clientTicketId || "").trim();
   const lineMappings = [];
-  console.log("[applyCreatePickupTicketMutation_] start mutationId=%s clientTicketId=%s requestLines=%s title=%s", String(mutation && mutation.id || ""), clientTicketId, String(requestLines.length || 0), String(request.title || "").trim());
 
   ticketsSheet.appendRow([
     ticketId,
@@ -1792,6 +1838,7 @@ function applyCreatePickupTicketMutation_(mutation) {
     requestLines.length,
     0,
     requestLines.length,
+    clientTicketId,
     1
   ]);
   console.log("[applyCreatePickupTicketMutation_] ticket written ticketId=%s ticketNumber=%s status=%s", ticketId, ticketNumber, "in_progress");
