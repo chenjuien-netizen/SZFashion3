@@ -29,12 +29,6 @@
       const ticketReferenceSuggestions = vue.computed(function() {
         return api.getReferenceSuggestions(state.ticketCreationDraft && state.ticketCreationDraft.quickReference, { limit: 8 });
       });
-      const quantitySuggestions = vue.computed(function() {
-        return Array.isArray(state.ticketQuantityDropdown && state.ticketQuantityDropdown.suggestions)
-          ? state.ticketQuantityDropdown.suggestions
-          : [];
-      });
-
       function openTicket(ticketId) {
         api.navigateTo("tickets", { ref: ticketId });
       }
@@ -87,22 +81,6 @@
         api.handleValidateTicket(ticketId);
       }
 
-      function isCreateQuantityActive() {
-        const dropdown = state.ticketQuantityDropdown || {};
-        return dropdown.open && dropdown.activeField === "create";
-      }
-
-      function isLineQuantityActive(lineId) {
-        const dropdown = state.ticketQuantityDropdown || {};
-        return dropdown.open && dropdown.activeField === "line" && String(dropdown.activeLineId || "") === String(lineId || "");
-      }
-
-      function applyQuantityDropdownSelection(value, event) {
-        if (!value) return;
-        api.applyTicketQuantitySuggestionSelection(value);
-        if (event && event.target) event.target.value = "";
-      }
-
       function lineDraft(line) {
         return api.getPickupLineDraft(line);
       }
@@ -136,18 +114,14 @@
         emptyLine: emptyLine,
         editLine: editLine,
         validateTicket: validateTicket,
-        isCreateQuantityActive: isCreateQuantityActive,
-        isLineQuantityActive: isLineQuantityActive,
-        applyQuantityDropdownSelection: applyQuantityDropdownSelection,
         lineDraft: lineDraft,
         linePreview: linePreview,
         getPreviewLines: getPreviewLines,
-        ticketReferenceSuggestions: ticketReferenceSuggestions,
-        quantitySuggestions: quantitySuggestions
+        ticketReferenceSuggestions: ticketReferenceSuggestions
       };
     },
     template: `
-      <main class="flex h-full min-h-0 flex-col overflow-hidden">
+      <main id="pickupTicketsContentWrap" class="relative flex h-full min-h-0 flex-col overflow-hidden">
         <div class="sticky top-0 z-40 shrink-0 bg-background">
           <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
             <div class="flex min-w-0 items-center gap-3">
@@ -176,16 +150,12 @@
                     <input v-model="state.ticketCreationDraft.title" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" placeholder="Titre (optionnel)" type="text" />
                     <input v-model="state.ticketCreationDraft.globalNote" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" placeholder="Remarque / note (optionnel)" type="text" />
                   </div>
-                  <div class="grid grid-cols-[minmax(0,1fr)_6.5rem_3.25rem_auto] gap-2">
+                  <div class="grid grid-cols-[minmax(0,1fr)_6.5rem_auto] gap-2">
                     <input v-model="state.ticketCreationDraft.quickReference" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" list="ticketReferenceSuggestions" placeholder="Référence" type="text" />
                     <datalist id="ticketReferenceSuggestions">
                       <option v-for="entry in ticketReferenceSuggestions" :key="entry.reference" :value="entry.reference">{{ entry.label }}</option>
                     </datalist>
                     <input id="pickupTicketQuickQuantityInput" v-model="state.ticketCreationDraft.quickQuantity" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[12px] text-on-surface" inputmode="decimal" placeholder="2箱" type="text" @focus="openCreateQuantityDropdown" @input="openCreateQuantityDropdown" />
-                    <select class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[11px] font-semibold text-on-surface-variant" @change="applyQuantityDropdownSelection($event.target.value, $event)">
-                      <option value="">▼</option>
-                      <option v-for="(suggestion, index) in isCreateQuantityActive() ? quantitySuggestions : []" :key="'create-quantity::' + suggestion + '::' + index" :value="suggestion">{{ suggestion }}</option>
-                    </select>
                     <button class="border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" type="button" @click="addDraftLine">Ajouter</button>
                   </div>
                 </div>
@@ -259,10 +229,6 @@
                         @focus="openLineQuantityDropdown"
                         @input="openLineQuantityDropdown"
                       />
-                      <select class="border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-center text-[11px] font-semibold text-on-surface-variant" @change="applyQuantityDropdownSelection($event.target.value, $event)">
-                        <option value="">▼</option>
-                        <option v-for="(suggestion, index) in isLineQuantityActive(line.lineId) ? quantitySuggestions : []" :key="'line-quantity::' + line.lineId + '::' + suggestion + '::' + index" :value="suggestion">{{ suggestion }}</option>
-                      </select>
                       <input :data-line-id="line.lineId" data-role="ticket-line-note-input" v-model="lineDraft(line).lineNote" autocomplete="off" class="min-w-0 w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" :placeholder="line.status === 'not_found' ? 'Précision introuvable...' : 'Commentaire'" type="text" />
                       <button aria-label="Confirmer la ligne" title="Confirmer" class="sz-ticket-line-action-btn border border-outline-variant/30 text-on-surface-variant" type="button" @click="saveLine(selectedVm.ticket.ticketId, line.lineId)">
                         <span class="material-symbols-outlined !text-[16px]">check</span>
@@ -361,6 +327,7 @@
             </template>
           </div>
         </section>
+        <div id="ticketQuantityDropdownLayer" class="pointer-events-none absolute inset-0 z-20 hidden"></div>
       </main>
     `
   };
