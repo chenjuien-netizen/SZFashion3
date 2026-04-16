@@ -5366,15 +5366,13 @@ function loadPickupTicketData(ticketId, options) {
     return Promise.resolve(false);
   }
   const tasks = [];
-  if (!state.pickupTicketsLoaded || !Array.isArray(state.pickupTickets) || !state.pickupTickets.length) {
+  if (includeDetail || !state.pickupTicketsLoaded || !Array.isArray(state.pickupTickets) || !state.pickupTickets.length) {
     tasks.push(refreshRemotePickupTicketsBootstrap({ silent: true }));
   } else {
     tasks.push(refreshRemotePickupTickets({ silent: true }));
   }
   if (normalizedTicketId && includeDetail) {
-    if (!(localViewModel && localViewModel.hasDetail)) {
-      tasks.push(refreshRemotePickupTicket(normalizedTicketId, { silent: true }));
-    } else {
+    if (localViewModel && localViewModel.hasDetail) {
       state.pickupTicketLoading = false;
     }
   } else {
@@ -6063,9 +6061,6 @@ function initApp() {
   if (state.currentView === "detail" && state.detailReference) {
     refreshRemoteDetail(state.detailReference, { silent: true });
   }
-  if (route.view === "tickets" && state.pickupTicket && !getPickupTicketViewModel(state.pickupTicket).hasDetail) {
-    refreshRemotePickupTicket(state.pickupTicket, { silent: true });
-  }
   if (state.currentView === "imports") {
     loadReferenceImportData(state.referenceImportBatch);
   }
@@ -6104,9 +6099,6 @@ function initApp() {
       }
       if (state.currentView === "tickets") {
         return loadPickupTicketData(state.pickupTicket, { includeDetail: Boolean(state.pickupTicket) });
-      }
-      if (state.lastTicketsView && state.lastTicketsView.view === "ticket_detail" && state.lastTicketsView.ticketId) {
-        return refreshRemotePickupTicket(state.lastTicketsView.ticketId, { silent: true });
       }
       return false;
     });
