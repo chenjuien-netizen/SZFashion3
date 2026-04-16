@@ -56,6 +56,10 @@
         api.applyQuickExitSuggestionSelection(segmentId, suggestion);
       }
 
+      function toggleOptionalSegment(segmentId) {
+        api.toggleQuickEditSegment(segmentId);
+      }
+
       return {
         state: state,
         api: api,
@@ -65,6 +69,7 @@
         packsHint: packsHint,
         isSelected: isSelected,
         toggleSegment: toggleSegment,
+        toggleOptionalSegment: toggleOptionalSegment,
         segmentConfig: segmentConfig,
         updateSegmentEntry: updateSegmentEntry,
         applySuggestion: applySuggestion
@@ -92,68 +97,155 @@
           <div class="inventory-scroll max-h-[calc(100dvh-12rem)] overflow-y-auto px-4 py-4">
             <template v-if="state.quickEditTab === 'quick-exit'">
               <div class="rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
-                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Stock courant</div>
-                <div class="mt-2 text-sm font-semibold text-on-surface">{{ item.stockDisplay || '-' }}</div>
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Stock actuel</div>
+                  <button :class="['shrink-0 rounded border px-2 py-1 text-[10px] font-bold tracking-[0.12em] transition-colors duration-150', state.quickExitClearSelected ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant/30 text-on-surface-variant hover:bg-surface-container']" type="button" @click="api.setQuickExitClearSelected(!state.quickExitClearSelected)">Vider</button>
+                </div>
+                <div class="mt-2 w-full overflow-x-auto">
+                  <div class="flex justify-center">
+                    <div class="inline-flex min-w-fit flex-nowrap gap-2 text-sm font-semibold text-primary">{{ item.stockDisplay || '-' }}</div>
+                  </div>
+                </div>
                 <div v-if="packsHint" class="mt-2 text-[10px] text-on-surface-variant" v-html="packsHint"></div>
+                <div class="mt-2 text-[11px] text-on-surface-variant" :class="{ hidden: !preview }">
+                  <span class="font-bold uppercase tracking-[0.16em] text-on-surface-variant">Apres sortie</span>
+                  <span class="ml-2 font-semibold text-on-surface">{{ preview || '-' }}</span>
+                </div>
               </div>
 
               <div class="mt-4">
-                <div class="flex items-center justify-between gap-3">
-                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Segments de sortie</div>
-                  <button :class="['rounded border px-2 py-1 text-[10px] font-bold tracking-[0.12em]', state.quickExitClearSelected ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant/30 text-on-surface-variant']" type="button" @click="api.setQuickExitClearSelected(!state.quickExitClearSelected)">Vider</button>
-                </div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <button v-for="segment in segments" :key="segment.id" :class="['inline-flex items-center rounded border px-2 py-1 text-sm font-semibold', isSelected(segment.id) ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant/30 text-primary']" type="button" @click="toggleSegment(segment)">
-                    {{ segment.label || segment.id }}
-                  </button>
-                </div>
-              </div>
-
-              <div v-if="!state.quickExitClearSelected" class="mt-4 grid gap-3">
-                <div v-for="segment in segments.filter(s => isSelected(s.id))" :key="segment.id" class="rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
-                  <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">{{ segment.id === 'tail' ? '尾箱' : '箱' }}</div>
-                  <div class="mt-1 text-sm font-semibold text-on-surface">{{ segment.label }}</div>
-                  <input :value="segmentConfig(segment.id).entry || ''" class="mt-3 w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" :placeholder="segment.id === 'tail' ? '(x)/3包/1/2' : '2箱/5包/1/2'" type="text" @input="updateSegmentEntry(segment.id, $event.target.value)" />
-                  <div class="mt-2 flex flex-wrap gap-1">
-                    <button v-for="suggestion in api.buildQuickExitSuggestions(item, segment, segmentConfig(segment.id).entry || '')" :key="segment.id + '::' + suggestion" class="rounded border border-outline-variant/30 px-2 py-1 text-[10px] font-semibold text-on-surface-variant" type="button" @click="applySuggestion(segment.id, suggestion)">
-                      {{ suggestion }}
+                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Segments de sortie</div>
+                <div class="mt-2 flex justify-center overflow-x-auto">
+                  <div class="inline-flex min-w-fit flex-nowrap items-center gap-2">
+                    <button v-for="segment in segments" :key="segment.id" :class="['inline-flex items-center rounded border px-2 py-1 text-sm font-semibold', isSelected(segment.id) ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant/30 text-primary']" type="button" @click="toggleSegment(segment)">
+                      {{ segment.label || segment.id }}
                     </button>
                   </div>
-                  <div v-if="state.quickExitSegmentErrors && state.quickExitSegmentErrors[segment.id]" class="mt-2 text-[11px] font-medium text-error">{{ state.quickExitSegmentErrors[segment.id] }}</div>
                 </div>
               </div>
 
-              <div class="mt-4 rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
-                <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Preview après sortie</div>
-                <div class="mt-1 text-[13px] font-black tracking-tight text-on-surface">{{ preview || '-' }}</div>
+              <div v-if="!state.quickExitClearSelected" class="mt-4 overflow-visible">
+                <div class="flex justify-center overflow-x-auto">
+                  <div class="inline-flex min-w-fit flex-nowrap items-start gap-6">
+                    <div v-for="segment in segments.filter(s => isSelected(s.id))" :key="segment.id" class="min-w-fit">
+                      <div class="flex min-w-fit flex-col items-start justify-end rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
+                        <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">{{ segment.id === 'tail' ? '尾箱' : '箱' }}</div>
+                        <div class="mt-1 text-sm font-semibold text-on-surface">{{ segment.label }}</div>
+                        <div class="mt-2 min-h-[4.5rem] w-[8.75rem]">
+                          <input :value="segmentConfig(segment.id).entry || ''" class="w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[16px] leading-tight font-semibold text-on-surface md:text-sm" :placeholder="segment.id === 'tail' ? '(x)/3包/ 1/2 / 2/3' : '2箱/5包/ 1/2 / 2/3'" type="text" @input="updateSegmentEntry(segment.id, $event.target.value)" />
+                          <div class="mt-2 flex flex-wrap gap-1">
+                            <button v-for="suggestion in api.buildQuickExitSuggestions(item, segment, segmentConfig(segment.id).entry || '')" :key="segment.id + '::' + suggestion" class="rounded border border-outline-variant/30 px-2 py-1 text-[10px] font-semibold text-on-surface-variant" type="button" @click="applySuggestion(segment.id, suggestion)">
+                              {{ suggestion }}
+                            </button>
+                          </div>
+                          <div v-if="state.quickExitSegmentErrors && state.quickExitSegmentErrors[segment.id]" class="mt-2 text-[11px] font-medium text-error">{{ state.quickExitSegmentErrors[segment.id] }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </template>
 
             <template v-else>
-              <div class="grid gap-3 sm:grid-cols-2">
-                <label class="block">
-                  <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</span>
-                  <input :value="state.quickEditForm && state.quickEditForm.tailInput || ''" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="(85p)" type="text" @input="api.handleQuickEditFieldChange('tailInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('tailInput')" />
-                </label>
-                <label class="block">
-                  <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</span>
-                  <input :value="state.quickEditForm && state.quickEditForm.unitsPerBoxInput || ''" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="144p" type="text" @input="api.handleQuickEditFieldChange('unitsPerBoxInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('unitsPerBoxInput')" />
-                </label>
-                <label class="block">
-                  <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</span>
-                  <input :value="state.quickEditForm && state.quickEditForm.itemBoxes || ''" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" type="number" @input="api.handleQuickEditFieldChange('itemBoxes', $event.target.value)" />
-                </label>
-                <label class="block">
-                  <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
-                  <select :value="state.quickEditForm && state.quickEditForm.sign || '+'" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('sign', $event.target.value)">
-                    <option value="+">+</option>
-                    <option value="×">×</option>
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
-                  <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
-                </label>
+              <div class="space-y-2">
+                <div class="w-full overflow-x-auto">
+                  <div class="mx-auto w-max min-w-0">
+                    <div class="relative flex items-end gap-x-2 gap-y-2 whitespace-nowrap pb-1">
+                      <div class="flex-none">
+                        <button v-if="!state.quickEditTailOpen" aria-label="Ajouter 尾箱" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="toggleOptionalSegment('tail')">
+                          <span class="material-symbols-outlined !text-[15px]">add</span>
+                        </button>
+                        <div v-else>
+                          <label class="block">
+                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</span>
+                            <input :value="state.quickEditForm && state.quickEditForm.tailInput || ''" class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] font-medium text-on-surface md:text-sm" placeholder="(85p)" type="text" @input="api.handleQuickEditFieldChange('tailInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('tailInput')" />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div v-if="state.quickEditTailOpen" class="pointer-events-none flex-none self-stretch">
+                        <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
+                          <span aria-hidden="true" class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
+                          <span aria-hidden="true" class="flex items-center justify-center text-sm font-medium text-on-surface-variant/80">+</span>
+                        </div>
+                      </div>
+
+                      <div class="flex-none">
+                        <label class="block">
+                          <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</span>
+                          <input :value="state.quickEditForm && state.quickEditForm.unitsPerBoxInput || ''" class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] font-semibold text-on-surface md:text-sm" placeholder="144p" type="text" @input="api.handleQuickEditFieldChange('unitsPerBoxInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('unitsPerBoxInput')" />
+                        </label>
+                      </div>
+
+                      <div class="pointer-events-none flex-none self-stretch">
+                        <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
+                          <span aria-hidden="true" class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
+                          <span aria-hidden="true" class="flex items-center justify-center text-sm font-medium text-on-surface-variant/80">×</span>
+                        </div>
+                      </div>
+
+                      <div class="flex-none">
+                        <label class="block">
+                          <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</span>
+                          <input :value="state.quickEditForm && state.quickEditForm.itemBoxes || ''" class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] font-semibold text-on-surface md:text-sm" inputmode="numeric" type="number" @input="api.handleQuickEditFieldChange('itemBoxes', $event.target.value)" />
+                        </label>
+                      </div>
+
+                      <div class="flex-none">
+                        <button v-if="!state.quickEditPartialOpen" aria-label="Ajouter bloc partiel" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="toggleOptionalSegment('partial')">
+                          <span class="material-symbols-outlined !text-[15px]">add</span>
+                        </button>
+                        <div v-else class="flex items-end gap-x-2 gap-y-2">
+                          <label class="block">
+                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
+                            <select :value="state.quickEditForm && state.quickEditForm.sign || '+'" class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('sign', $event.target.value)">
+                              <option value="+">+</option>
+                              <option value="×">×</option>
+                            </select>
+                          </label>
+                          <label class="block">
+                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">分数</span>
+                            <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" class="border-outline-variant/30 bg-surface-container-low px-2 text-[16px] font-medium text-on-surface md:text-sm" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="w-full overflow-x-auto">
+                  <div class="mx-auto w-max min-w-0">
+                    <div class="flex items-start gap-x-2 gap-y-1 whitespace-nowrap">
+                      <div class="flex-none">
+                        <button v-if="state.quickEditTailOpen" aria-label="Retirer 尾箱" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="toggleOptionalSegment('tail')">
+                          <span class="material-symbols-outlined !text-[15px]">remove</span>
+                        </button>
+                        <span v-else aria-hidden="true" class="inline-flex h-8 w-8 opacity-0"></span>
+                      </div>
+                      <div class="flex-none" :class="{ 'opacity-0': !state.quickEditTailOpen }">
+                        <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
+                          <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
+                          <span class="flex items-center justify-center text-sm font-medium opacity-0">+</span>
+                        </div>
+                      </div>
+                      <span aria-hidden="true" class="flex-none opacity-0 text-[16px]">144p</span>
+                      <div aria-hidden="true" class="flex-none">
+                        <div class="grid h-full grid-rows-[auto_minmax(2.25rem,1fr)]">
+                          <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] opacity-0">.</span>
+                          <span class="flex items-center justify-center text-sm font-medium opacity-0">×</span>
+                        </div>
+                      </div>
+                      <span aria-hidden="true" class="flex-none opacity-0 text-[16px]">8</span>
+                      <div class="flex-none">
+                        <button v-if="state.quickEditPartialOpen" aria-label="Retirer bloc partiel" class="inline-flex h-8 w-8 items-center justify-center rounded border border-outline-variant/30 text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="toggleOptionalSegment('partial')">
+                          <span class="material-symbols-outlined !text-[15px]">remove</span>
+                        </button>
+                        <span v-else aria-hidden="true" class="inline-flex h-8 w-8 opacity-0"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </template>
 
