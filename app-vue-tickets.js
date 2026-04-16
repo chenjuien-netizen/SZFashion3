@@ -251,6 +251,7 @@
                         <span v-if="line.warehouseHelpDisplay || api.getPickupLineAvailableStockDisplay(line)" class="font-semibold text-on-surface-variant">{{ [String(line.warehouseHelpDisplay || '').trim(), api.getPickupLineAvailableStockDisplay(line)].filter(Boolean).join(' · ') }}</span>
                         <span>{{ linePreview(line).requested }}</span>
                         <span v-if="linePreview(line).pickedLabel" class="font-semibold text-on-surface">{{ linePreview(line).pickedLabel }}</span>
+                        <span v-if="linePreview(line).projectedStock" class="basis-full font-semibold text-primary md:basis-auto">{{ linePreview(line).projectedStock }}</span>
                       </div>
                     </div>
                     <div :class="['shrink-0 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em]', api.getPickupLineTone(line.status).badge]">{{ api.getPickupLineUiStatus(line.status) }}</div>
@@ -360,7 +361,7 @@
                             <span :class="['h-2 w-2 shrink-0 rounded-full', api.getPickupLineTone(line.status).dot]"></span>
                             <span class="truncate">{{ line.reference || '-' }}<span v-if="api.getPickupLineAvailableStockDisplay(line)">{{ ' · ' + api.getPickupLineAvailableStockDisplay(line) }}</span></span>
                           </div>
-                          <span class="shrink-0">{{ line.status === 'not_found' ? 'introuvable' : (line.pickedDisplay ? ((api.buildRequestedDisplayFromDraftLine(line) || line.requestedDisplay || 'À confirmer') + ' -> ' + line.pickedDisplay) : (api.buildRequestedDisplayFromDraftLine(line) || line.requestedDisplay || 'À confirmer')) }}</span>
+                          <span class="shrink-0">{{ line.status === 'not_found' ? 'introuvable' : (line.pickedDisplay ? ((api.buildRequestedDisplayFromDraftLine(line) || line.requestedDisplay || 'À confirmer') + ' -> ' + line.pickedDisplay + (api.buildPickupLinePreview(line, null).projectedStock ? (' · ' + api.buildPickupLinePreview(line, null).projectedStock) : '')) : (api.buildRequestedDisplayFromDraftLine(line) || line.requestedDisplay || 'À confirmer')) }}</span>
                         </div>
                       </div>
                     </article>

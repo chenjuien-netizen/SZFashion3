@@ -4502,13 +4502,68 @@ function buildPickupLinePickedPreview(line, draft) {
   return String(safeLine.pickedDisplay || "").trim();
 }
 
+function getPickupLineProjectedStockDisplay(line, draft) {
+  const safeLine = line || {};
+  const safeDraft = draft || {};
+  if (safeDraft.error) return "";
+  if (String(safeLine.status || "").trim() === "not_found") return "";
+  const reference = normalizeReference(safeLine.reference);
+  if (!reference) return "";
+  const item = getInventoryByReference(reference);
+  if (!item) return "";
+
+  let pickedUnit = "";
+  let pickedQuantity = 0;
+  const draftEntry = String(safeDraft.pickedInput || "").trim();
+  if (draftEntry) {
+    const parsedQuantity = parsePickupQuantityInput(draftEntry);
+    if (!parsedQuantity.ok) return "";
+    const resolvedQuantity = resolvePickupParsedQuantityForLine(safeLine, parsedQuantity);
+    if (!resolvedQuantity.ok || String(resolvedQuantity.status || "").trim() === "not_found") return "";
+    pickedUnit = String(resolvedQuantity.pickedUnit || "").trim();
+    pickedQuantity = Number(resolvedQuantity.pickedQuantity || 0);
+  } else if (safeLine.pickedDisplay) {
+    pickedUnit = String(safeLine.pickedUnit || "").trim();
+    pickedQuantity = Number(safeLine.pickedQuantity || 0);
+  }
+
+  if (!(pickedQuantity > 0) || !pickedUnit) return "";
+  let removedPieces = 0;
+  if (pickedUnit === "box") removedPieces = Math.max(0, toInt(item.unitsPerBox)) * pickedQuantity;
+  else if (pickedUnit === "pack") removedPieces = Math.max(0, toInt(item.colisage)) * pickedQuantity;
+  else if (pickedUnit === "piece") removedPieces = pickedQuantity;
+  if (!(removedPieces > 0)) return "";
+
+  const basePieces = safeLine.stockAvailablePiecesSnapshot != null
+    ? Math.max(0, Math.round(Number(safeLine.stockAvailablePiecesSnapshot) || 0))
+    : Math.max(0, Math.round(stateModelToPieces(item)));
+  const nextPieces = basePieces - removedPieces;
+  if (nextPieces < 0) return "";
+  if (nextPieces === 0) return "vide";
+
+  try {
+    const nextState = buildStateFromPieces(nextPieces, {
+      unitsPerBox: item.unitsPerBox,
+      colisage: item.colisage,
+      remark: item.remark,
+      reconstructionMode: pickedUnit === "pack" ? "packs" : ""
+    });
+    return buildLocalStockDisplay(nextState);
+  } catch (error) {
+    return "";
+  }
+}
+
 function buildPickupLinePreview(line, draft) {
   const requested = buildRequestedDisplayFromDraftLine(line) || "À confirmer";
   const picked = buildPickupLinePickedPreview(line, draft);
+  const projectedStock = getPickupLineProjectedStockDisplay(line, draft);
   return {
     requested: requested,
     picked: picked,
-    pickedLabel: picked ? ("→ " + picked) : ""
+    pickedLabel: picked ? ("→ " + picked) : "",
+    projectedStock: projectedStock,
+    projectedStockLabel: projectedStock ? ("· " + projectedStock) : ""
   };
 }
 
@@ -4524,6 +4579,7 @@ function buildPickupTicketEventDisplayLabel(event, lines) {
     : null;
   const payload = event && event.payload ? event.payload : {};
   let pickedDisplay = "";
+  let projectedStockDisplay = "";
   if (line && line.pickedDisplay) {
     pickedDisplay = String(line.pickedDisplay || "").trim();
   } else if (String(payload.status || "").trim() === "not_found") {
@@ -4531,7 +4587,15 @@ function buildPickupTicketEventDisplayLabel(event, lines) {
   } else if (payload.pickedUnit && Object.prototype.hasOwnProperty.call(payload, "pickedQuantity")) {
     pickedDisplay = buildTicketQuantityDisplay(String(payload.pickedUnit || ""), payload.pickedQuantity);
   }
-  return pickedDisplay ? (label + " → " + pickedDisplay) : label;
+  if (line) {
+    projectedStockDisplay = getPickupLineProjectedStockDisplay(line, {
+      pickedInput: pickedDisplay,
+      error: ""
+    });
+  }
+  return pickedDisplay
+    ? (label + " → " + pickedDisplay + (projectedStockDisplay ? (" · " + projectedStockDisplay) : ""))
+    : label;
 }
 
 function renderPickupTicketDetailView(selectedTicket) {
@@ -4575,6 +4639,7 @@ function renderPickupTicketDetailView(selectedTicket) {
       + ((line.warehouseHelpDisplay || availableStock) ? ('<span class="font-semibold text-on-surface-variant">' + escapeHtml([String(line.warehouseHelpDisplay || "").trim(), availableStock].filter(Boolean).join(" · ")) + '</span>') : '')
       + '<span>' + escapeHtml(preview.requested) + '</span>'
       + (preview.pickedLabel ? '<span class="font-semibold text-on-surface">' + escapeHtml(preview.pickedLabel) + '</span>' : '')
+      + (preview.projectedStock ? '<span class="basis-full font-semibold text-primary md:basis-auto">' + escapeHtml(preview.projectedStock) + '</span>' : '')
       + '</div>'
       + '</div>'
       + '<div class="shrink-0 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] ' + escapeHtml(tone.badge) + '">' + escapeHtml(statusLabel) + '</div>'
