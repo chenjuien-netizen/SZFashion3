@@ -6,12 +6,14 @@ let remotePickupTicketsRefreshPromise = null;
 let remotePickupTicketRefreshPromises = Object.create(null);
 let remoteMutationSyncPromise = null;
 let hasLocalWritesThisSession = false;
+let iosTouchGuardInstalled_ = false;
 
 const baseState = {
   items: [],
   historyItems: [],
   pendingMutations: [],
   syncStatus: "idle",
+  remoteAccessError: "",
   lastSyncAt: "",
   dataSource: "local",
   query: "",
@@ -107,6 +109,66 @@ function bootLog_(stage, payload) {
   console.info("[boot] " + stage, payload || {});
 }
 
+function isIosLikeDevice_() {
+  const userAgent = String(window.navigator && window.navigator.userAgent || "");
+  const platform = String(window.navigator && window.navigator.platform || "");
+  return /iPhone|iPad|iPod/i.test(userAgent) || (/Mac/i.test(platform) && navigator.maxTouchPoints > 1);
+}
+
+function isInteractiveTextField_(target) {
+  if (!target || !target.closest) return false;
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true'], [contenteditable=''], [data-allow-ios-zoom='true']"));
+}
+
+function runNavDoubleTapShortcut_(target) {
+  const actionNode = target && target.closest ? target.closest("[data-nav-doubletap]") : null;
+  const action = String(actionNode && actionNode.getAttribute("data-nav-doubletap") || "");
+  if (action === "inventory") {
+    forceInventoryListView();
+    return true;
+  }
+  if (action === "history") {
+    forceHistoryListView();
+    return true;
+  }
+  if (action === "tickets") {
+    forceTicketsListView();
+    return true;
+  }
+  return false;
+}
+
+function installIosAntiZoomGuards_() {
+  if (iosTouchGuardInstalled_ || typeof document === "undefined" || !isIosLikeDevice_()) return;
+  iosTouchGuardInstalled_ = true;
+  let lastTouch = { time: 0, x: 0, y: 0, target: null };
+
+  document.addEventListener("touchend", function(event) {
+    if (!event || !event.changedTouches || event.changedTouches.length !== 1) return;
+    const touch = event.changedTouches[0];
+    const now = Date.now();
+    const target = event.target;
+    if (isInteractiveTextField_(target)) {
+      lastTouch = { time: now, x: touch.clientX, y: touch.clientY, target: target };
+      return;
+    }
+
+    const deltaMs = now - lastTouch.time;
+    const deltaX = Math.abs(Number(touch.clientX || 0) - Number(lastTouch.x || 0));
+    const deltaY = Math.abs(Number(touch.clientY || 0) - Number(lastTouch.y || 0));
+    const sameZone = deltaX < 24 && deltaY < 24;
+    if (deltaMs > 0 && deltaMs < 350 && sameZone) {
+      event.preventDefault();
+      runNavDoubleTapShortcut_(target);
+    }
+    lastTouch = { time: now, x: touch.clientX, y: touch.clientY, target: target };
+  }, { passive: false });
+
+  document.addEventListener("gesturestart", function(event) {
+    if (event && !isInteractiveTextField_(event.target)) event.preventDefault();
+  }, { passive: false });
+}
+
 function getBootDiagnostics_() {
   return {
     vueLoaded: Boolean(window.Vue),
@@ -168,10 +230,26 @@ function isRemoteReadAllowed(options) {
 }
 
 function getSyncStatusLabel(defaultLabel) {
+  if (state.remoteAccessError) return "Accès refusé";
   if (state.syncStatus === "refreshing") return "Refresh...";
   if (state.syncStatus === "offline") return "Hors ligne";
   if (state.syncStatus === "error") return "Erreur";
   return defaultLabel;
+}
+
+function clearRemoteAccessError_() {
+  state.remoteAccessError = "";
+}
+
+function setRemoteAccessError_(error) {
+  const status = Number(error && error.status || 0);
+  const code = String(error && error.code || "");
+  if (status === 401 || status === 403 || code === "AUTH_REQUIRED" || code === "AUTH_FORBIDDEN") {
+    state.remoteAccessError = String(error && error.message || "Accès refusé au backend SZFashion.");
+    state.syncStatus = "error";
+    return true;
+  }
+  return false;
 }
 
 function refreshRemoteSnapshot(options) {
@@ -192,6 +270,7 @@ function refreshRemoteSnapshot(options) {
     remoteDataSource.fetchInventory(),
     remoteDataSource.fetchHistory()
   ]).then(function(results) {
+    clearRemoteAccessError_();
     const inventoryPayload = results[0];
     const historyPayload = results[1];
     const pendingCount = state.pendingMutations.length;
@@ -216,7 +295,7 @@ function refreshRemoteSnapshot(options) {
     return true;
   }).catch(function(error) {
     console.warn("Remote read-only refresh failed", error);
-    state.syncStatus = navigator.onLine ? "error" : "offline";
+    if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
     bootLog_("remote snapshot failed", {
       message: error && error.message ? error.message : String(error || ""),
       syncStatus: state.syncStatus
@@ -243,6 +322,7 @@ function refreshRemoteDetail(reference, options) {
   }
 
   return remoteDataSource.fetchDetail(normalizedReference).then(function(payload) {
+    clearRemoteAccessError_();
     const snapshotResult = dataSource.mergeRemoteSnapshot({
       reference: normalizedReference,
       item: payload.item,
@@ -259,7 +339,7 @@ function refreshRemoteDetail(reference, options) {
   }).catch(function(error) {
     console.warn("Remote detail refresh failed", error);
     if (!options || !options.silent) {
-      state.syncStatus = navigator.onLine ? "error" : "offline";
+      if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
       renderAll();
     }
     return false;
@@ -285,6 +365,7 @@ function refreshRemotePickupTickets(options) {
   }
 
   remotePickupTicketsRefreshPromise = remoteDataSource.fetchPickupTickets().then(function(payload) {
+    clearRemoteAccessError_();
     mergeRemotePickupTicketsList(payload && payload.items, payload && payload.generatedAt);
     if (!options || !options.silent) {
       state.syncStatus = "idle";
@@ -294,7 +375,7 @@ function refreshRemotePickupTickets(options) {
   }).catch(function(error) {
     console.warn("Pickup tickets list refresh failed", error);
     if (!options || !options.silent) {
-      state.syncStatus = navigator.onLine ? "error" : "offline";
+      if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
       renderAll();
     }
     return false;
@@ -317,6 +398,7 @@ function refreshRemotePickupTicketsBootstrap(options) {
   if (remotePickupTicketsRefreshPromise) return remotePickupTicketsRefreshPromise;
 
   remotePickupTicketsRefreshPromise = remoteDataSource.fetchPickupTicketsBootstrap().then(function(payload) {
+    clearRemoteAccessError_();
     if (dataSource && dataSource.savePickupTicketsBootstrap) {
       dataSource.savePickupTicketsBootstrap(payload);
       applyLocalPickupTicketsState(state.pickupTicket);
@@ -342,7 +424,7 @@ function refreshRemotePickupTicketsBootstrap(options) {
       syncStatus: navigator.onLine ? "error" : "offline"
     });
     if (!options || !options.silent) {
-      state.syncStatus = navigator.onLine ? "error" : "offline";
+      if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
       renderAll();
     }
     return false;
@@ -366,6 +448,7 @@ function refreshRemotePickupTicket(ticketId, options) {
   }
 
   remotePickupTicketRefreshPromises[normalizedTicketId] = remoteDataSource.fetchPickupTicket(normalizedTicketId).then(function(payload) {
+    clearRemoteAccessError_();
     if (payload && payload.ticket) {
       mergeRemotePickupTicketDetail({
         ticket: payload.ticket,
@@ -384,6 +467,7 @@ function refreshRemotePickupTicket(ticketId, options) {
   }).catch(function(error) {
     console.warn("Pickup ticket detail refresh failed", error);
     if (state.pickupTicket === normalizedTicketId) {
+      setRemoteAccessError_(error);
       state.pickupTicketMissingConfirmed = false;
       renderPickupTicketsPage();
     }
@@ -442,6 +526,7 @@ function syncPendingMutations(options) {
       mutation: describePendingMutation_(mutation)
     });
     return remoteDataSource.pushMutation(mutation).then(function(result) {
+      clearRemoteAccessError_();
       const localTicketBeforeCommit = mutation && mutation.ticketId ? getPickupTicketDetail(mutation.ticketId) : null;
       console.info("[syncPendingMutations] ticket payload received", {
         mutation: describePendingMutation_(mutation),
@@ -504,7 +589,7 @@ function syncPendingMutations(options) {
       remainingQueue: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0,
       error: error && error.message ? error.message : String(error || "")
     });
-    state.syncStatus = navigator.onLine ? "error" : "offline";
+    if (!setRemoteAccessError_(error)) state.syncStatus = navigator.onLine ? "error" : "offline";
     renderAll();
     return false;
   }).finally(function() {
@@ -1353,7 +1438,6 @@ function summarizeDetailItem(item) {
   if (toInt(item.unitsPerBox) > 0) parts.push("件/箱 " + toInt(item.unitsPerBox));
   if (toInt(item.itemBoxes) > 0) parts.push("箱数 " + toInt(item.itemBoxes));
   if (item.fractionText) parts.push("分数 " + item.fractionText);
-  if (getMainPackNotationFromState(item)) parts.push(getMainPackNotationFromState(item));
   return parts.join(" · ") || item.stockDisplay || "-";
 }
 
@@ -1450,8 +1534,6 @@ function renderDetailStockStateMarkup(item) {
   const boxesDisplay = toInt(item.itemBoxes) > 0 ? String(toInt(item.itemBoxes)) : "-";
   const fractionDisplay = item.fractionText ? String(item.fractionText).trim() : "";
   const fractionSign = fractionDisplay ? (item.sign || "+") : "";
-  const packMeta = parsePackNotation(getMainPackNotationFromState(item));
-  const packDisplay = packMeta.count > 0 ? String(packMeta.count) + "包" : "";
   const totalPieces = formatMetricNumber(stateModelToPieces(item));
   const totalBoxes = getItemDisplayBoxTotal(item);
   const totalPacks = getItemPackTotal(item);
@@ -1469,10 +1551,6 @@ function renderDetailStockStateMarkup(item) {
   if (fractionDisplay) {
     columns.push({ label: "", value: fractionSign, operator: true });
     columns.push({ label: "分数", value: fractionDisplay, align: "center" });
-  }
-  if (packDisplay) {
-    columns.push({ label: "", value: packMeta.sign || "+", operator: true });
-    columns.push({ label: "包", value: packDisplay, align: "right" });
   }
   return ''
     + '<div class="w-full overflow-x-auto">'
@@ -1793,11 +1871,6 @@ function getInventorySummary(items) {
       }
     } else if (fractionValue > 0 && itemBoxes <= 0) {
       cartonCount += 1;
-    }
-
-    const packMeta = parsePackNotation(getMainPackNotationFromState(item));
-    if (packMeta.count > 0 && colisage > 0) {
-      itemPieces += (packMeta.sign === "-" ? -1 : 1) * (packMeta.count * colisage);
     }
 
     acc.totalPieces += itemPieces;
@@ -5763,6 +5836,14 @@ function registerVueBridge() {
       syncStatus: String(state.syncStatus || "")
     };
   };
+  window.__szSecurityDebug = function() {
+    return {
+      remoteAccessError: String(state.remoteAccessError || ""),
+      syncStatus: String(state.syncStatus || ""),
+      remoteConfigured: Boolean(remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured()),
+      remoteBaseUrl: remoteDataSource && remoteDataSource.getDebugInfo ? String(remoteDataSource.getDebugInfo().apiBaseUrl || "") : ""
+    };
+  };
   window.__szAppApi = {
     state: state,
     adoptReactiveState: adoptReactiveState,
@@ -5880,6 +5961,7 @@ function registerVueBridge() {
 }
 
 function initApp() {
+  installIosAntiZoomGuards_();
   dataSource = window.createLocalDataSource({
     hydrateItem: hydrateItem,
     normalizeReference: normalizeReference,

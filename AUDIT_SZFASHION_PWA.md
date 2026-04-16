@@ -93,10 +93,10 @@
 ### Conclusion d'exploitabilité
 - L'app peut devenir exploitable au quotidien.
 - Elle n'est pas encore assez stable pour un usage intensif sans prioriser :
-  1. sécurité
-  2. cohérence inter-appareils
-  3. simplification du modèle stock
-  4. amélioration UX mobile
+  1. cohérence inter-appareils
+  2. simplification du modèle stock
+  3. amélioration UX mobile
+  4. autocomplétion locale
 
 ## 5. UX / design / PWA
 
@@ -106,6 +106,7 @@
 
 ### Priorités UX
 - Corriger le zoom iPhone au focus.
+- Bloquer aussi le zoom iPhone au double/triple tap dans la web app.
 - Alléger visuellement les vues les plus denses :
   - Tickets
   - Quick Edit
@@ -132,18 +133,35 @@
   - accès limité aux comptes autorisés
   - idéalement restriction domaine ou liste blanche email
 
+### Mise en place preparatoire deja branchee
+- Le backend peut maintenant etre prepare en mode :
+  - `SZFASHION_AUTH_MODE=open`
+  - `SZFASHION_AUTH_MODE=google`
+- Les restrictions peuvent etre pilotees par :
+  - `SZFASHION_ALLOWED_EMAILS`
+  - `SZFASHION_ALLOWED_DOMAIN`
+- Le mode par defaut reste `open` tant que l'architecture finale d'acces Google n'est pas basculee.
+
 ### Important
 - Avec l'architecture actuelle `GitHub Pages -> fetch cross-origin -> Apps Script`, le passage à un vrai Google login demande une adaptation d'architecture.
 - Ce point doit être traité comme chantier prioritaire, pas comme simple flag à activer.
 
+### Décision actuelle
+- La sécurité/authentification est volontairement reportée.
+- Le chantier courant se concentre sur :
+  - cohérence online
+  - simplification du modèle stock
+  - UX mobile
+  - autocomplétion
+
 ## 7. Roadmap priorisée
 
-1. Sécuriser l'accès backend.
-2. Stabiliser la cohérence stock / historique / tickets entre appareils.
-3. Retirer `Notation paquets` de la web app.
-4. Sortir `SortKey` de la logique métier web app.
-5. Corriger les irritants iPhone.
-6. Ajouter l'autocomplétion locale.
+1. Stabiliser la cohérence stock / historique / tickets entre appareils.
+2. Retirer `Notation paquets` de la web app.
+3. Sortir `SortKey` de la logique métier web app.
+4. Corriger les irritants iPhone, y compris le zoom au double/triple tap.
+5. Ajouter l'autocomplétion locale.
+6. Reprendre la sécurité/authentification à la fin.
 
 ## Risques si on pousse un vrai offline complet maintenant
 

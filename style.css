@@ -2,6 +2,15 @@
   display: none !important;
 }
 
+html,
+body,
+button,
+a,
+[role="button"],
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
 .quick-edit-body.dropdown-open {
   overscroll-behavior: none;
   touch-action: pan-x;

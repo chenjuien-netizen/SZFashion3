@@ -8,7 +8,7 @@
 - Pas de mode offline prolonge prioritaire.
 - `Notation paquets` retiree de la web app.
 - `SortKey` retire de la logique active web app.
-- Securite cible: authentification Google + autorisation explicite.
+- Securite/authentification reportee a un chantier final separe.
 
 ## Lots prioritaires
 
@@ -16,42 +16,36 @@
 - Document de verite code/produit: [AUDIT_SZFASHION_PWA.md](/Users/julien/Desktop/GoogleAppsScript/SZFashion3/AUDIT_SZFASHION_PWA.md)
 - Position officielle:
   - online-first
-  - Google login
   - Inventory + History = socle terrain
   - Tickets = flux operationnel
   - Imports = back-office
 
-### Lot 1. Securite
-- Ajouter un vrai controle d'acces backend.
-- Authentifier les utilisateurs Google.
-- Restreindre par domaine ou liste blanche email.
-- Refuser lecture/ecriture aux non autorises.
-
-Risque:
-- Avec frontend GitHub Pages + Apps Script cross-origin, une bascule auth naive peut casser les appels.
-- Ce lot demande une decision d'architecture avant implementation finale.
-
-### Lot 2. Cohérence online
+### Lot 1. Cohérence online
 - Stabiliser la convergence entre appareils.
 - Garder serveur = verite durable.
 - Garder local = acceleration UX.
 - Limiter l'ambition offline a des coupures courtes.
 
-### Lot 3. Simplification du modele stock
+### Lot 2. Simplification du modele stock
 - Retirer `Notation paquets` des ecrans et payloads web app.
 - Retirer `SortKey` du tri actif cote app.
 - Trier dans le code par regles explicites.
 
-### Lot 4. UX mobile
+### Lot 3. UX mobile
 - Tous les champs interactifs a `16px` minimum sur mobile.
 - Alleger visuellement Quick Edit et Tickets.
 - Rendre la saisie iPhone plus stable.
+- Bloquer le zoom iPhone au double/triple tap sans casser la navigation.
 
-### Lot 5. Autocompletion
+### Lot 4. Autocompletion
 - Suggestions locales sur recherche inventaire.
 - Suggestions locales sur creation de ticket.
 - Source unique: `state.items`.
 - Aucun roundtrip reseau pour les suggestions de base.
+
+### Lot 5. Securite plus tard
+- Reprendre l'authentification Google une fois le produit plus stabilise.
+- Revalider alors l'architecture d'acces entre GitHub Pages et Apps Script.
 
 ## Critères d'acceptation
 
@@ -76,4 +70,4 @@ Risque:
 - Le tri principal ne depend plus de `SortKey`.
 
 ### Securite
-- Un utilisateur non autorise ne peut plus lire ou muter la base via le backend final.
+- Ce chantier est reporte et ne bloque pas la stabilisation online actuelle.

@@ -1275,8 +1275,7 @@ function readReferenceImportLines_(sheet, batchId) {
         unitsPerBox: String(row.mapped_units_per_box || "").trim(),
         boxes: String(row.mapped_boxes || "").trim(),
         sign: String(row.mapped_sign || "").trim(),
-        fractionText: String(row.mapped_fraction || "").trim(),
-        packNotation: String(row.mapped_pack_notation || "").trim()
+        fractionText: String(row.mapped_fraction || "").trim()
       },
       validationErrors: parseJsonSafely_(row.validation_errors_json, []),
       resolutionAction: String(row.resolution_action || "").trim(),
@@ -1684,8 +1683,7 @@ function mapImportedReferenceRows_(headers, rows, mapping) {
         unitsPerBox: readMappedCell_(row, "unitsPerBox"),
         boxes: readMappedCell_(row, "boxes"),
         sign: readMappedCell_(row, "sign"),
-        fractionText: readMappedCell_(row, "fractionText"),
-        packNotation: readMappedCell_(row, "packNotation")
+        fractionText: readMappedCell_(row, "fractionText")
       }
     };
   });
@@ -1724,8 +1722,7 @@ function applyFinalizeReferenceImportBatchMutation_(mutation) {
           unitsPerBox: line.mapped.unitsPerBox,
           boxes: line.mapped.boxes,
           sign: line.mapped.sign,
-          fractionText: line.mapped.fractionText,
-          packNotation: line.mapped.packNotation
+          fractionText: line.mapped.fractionText
         }
       }, {
         mutationId: String(mutation.id || ""),
@@ -2134,8 +2131,7 @@ function applyValidatePickupTicketMutation_(mutation) {
       unitsPerBox: nextState.unitsPerBox,
       itemBoxes: nextState.itemBoxes,
       sign: nextState.sign,
-      fractionText: nextState.fractionText,
-      packNotation: nextState.packNotation
+      fractionText: nextState.fractionText
     }, beforeItem);
     const afterRow = stockSheet.getRange(stockRowIndex, 1, 1, stockSheet.getLastColumn()).getDisplayValues()[0];
     const afterItem = buildInventoryItem_(afterRow, stockCols, stockRowIndex);

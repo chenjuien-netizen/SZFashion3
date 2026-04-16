@@ -38,7 +38,10 @@
     },
     template: `
       <div class="relative h-[100dvh] max-h-[100dvh] overflow-hidden bg-background">
-        <div class="fixed inset-x-0 top-0 bottom-16 overflow-hidden bg-background">
+        <div v-if="state.remoteAccessError" class="fixed inset-x-0 top-0 z-[60] border-b border-error/20 bg-error-container px-3 py-2 text-[11px] font-medium text-on-error-container">
+          {{ state.remoteAccessError }}
+        </div>
+        <div :class="['fixed inset-x-0 bottom-16 overflow-hidden bg-background', state.remoteAccessError ? 'top-9' : 'top-0']">
           <InventoryScreen v-show="state.currentView === 'inventory'" />
           <HistoryScreen v-show="state.currentView === 'history'" />
           <DetailScreen v-show="state.currentView === 'detail'" />
@@ -47,15 +50,15 @@
         </div>
 
         <nav class="fixed inset-x-0 bottom-0 z-50 flex h-16 items-stretch justify-around border-t border-slate-200 bg-slate-50">
-          <button :class="'flex flex-1 flex-col items-center justify-center px-2 py-1 ' + ((state.currentView === 'inventory' || (state.currentView === 'detail' && state.detailOrigin !== 'history')) ? 'bg-slate-200 text-slate-900' : 'text-slate-400')" type="button" :aria-current="(state.currentView === 'inventory' || (state.currentView === 'detail' && state.detailOrigin !== 'history')) ? 'page' : 'false'" @click="goInventory" @dblclick.prevent="api.forceInventoryListView()">
+          <button :class="'flex flex-1 flex-col items-center justify-center px-2 py-1 ' + ((state.currentView === 'inventory' || (state.currentView === 'detail' && state.detailOrigin !== 'history')) ? 'bg-slate-200 text-slate-900' : 'text-slate-400')" data-nav-doubletap="inventory" type="button" :aria-current="(state.currentView === 'inventory' || (state.currentView === 'detail' && state.detailOrigin !== 'history')) ? 'page' : 'false'" @click="goInventory" @dblclick.prevent="api.forceInventoryListView()">
             <span class="material-symbols-outlined">inventory_2</span>
             <span class="mt-1 text-[10px] font-bold uppercase tracking-widest">Inventaire</span>
           </button>
-          <button :class="'flex flex-1 flex-col items-center justify-center px-2 py-1 ' + ((state.currentView === 'history' || (state.currentView === 'detail' && state.detailOrigin === 'history')) ? 'bg-slate-200 text-slate-900' : 'text-slate-400')" type="button" :aria-current="(state.currentView === 'history' || (state.currentView === 'detail' && state.detailOrigin === 'history')) ? 'page' : 'false'" @click="goHistory" @dblclick.prevent="api.forceHistoryListView()">
+          <button :class="'flex flex-1 flex-col items-center justify-center px-2 py-1 ' + ((state.currentView === 'history' || (state.currentView === 'detail' && state.detailOrigin === 'history')) ? 'bg-slate-200 text-slate-900' : 'text-slate-400')" data-nav-doubletap="history" type="button" :aria-current="(state.currentView === 'history' || (state.currentView === 'detail' && state.detailOrigin === 'history')) ? 'page' : 'false'" @click="goHistory" @dblclick.prevent="api.forceHistoryListView()">
             <span class="material-symbols-outlined">history</span>
             <span class="mt-1 text-[10px] font-bold uppercase tracking-widest">Historique</span>
           </button>
-          <button :class="'flex flex-1 flex-col items-center justify-center px-2 py-1 ' + (state.currentView === 'tickets' ? 'bg-slate-200 text-slate-900' : 'text-slate-400')" type="button" :aria-current="state.currentView === 'tickets' ? 'page' : 'false'" @click="goTickets" @dblclick.prevent="api.forceTicketsListView()">
+          <button :class="'flex flex-1 flex-col items-center justify-center px-2 py-1 ' + (state.currentView === 'tickets' ? 'bg-slate-200 text-slate-900' : 'text-slate-400')" data-nav-doubletap="tickets" type="button" :aria-current="state.currentView === 'tickets' ? 'page' : 'false'" @click="goTickets" @dblclick.prevent="api.forceTicketsListView()">
             <span class="material-symbols-outlined">local_shipping</span>
             <span class="mt-1 text-[10px] font-bold uppercase tracking-widest">Tickets</span>
           </button>
