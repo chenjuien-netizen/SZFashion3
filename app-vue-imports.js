@@ -77,7 +77,6 @@
                 <input v-model="state.referenceImportDraft.mapping.tail" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" placeholder="Colonne 尾箱" type="text" />
                 <input v-model="state.referenceImportDraft.mapping.unitsPerBox" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" placeholder="Colonne 件/箱" type="text" />
                 <input v-model="state.referenceImportDraft.mapping.boxes" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" placeholder="Colonne 箱数" type="text" />
-                <input v-model="state.referenceImportDraft.mapping.packNotation" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[11px] text-on-surface" placeholder="Colonne 包 notation" type="text" />
               </div>
               <button class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" type="button" @click="api.createReferenceImportBatchFromForm()">Créer brouillon import</button>
             </div>

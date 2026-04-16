@@ -62,6 +62,9 @@
           return list;
         }, []);
       });
+      const ticketReferenceSuggestions = vue.computed(function() {
+        return api.getReferenceSuggestions(state.ticketCreationDraft && state.ticketCreationDraft.quickReference, { limit: 8 });
+      });
 
       function openTicket(ticketId) {
         api.navigateTo("tickets", { ref: ticketId });
@@ -162,7 +165,8 @@
         isLineQuantityActive: isLineQuantityActive,
         lineDraft: lineDraft,
         linePreview: linePreview,
-        getPreviewLines: getPreviewLines
+        getPreviewLines: getPreviewLines,
+        ticketReferenceSuggestions: ticketReferenceSuggestions
       };
     },
     template: `
@@ -196,7 +200,10 @@
                     <input v-model="state.ticketCreationDraft.globalNote" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" placeholder="Remarque / note (optionnel)" type="text" />
                   </div>
                   <div class="grid grid-cols-[minmax(0,1fr)_7.5rem_auto] gap-2">
-                    <input v-model="state.ticketCreationDraft.quickReference" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" placeholder="Référence" type="text" />
+                    <input v-model="state.ticketCreationDraft.quickReference" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" list="ticketReferenceSuggestions" placeholder="Référence" type="text" />
+                    <datalist id="ticketReferenceSuggestions">
+                      <option v-for="entry in ticketReferenceSuggestions" :key="entry.reference" :value="entry.reference">{{ entry.label }}</option>
+                    </datalist>
                     <input id="pickupTicketQuickQuantityInput" v-model="state.ticketCreationDraft.quickQuantity" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" inputmode="decimal" placeholder="2箱" type="text" @focus="openCreateQuantityDropdown" @input="openCreateQuantityDropdown" />
                     <button class="border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" type="button" @click="addDraftLine">Ajouter</button>
                     <TicketQuantitySuggestions :active="isCreateQuantityActive()" />

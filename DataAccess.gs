@@ -208,7 +208,7 @@ function readInventoryItems_(sheet) {
     if (item) items.push(item);
   }
   items.sort(function(a, b) {
-    return String(a.sortKey || a.reference || "").localeCompare(String(b.sortKey || b.reference || ""));
+    return String(a.reference || "").localeCompare(String(b.reference || ""));
   });
   return items;
 }
@@ -225,7 +225,6 @@ function buildInventoryItem_(row, cols, rowIndex) {
   const fractionValue = parseFractionValue_(fractionRaw);
   const sign = normalizeSign_(getRowCell_(row, cols.signRaw));
   const colisage = parsePositiveNumber_(getRowCell_(row, cols.colisage));
-  const packNotation = normalizePackNotation_(getRowCell_(row, cols.packNotation));
   const remark = String(getRowCell_(row, cols.remark) || "").trim();
   const warehouse = String(getRowCell_(row, cols.warehouse) || "").trim();
   const createdAt = String(getRowCell_(row, cols.createdAt) || "").trim();
@@ -239,14 +238,12 @@ function buildInventoryItem_(row, cols, rowIndex) {
     fractionText: fractionText,
     fractionValue: fractionValue,
     colisage: colisage,
-    packNotation: packNotation,
     remark: remark
   };
 
   return {
     id: "row_" + String(rowIndex || 0),
     reference: reference,
-    sortKey: normalizeReference_(getRowCell_(row, cols.sortKey)) || reference,
     stockDisplay: buildStockDisplay_(stateModel),
     stockState: computeStockState_(stateModel),
     tail: tail,
@@ -256,10 +253,9 @@ function buildInventoryItem_(row, cols, rowIndex) {
     fractionText: fractionText,
     fractionValue: fractionValue,
     colisage: colisage,
-    packNotation: packNotation,
     remark: remark,
     packsPerBox: colisage > 0 ? colisage : 0,
-    packCounterText: packNotation || "",
+    packCounterText: "",
     dynamicFractions: [],
     warehouse: warehouse,
     createdAt: createdAt,
@@ -273,7 +269,7 @@ function buildInventoryItem_(row, cols, rowIndex) {
       unitsPerBox: unitsPerBox,
       itemBoxes: itemBoxes,
       fractionText: fractionText,
-      packNotation: packNotation
+      packNotation: ""
     })
   };
 }
@@ -629,8 +625,6 @@ function buildStockDisplay_(stateInput) {
   const itemBoxes = Math.max(0, parseLooseInteger_(state.itemBoxes));
   const sign = normalizeSign_(state.sign);
   const fractionText = normalizeFractionText_(state.fractionText) || fractionToText_(state.fractionValue);
-  const packNotation = normalizePackNotation_(state.packNotation);
-
   const tailDisplay = tail > 0 ? "(" + tail + "p)" : "";
   let core = "";
   if (unitsPerBox > 0 && (itemBoxes > 0 || !!fractionText)) {
@@ -647,7 +641,7 @@ function buildStockDisplay_(stateInput) {
   let display = "";
   if (tailDisplay) display = tailDisplay + (core ? "+" + core : "");
   else display = core || "-";
-  return packNotation ? (display === "-" ? packNotation : display + packNotation) : display;
+  return display;
 }
 
 function stateModelToPieces_(stateInput) {
@@ -909,7 +903,6 @@ function writeQuickEditToStockRow_(sheet, cols, rowIndex, request, beforeItem) {
   writeCellIfPresent_(sheet, rowIndex, cols.boxesRaw, Math.max(0, parseLooseInteger_(request.itemBoxes)));
   writeCellIfPresent_(sheet, rowIndex, cols.signRaw, normalizeSign_(request.sign));
   writeCellIfPresent_(sheet, rowIndex, cols.fractionRaw, normalizeFractionText_(request.fractionText));
-  writeCellIfPresent_(sheet, rowIndex, cols.packNotation, normalizePackNotation_(request.packNotation));
 }
 
 function writeCellIfPresent_(sheet, rowIndex, columnIndex, value) {
@@ -1087,8 +1080,7 @@ function computeReferenceCompletionStatus_(item) {
   const hasStockInfo = Math.max(0, parseLooseInteger_(item && item.tail)) > 0
     || Math.max(0, parseLooseInteger_(item && item.unitsPerBox)) > 0
     || Math.max(0, parseLooseInteger_(item && item.itemBoxes)) > 0
-    || !!normalizeFractionText_(item && item.fractionText)
-    || !!normalizePackNotation_(item && item.packNotation);
+    || !!normalizeFractionText_(item && item.fractionText);
   return hasStockInfo ? "complete" : "incomplete";
 }
 
@@ -1450,7 +1442,6 @@ function createReferenceInStock_(request, options) {
   if (sheet.getMaxColumns() < lastCol) sheet.insertColumnsAfter(sheet.getMaxColumns(), lastCol - sheet.getMaxColumns());
   sheet.getRange(nextRowIndex, 1, 1, lastCol).clearContent();
   writeCellIfPresent_(sheet, nextRowIndex, cols.reference, reference);
-  writeCellIfPresent_(sheet, nextRowIndex, cols.sortKey, reference);
   writeCellIfPresent_(sheet, nextRowIndex, cols.warehouse, String(request.warehouse || "").trim());
   writeCellIfPresent_(sheet, nextRowIndex, cols.arrivalNote, String(request.arrivalNote || "").trim());
   writeCellIfPresent_(sheet, nextRowIndex, cols.remark, String(request.remark || "").trim());
@@ -1461,7 +1452,6 @@ function createReferenceInStock_(request, options) {
   writeCellIfPresent_(sheet, nextRowIndex, cols.boxesRaw, Math.max(0, parseLooseInteger_(initialStock.boxes)));
   writeCellIfPresent_(sheet, nextRowIndex, cols.signRaw, normalizeSign_(initialStock.sign));
   writeCellIfPresent_(sheet, nextRowIndex, cols.fractionRaw, normalizeFractionText_(initialStock.fractionText));
-  writeCellIfPresent_(sheet, nextRowIndex, cols.packNotation, normalizePackNotation_(initialStock.packNotation));
   writeCellIfPresent_(sheet, nextRowIndex, cols.createdAt, new Date());
 
   const displayRow = sheet.getRange(nextRowIndex, 1, 1, lastCol).getDisplayValues()[0];

@@ -107,6 +107,9 @@
       const filteredItems = vue.computed(function() {
         return api.filterInventoryItems(state.query);
       });
+      const referenceSuggestions = vue.computed(function() {
+        return api.getReferenceSuggestions(state.query, { limit: 8 });
+      });
       const inventorySummary = vue.computed(function() {
         return api.getInventorySummary(filteredItems.value);
       });
@@ -163,7 +166,8 @@
           return online.value ? "En ligne" : "Hors ligne";
         }),
         columns: columns,
-        buildEntries: buildEntries
+        buildEntries: buildEntries,
+        referenceSuggestions: referenceSuggestions
       };
     },
     template: `
@@ -185,7 +189,10 @@
           <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-1.5 shadow-ledger">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
-              <input v-model="state.query" autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" placeholder="RECHERCHE RÉFÉRENCE / STOCK..." type="search" />
+              <input v-model="state.query" autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" list="inventoryReferenceSuggestions" placeholder="RECHERCHE RÉFÉRENCE / STOCK..." type="search" />
+              <datalist id="inventoryReferenceSuggestions">
+                <option v-for="entry in referenceSuggestions" :key="entry.reference" :value="entry.reference">{{ entry.label }}</option>
+              </datalist>
             </div>
             <div class="mt-1.5 grid grid-cols-2 gap-2">
               <select v-model="state.inventoryStockFilter" class="border-outline-variant/30 bg-surface-container-lowest py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface">

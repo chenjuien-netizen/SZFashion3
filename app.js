@@ -49,8 +49,7 @@ const baseState = {
       remark: "放位/提醒",
       tail: "尾箱",
       unitsPerBox: "件/箱",
-      boxes: "箱数",
-      packNotation: "Notation paquets"
+      boxes: "箱数"
     }
   },
   pickupTickets: [],
@@ -1052,7 +1051,7 @@ function hasQuickEditTailValue(form) {
 
 function hasQuickEditPartialValue(form) {
   if (!form) return false;
-  return !!(sanitizeFractionText(form.fractionText) || sanitizeIntegerInput(form.packNotationCount));
+  return !!sanitizeFractionText(form.fractionText);
 }
 
 function splitPackNotation(value) {
@@ -1084,7 +1083,7 @@ function normalizeStateModel(stateInput) {
     fractionText: normalizeFractionText(stateInput.fractionText),
     fractionValue: parseFractionValue(stateInput.fractionValue || stateInput.fractionText),
     colisage: parsePositiveNumber(stateInput.colisage),
-    packNotation: String(stateInput.packNotation || "").trim(),
+    packNotation: "",
     remark: String(stateInput.remark || "").trim()
   };
 
@@ -1111,15 +1110,7 @@ function normalizeStateModel(stateInput) {
 
 function getTailActualPieces(stateInput) {
   const tailBase = Math.max(0, toInt(stateInput && stateInput.tail));
-  const tailNotation = getTailNotationFromState(stateInput);
-  if (!(tailBase > 0) || !tailNotation) return tailBase;
-  if (/^-\d+包$/.test(tailNotation)) {
-    const packMeta = parsePackNotation(tailNotation);
-    const colisage = Math.max(0, toInt(stateInput && stateInput.colisage));
-    return Math.max(0, tailBase - (packMeta.count * colisage));
-  }
-  const fractionValue = parseFractionValue(tailNotation);
-  return fractionValue > 0 ? Math.max(0, tailBase * fractionValue) : tailBase;
+  return tailBase;
 }
 
 function stateModelToPieces(stateInput) {
@@ -1138,11 +1129,6 @@ function stateModelToPieces(stateInput) {
     } else {
       totalPieces += state.unitsPerBox * state.itemBoxes;
     }
-  }
-
-  const packMeta = parsePackNotation(getMainPackNotationFromState(state));
-  if (packMeta.count > 0 && state.colisage > 0) {
-    totalPieces += (packMeta.sign === "-" ? -1 : 1) * (packMeta.count * state.colisage);
   }
 
   return totalPieces;
@@ -1177,7 +1163,7 @@ function buildSimpleStateFromPieces(totalPiecesInput, options) {
   const remainderPieces = Math.max(0, totalPieces - (wholeBoxes * unitsPerBox));
 
   if (!(remainderPieces > 0)) {
-    return normalizeStateModel({ tail: 0, unitsPerBox: unitsPerBox, itemBoxes: wholeBoxes, sign: "", fractionText: "", fractionValue: 0, colisage: colisage, packNotation: "", remark: remark });
+    return normalizeStateModel({ tail: 0, unitsPerBox: unitsPerBox, itemBoxes: wholeBoxes, sign: "", fractionText: "", fractionValue: 0, colisage: colisage, remark: remark });
   }
 
   return normalizeStateModel({
@@ -1188,7 +1174,6 @@ function buildSimpleStateFromPieces(totalPiecesInput, options) {
     fractionText: fractionTextFromPieces(remainderPieces, unitsPerBox),
     fractionValue: remainderPieces / unitsPerBox,
     colisage: colisage,
-    packNotation: "",
     remark: remark
   });
 }
@@ -1216,23 +1201,6 @@ function buildPackFriendlyStateFromPieces(totalPiecesInput, options) {
       fractionText: packCount + "/" + packsPerBox,
       fractionValue: packCount / packsPerBox,
       colisage: colisage,
-      packNotation: "",
-      remark: remark
-    });
-  }
-
-  if (packsPerBox > 0 && colisage > 0) {
-    const packCount = Math.floor(remainderPieces / colisage);
-    const loosePieces = remainderPieces - (packCount * colisage);
-    return normalizeStateModel({
-      tail: 0,
-      unitsPerBox: unitsPerBox,
-      itemBoxes: wholeBoxes > 0 ? wholeBoxes : 1,
-      sign: wholeBoxes > 0 ? "+" : "×",
-      fractionText: fractionTextFromPieces(loosePieces || remainderPieces, unitsPerBox),
-      fractionValue: (loosePieces || remainderPieces) / unitsPerBox,
-      colisage: colisage,
-      packNotation: loosePieces > 0 && packCount > 0 ? ("+" + packCount + "包") : "",
       remark: remark
     });
   }
@@ -1280,11 +1248,7 @@ function buildRawStockDisplay(stateInput) {
 }
 
 function buildStockDisplay(stateInput) {
-  const state = normalizeStateModel(stateInput || {});
-  const rawDisplay = buildRawStockDisplay(state);
-  const mainPackNotation = getMainPackNotationFromState(state);
-  if (!mainPackNotation) return rawDisplay;
-  return rawDisplay === "-" ? mainPackNotation : rawDisplay + mainPackNotation;
+  return buildRawStockDisplay(normalizeStateModel(stateInput || {}));
 }
 
 function computeStockStateFromModel(stateInput) {
@@ -1306,11 +1270,9 @@ function buildPackMeta(stateInput) {
   }
 
   if (packsPerBox > 0) {
-    const packMeta = parsePackNotation(getMainPackNotationFromState(state));
     const basePackCount = state.fractionValue > 0 ? (state.fractionValue * packsPerBox) : 0;
-    const deltaPackCount = packMeta.count > 0 ? (packMeta.sign === "-" ? -packMeta.count : packMeta.count) : 0;
-    if (state.fractionValue > 0 || packMeta.count > 0) {
-      const counter = Math.max(0, Math.floor(basePackCount + deltaPackCount));
+    if (state.fractionValue > 0) {
+      const counter = Math.max(0, Math.floor(basePackCount));
       packCounterText = counter + "/" + packsPerBox;
     }
   }
@@ -1335,8 +1297,7 @@ function computeReferenceCompletionStatus(item) {
   const hasStockInfo = Math.max(0, toInt(item && item.tail)) > 0
     || Math.max(0, toInt(item && item.unitsPerBox)) > 0
     || Math.max(0, toInt(item && item.itemBoxes)) > 0
-    || !!sanitizeFractionText(item && item.fractionText)
-    || !!normalizePackNotation(item && item.packNotation, false);
+    || !!sanitizeFractionText(item && item.fractionText);
   return hasStockInfo ? "complete" : "incomplete";
 }
 
@@ -1667,11 +1628,6 @@ function sortItems(items, sortMode) {
       const stockDiff = stateModelToPieces(b) - stateModelToPieces(a);
       if (stockDiff !== 0) return stockDiff;
     }
-    const leftSortKey = String(a && a.sortKey ? a.sortKey : "").trim();
-    const rightSortKey = String(b && b.sortKey ? b.sortKey : "").trim();
-    if (leftSortKey && rightSortKey && leftSortKey !== rightSortKey) return leftSortKey.localeCompare(rightSortKey);
-    if (leftSortKey && !rightSortKey) return -1;
-    if (!leftSortKey && rightSortKey) return 1;
     return String(a.reference || "").localeCompare(String(b.reference || ""));
   });
 }
@@ -1690,6 +1646,39 @@ function filterInventoryItems(query) {
     return haystack.indexOf(normalizedQuery) !== -1;
   });
   return sortItems(filtered, state.inventorySort);
+}
+
+function getReferenceSuggestions(query, options) {
+  const settings = options || {};
+  const limit = Math.max(1, Math.trunc(Number(settings.limit) || 8));
+  const normalizedQuery = normalizeText(query);
+  const includeWarehouse = settings.includeWarehouse !== false;
+  const source = Array.isArray(settings.items) ? settings.items : state.items;
+  const seen = {};
+  const scored = (Array.isArray(source) ? source : []).map(function(item) {
+    const reference = normalizeReference(item && item.reference);
+    if (!reference || seen[reference]) return null;
+    seen[reference] = true;
+    const warehouse = String(item && item.warehouse || "").trim();
+    const haystack = normalizeText([reference, includeWarehouse ? warehouse : ""].join(" "));
+    let score = 0;
+    if (!normalizedQuery) score = 1;
+    else if (reference === String(query || "").trim().toUpperCase()) score = 120;
+    else if (normalizeText(reference).indexOf(normalizedQuery) === 0) score = 100;
+    else if (haystack.indexOf(normalizedQuery) >= 0) score = 60;
+    if (!score) return null;
+    return {
+      reference: reference,
+      warehouse: warehouse,
+      label: warehouse ? (reference + " · " + warehouse) : reference,
+      score: score
+    };
+  }).filter(Boolean);
+  scored.sort(function(a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    return String(a.reference || "").localeCompare(String(b.reference || ""));
+  });
+  return scored.slice(0, limit);
 }
 
 function getArrivalGroupMeta(item) {
@@ -2283,7 +2272,7 @@ function getQuickExitSegments_(item) {
     if (unitsPerBox > 0) mainActions.push({ value: "fraction", label: "fraction" });
     segments.push({
       id: "main",
-      label: buildRawLocalStockDisplay(Object.assign({}, currentItem, { tail: 0, packNotation: getMainPackNotationFromState(currentItem) })),
+      label: buildRawLocalStockDisplay(Object.assign({}, currentItem, { tail: 0 })),
       availablePieces: mainPieces,
       actions: mainActions
     });
@@ -2312,7 +2301,6 @@ function buildQuickExitEmptyMainState_(item, remark) {
     fractionText: "",
     fractionValue: 0,
     colisage: Math.max(0, Math.trunc(Number(item && item.colisage) || 0)),
-    packNotation: "",
     remark: String(remark || "").trim()
   };
 }
@@ -2328,7 +2316,6 @@ function buildQuickExitCurrentMainState_(item, remark) {
     fractionText: sanitizeFractionText(currentItem.fractionText),
     fractionValue: parseFractionValue(currentItem.fractionValue || currentItem.fractionText),
     colisage: Math.max(0, Math.trunc(Number(currentItem.colisage) || 0)),
-    packNotation: getMainPackNotationFromState(currentItem),
     remark: String(remark || currentItem.remark || "").trim()
   };
   return stateModelToPieces(mainState) > 0
@@ -2342,7 +2329,6 @@ function buildQuickExitCombinedState_(item, tailState, mainState, remark) {
   const resolvedRemark = String(remark || "").trim();
   const resolvedMainState = mainState || buildQuickExitEmptyMainState_(currentItem, resolvedRemark);
   const resolvedTailState = tailState || { tail: 0, tailNotation: "" };
-  const mainPackNotation = getMainPackNotationFromState(resolvedMainState);
   return {
     tail: Math.max(0, Math.trunc(Number(resolvedTailState.tail) || 0)),
     unitsPerBox: Math.max(0, Math.trunc(Number(resolvedMainState.unitsPerBox) || 0)),
@@ -2351,7 +2337,6 @@ function buildQuickExitCombinedState_(item, tailState, mainState, remark) {
     fractionText: sanitizeFractionText(resolvedMainState.fractionText),
     fractionValue: parseFractionValue(resolvedMainState.fractionValue || resolvedMainState.fractionText),
     colisage: Math.max(0, Math.trunc(Number(resolvedMainState.colisage) || 0)),
-    packNotation: buildCompositePackNotation(resolvedTailState.tailNotation, mainPackNotation),
     remark: resolvedRemark
   };
 }
@@ -2513,7 +2498,6 @@ function buildCurrentEditStateModel() {
     fractionText: fractionText,
     fractionValue: parseFractionValue(fractionText),
     colisage: Math.max(0, toInt(state.quickEditItem.colisage)),
-    packNotation: buildPackNotationFromParts(state.quickEditForm.packNotationSign, state.quickEditForm.packNotationCount, ""),
     remark: String(form.remark || "").trim()
   };
 }
@@ -3118,8 +3102,6 @@ function syncQuickEditFieldWidths_() {
   setFieldWidth_(document.getElementById("quickEditItemBoxesField"), document.getElementById("quickEditItemBoxes"), form.itemBoxes, "1", 6, 8, 1);
   setFieldWidth_(document.getElementById("quickEditSignField"), document.getElementById("quickEditSign"), sanitizeSign(form.sign), "+", 6, 7, 1);
   setFieldWidth_(document.getElementById("quickEditFractionTextField"), document.getElementById("quickEditFractionText"), form.fractionText, document.getElementById("quickEditFractionText").placeholder, 5, 7, 0);
-  setFieldWidth_(document.getElementById("quickEditPackSignField"), document.getElementById("quickEditPackNotationSign"), form.packNotationSign, "+", 6, 7, 1);
-  setFieldWidth_(document.getElementById("quickEditPackCountField"), document.getElementById("quickEditPackNotationCount"), form.packNotationCount, "0", 6, 8, 1);
   scheduleQuickEditMeasuredLayout_();
 }
 
@@ -3176,8 +3158,6 @@ function renderQuickEdit() {
   els.quickEditItemBoxes.value = form.itemBoxes || "";
   if (els.quickEditSign) els.quickEditSign.value = showPartialGroup ? (sanitizeSign(form.sign) || "+") : "+";
   if (els.quickEditFractionText) els.quickEditFractionText.value = form.fractionText || "";
-  if (els.quickEditPackNotationSign) els.quickEditPackNotationSign.value = showPartialGroup ? (form.packNotationSign || "+") : "+";
-  if (els.quickEditPackNotationCount) els.quickEditPackNotationCount.value = form.packNotationCount || "";
   els.quickEditRemark.value = form.remark || "";
   els.quickEditTabQuickExit.className = "border px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] " + (isQuickExit ? "border-primary bg-primary text-on-primary" : "border-outline-variant/30 text-on-surface-variant");
   els.quickEditTabEdit.className = "border px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] " + (!isQuickExit ? "border-primary bg-primary text-on-primary" : "border-outline-variant/30 text-on-surface-variant");
@@ -3197,8 +3177,6 @@ function renderQuickEdit() {
   els.quickEditPartialRemoveSlot.classList.toggle("hidden", !showPartialGroup);
   els.quickEditTailToggleIcon.textContent = "add";
   els.quickEditPartialToggleIcon.textContent = "add";
-  els.quickEditPackNotationSign.disabled = false;
-  els.quickEditPackNotationCount.disabled = false;
   els.quickEditPartialGroup.classList.remove("opacity-60");
   els.quickEditPartialToggle.classList.remove("opacity-60");
   els.quickExitClearButton.className = "shrink-0 rounded border px-2 py-1 text-[10px] font-bold tracking-[0.12em] transition-colors duration-150 "
@@ -3235,15 +3213,12 @@ function openQuickEdit(item) {
   state.quickEditTab = "quick-exit";
   state.quickEditSaving = false;
   setQuickEditError("");
-  const packNotationParts = splitPackNotation(item.packNotation);
   state.quickEditForm = {
     tailInput: formatTailDisplay(item.tail),
     unitsPerBoxInput: formatUnitsPerBoxDisplay(item.unitsPerBox),
     itemBoxes: sanitizeIntegerInput(item.itemBoxes),
     sign: sanitizeSign(item.sign),
     fractionText: sanitizeFractionText(item.fractionText),
-    packNotationSign: packNotationParts.sign,
-    packNotationCount: packNotationParts.count,
     remark: ""
   };
   state.quickEditTailOpen = hasQuickEditTailValue(state.quickEditForm);
@@ -3287,10 +3262,7 @@ function toggleQuickEditSegment(segment) {
   if (segment === "partial") {
     const nextOpen = !state.quickEditPartialOpen;
     state.quickEditPartialOpen = nextOpen;
-    if (nextOpen) {
-      if (!sanitizeSign(state.quickEditForm.sign)) state.quickEditForm.sign = "+";
-      if (!String(state.quickEditForm.packNotationSign || "").trim()) state.quickEditForm.packNotationSign = "+";
-    }
+    if (nextOpen && !sanitizeSign(state.quickEditForm.sign)) state.quickEditForm.sign = "+";
   }
   renderQuickEdit();
 }
@@ -3299,10 +3271,6 @@ function handleQuickEditFieldChange(field, value) {
   if (!state.quickEditForm) return;
   if (field === "tailInput" || field === "unitsPerBoxInput") {
     state.quickEditForm[field] = String(value || "");
-  } else if (field === "packNotationSign") {
-    state.quickEditForm.packNotationSign = String(value || "") === "-" ? "-" : "+";
-  } else if (field === "packNotationCount") {
-    state.quickEditForm.packNotationCount = sanitizeIntegerInput(value);
   } else if (field === "remark") {
     state.quickEditForm.remark = String(value || "");
   } else if (field === "sign") {
@@ -3336,7 +3304,6 @@ function validateEditPayload() {
   const unitsResult = parseStyledIntegerInput(state.quickEditForm.unitsPerBoxInput, { mode: "units" });
   const itemBoxes = Number(state.quickEditForm.itemBoxes || 0);
   const fractionText = sanitizeFractionText(state.quickEditForm.fractionText);
-  const packNotation = buildPackNotationFromParts(state.quickEditForm.packNotationSign, state.quickEditForm.packNotationCount, "");
   const remark = String(state.quickEditForm.remark || "").trim();
   if (!tailResult.valid) {
     setQuickEditError("尾箱 invalide. Exemple attendu: (85p).");
@@ -3359,9 +3326,6 @@ function validateEditPayload() {
     itemBoxes: Math.max(0, Math.trunc(Number.isFinite(itemBoxes) ? itemBoxes : 0)),
     sign: sanitizeSign(state.quickEditForm.sign),
     fractionText: fractionText,
-    packNotationSign: state.quickEditForm.packNotationSign,
-    packNotationCount: Math.max(0, Math.trunc(Number(state.quickEditForm.packNotationCount) || 0)),
-    packNotation: packNotation,
     remark: remark
   };
 }
@@ -3380,9 +3344,6 @@ function validateQuickExitPayload(item) {
       itemBoxes: 0,
       sign: "",
       fractionText: "",
-      packNotationSign: "+",
-      packNotationCount: 0,
-      packNotation: "",
       remark: String(state.quickEditForm && state.quickEditForm.remark || "").trim(),
       fractionValue: 0
     };
@@ -3396,8 +3357,6 @@ function validateQuickExitPayload(item) {
   }
   state.quickExitSegmentErrors = {};
   const nextState = result.nextState;
-  const nextMeta = buildPackMeta(nextState);
-  const packSplit = splitPackNotation(nextState.packNotation);
   return {
     id: currentItem.id,
     reference: currentItem.reference,
@@ -3407,11 +3366,7 @@ function validateQuickExitPayload(item) {
     itemBoxes: Math.max(0, Math.trunc(Number(nextState.itemBoxes) || 0)),
     sign: sanitizeSign(nextState.sign),
     fractionText: sanitizeFractionText(nextState.fractionText),
-    packNotationSign: packSplit.sign,
-    packNotationCount: Math.max(0, Math.trunc(Number(packSplit.count) || 0)),
-    packNotation: normalizePackNotation(nextState.packNotation, false),
-    remark: String(state.quickEditForm && state.quickEditForm.remark || "").trim(),
-    packsPerBox: nextMeta.packsPerBox
+    remark: String(state.quickEditForm && state.quickEditForm.remark || "").trim()
   };
 }
 
@@ -3425,7 +3380,6 @@ function buildOptimisticItemFromRequest(baseItem, request) {
     sign: String(request.sign || "").trim() ? sanitizeSign(request.sign) : "",
     fractionText: nextFractionText,
     fractionValue: parseFractionValue(nextFractionText),
-    packNotation: normalizePackNotation(request.packNotation, false),
     remark: String(baseItem.remark || "").trim()
   });
   return hydrateItem(nextItem);
@@ -3613,12 +3567,6 @@ function bindQuickEditEvents() {
   });
   els.quickEditFractionTextField.addEventListener("blur", function() {
     normalizeQuickEditFieldOnBlur("fractionText");
-  });
-  els.quickEditPackSignField.addEventListener("change", function(event) {
-    handleQuickEditFieldChange("packNotationSign", event.target.value);
-  });
-  els.quickEditPackCountField.addEventListener("input", function(event) {
-    handleQuickEditFieldChange("packNotationCount", event.target.value);
   });
   els.quickEditTailToggle.addEventListener("click", function() {
     toggleQuickEditSegment("tail");
@@ -4728,6 +4676,7 @@ function renderAll() {
   renderReferenceImportsPage();
   renderPickupTicketsPage();
   if (state.quickEditOpen) renderQuickEdit();
+  renderReferenceSuggestionDatalists_();
 }
 
 function syncActiveShell() {
@@ -5290,8 +5239,7 @@ function getReferenceImportMappingFromForm() {
     remark: String(mapping.remark || "").trim(),
     tail: String(mapping.tail || "").trim(),
     unitsPerBox: String(mapping.unitsPerBox || "").trim(),
-    boxes: String(mapping.boxes || "").trim(),
-    packNotation: String(mapping.packNotation || "").trim()
+    boxes: String(mapping.boxes || "").trim()
   };
 }
 
@@ -5408,6 +5356,23 @@ function addPickupTicketDraftLineFromFields() {
   state.ticketCreationDraft.quickReference = "";
   state.ticketCreationDraft.quickQuantity = "";
   renderPickupTicketsPage();
+}
+
+function buildReferenceDatalistMarkup_(suggestions) {
+  return (Array.isArray(suggestions) ? suggestions : []).map(function(entry) {
+    return '<option value="' + escapeHtml(entry.reference || "") + '">' + escapeHtml(entry.label || entry.reference || "") + '</option>';
+  }).join("");
+}
+
+function renderReferenceSuggestionDatalists_() {
+  const inventoryDatalist = document.getElementById("inventoryReferenceSuggestions");
+  if (inventoryDatalist) {
+    inventoryDatalist.innerHTML = buildReferenceDatalistMarkup_(getReferenceSuggestions(state.query, { limit: 10 }));
+  }
+  const ticketsDatalist = document.getElementById("ticketReferenceSuggestions");
+  if (ticketsDatalist) {
+    ticketsDatalist.innerHTML = buildReferenceDatalistMarkup_(getReferenceSuggestions(state.ticketCreationDraft && state.ticketCreationDraft.quickReference, { limit: 10 }));
+  }
 }
 
 function addPickupTicketDraftLinesFromText() {
@@ -5739,6 +5704,7 @@ function registerVueBridge() {
     getBootDiagnostics: getBootDiagnostics_,
     getDetailViewModel: getDetailViewModel,
     filterInventoryItems: filterInventoryItems,
+    getReferenceSuggestions: getReferenceSuggestions,
     filterHistoryItems: filterHistoryItems,
     filterPickupTickets: filterPickupTickets,
     getInventorySummary: getInventorySummary,
@@ -5843,7 +5809,8 @@ function registerVueBridge() {
     loadReferenceImportData: loadReferenceImportData,
     createReferenceImportBatchFromForm: createReferenceImportBatchFromForm,
     handleFinalizeImportLine: handleFinalizeImportLine,
-    getReferenceImportMappingFromForm: getReferenceImportMappingFromForm
+    getReferenceImportMappingFromForm: getReferenceImportMappingFromForm,
+    renderReferenceSuggestionDatalists: renderReferenceSuggestionDatalists_
   };
 }
 

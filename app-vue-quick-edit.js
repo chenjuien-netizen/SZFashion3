@@ -154,17 +154,6 @@
                   <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
                   <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
                 </label>
-                <label class="block">
-                  <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">包 符号</span>
-                  <select :value="state.quickEditForm && state.quickEditForm.packNotationSign || '+'" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('packNotationSign', $event.target.value)">
-                    <option value="+">+</option>
-                    <option value="-">-</option>
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">包</span>
-                  <input :value="state.quickEditForm && state.quickEditForm.packNotationCount || ''" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" min="0" step="1" type="number" @input="api.handleQuickEditFieldChange('packNotationCount', $event.target.value)" />
-                </label>
               </div>
             </template>
 
