@@ -991,7 +991,7 @@ function normalizePackNotation(value, strict) {
   if (!text) return "";
   const match = text.match(/^([+-])\s*(\d+)\s*包$/i);
   if (!match) {
-    if (strict) throw new Error("Notation paquets invalide. Utilise +N包 ou -N包.");
+    if (strict) throw new Error("当前缺包 invalide. Utilise +N包 ou -N包.");
     return text;
   }
   const count = Math.max(0, Math.trunc(Number(match[2]) || 0));
@@ -1032,6 +1032,12 @@ function buildCompositePackNotation(tailNotation, mainNotation) {
   if (normalizedTail && normalizedMain) return "TAIL:" + normalizedTail + "|" + normalizedMain;
   if (normalizedTail) return "TAIL:" + normalizedTail;
   return /^([+-])\d+包$/.test(normalizedMain) ? normalizedMain : "";
+}
+
+function normalizeCompositePackNotationValue(value) {
+  const parts = splitCompositePackNotation(value);
+  const composite = buildCompositePackNotation(parts.tailNotation, parts.mainNotation);
+  return composite || normalizePackNotation(value, false);
 }
 
 function getTailNotationFromState(stateInput) {
@@ -1112,7 +1118,8 @@ function hasQuickEditTailValue(form) {
 
 function hasQuickEditPartialValue(form) {
   if (!form) return false;
-  return !!sanitizeFractionText(form.fractionText);
+  return !!sanitizeFractionText(form.fractionText)
+    || !!sanitizeIntegerInput(form.packNotationCount);
 }
 
 function splitPackNotation(value) {
@@ -1144,7 +1151,7 @@ function normalizeStateModel(stateInput) {
     fractionText: normalizeFractionText(stateInput.fractionText),
     fractionValue: parseFractionValue(stateInput.fractionValue || stateInput.fractionText),
     colisage: parsePositiveNumber(stateInput.colisage),
-    packNotation: "",
+    packNotation: normalizeCompositePackNotationValue(stateInput.packNotation),
     remark: String(stateInput.remark || "").trim()
   };
 
@@ -1192,7 +1199,13 @@ function stateModelToPieces(stateInput) {
     }
   }
 
-  return totalPieces;
+  const mainPackNotation = parsePackNotation(getMainPackNotationFromState(state));
+  if (mainPackNotation.valid && mainPackNotation.count > 0 && state.colisage > 0) {
+    const delta = mainPackNotation.count * state.colisage;
+    totalPieces += mainPackNotation.sign === "-" ? -delta : delta;
+  }
+
+  return Math.max(0, totalPieces);
 }
 
 function reduceFraction(num, den) {
@@ -1309,7 +1322,11 @@ function buildRawStockDisplay(stateInput) {
 }
 
 function buildStockDisplay(stateInput) {
-  return buildRawStockDisplay(normalizeStateModel(stateInput || {}));
+  const state = normalizeStateModel(stateInput || {});
+  const rawDisplay = buildRawStockDisplay(state);
+  const mainPackNotation = getMainPackNotationFromState(state);
+  if (!mainPackNotation) return rawDisplay;
+  return rawDisplay === "-" ? mainPackNotation : (rawDisplay + mainPackNotation);
 }
 
 function computeStockStateFromModel(stateInput) {
@@ -1358,7 +1375,8 @@ function computeReferenceCompletionStatus(item) {
   const hasStockInfo = Math.max(0, toInt(item && item.tail)) > 0
     || Math.max(0, toInt(item && item.unitsPerBox)) > 0
     || Math.max(0, toInt(item && item.itemBoxes)) > 0
-    || !!sanitizeFractionText(item && item.fractionText);
+    || !!sanitizeFractionText(item && item.fractionText)
+    || !!normalizeCompositePackNotationValue(item && item.packNotation);
   return hasStockInfo ? "complete" : "incomplete";
 }
 
@@ -1414,6 +1432,7 @@ function summarizeDetailItem(item) {
   if (toInt(item.unitsPerBox) > 0) parts.push("件/箱 " + toInt(item.unitsPerBox));
   if (toInt(item.itemBoxes) > 0) parts.push("箱数 " + toInt(item.itemBoxes));
   if (item.fractionText) parts.push("分数 " + item.fractionText);
+  if (getMainPackNotationFromState(item)) parts.push("当前缺包 " + getMainPackNotationFromState(item));
   return parts.join(" · ") || item.stockDisplay || "-";
 }
 
@@ -1510,6 +1529,9 @@ function renderDetailStockStateMarkup(item) {
   const boxesDisplay = toInt(item.itemBoxes) > 0 ? String(toInt(item.itemBoxes)) : "-";
   const fractionDisplay = item.fractionText ? String(item.fractionText).trim() : "";
   const fractionSign = fractionDisplay ? (item.sign || "+") : "";
+  const mainPackNotation = parsePackNotation(getMainPackNotationFromState(item));
+  const packNotationSign = mainPackNotation.valid ? mainPackNotation.sign : "";
+  const packNotationDisplay = mainPackNotation.valid && mainPackNotation.count > 0 ? (mainPackNotation.count + "包") : "";
   const totalPieces = formatMetricNumber(stateModelToPieces(item));
   const totalBoxes = getItemDisplayBoxTotal(item);
   const totalPacks = getItemPackTotal(item);
@@ -1527,6 +1549,10 @@ function renderDetailStockStateMarkup(item) {
   if (fractionDisplay) {
     columns.push({ label: "", value: fractionSign, operator: true });
     columns.push({ label: "分数", value: fractionDisplay, align: "center" });
+  }
+  if (packNotationDisplay) {
+    columns.push({ label: "", value: packNotationSign, operator: true });
+    columns.push({ label: "当前缺包", value: packNotationDisplay, align: "center" });
   }
   return ''
     + '<div class="w-full overflow-x-auto">'
@@ -2531,6 +2557,7 @@ function buildCurrentEditStateModel() {
   const unitsResult = parseStyledIntegerInput(state.quickEditForm.unitsPerBoxInput, { mode: "units" });
   if (!tailResult.valid || !unitsResult.valid) return null;
   const fractionText = sanitizeFractionText(state.quickEditForm.fractionText);
+  const packNotationFallback = buildCompositePackNotation(getTailNotationFromState(state.quickEditItem), "");
   return {
     tail: tailResult.value,
     unitsPerBox: unitsResult.value,
@@ -2539,6 +2566,7 @@ function buildCurrentEditStateModel() {
     fractionText: fractionText,
     fractionValue: parseFractionValue(fractionText),
     colisage: Math.max(0, toInt(state.quickEditItem.colisage)),
+    packNotation: buildPackNotationFromParts(form.packNotationSign, form.packNotationCount, packNotationFallback),
     remark: String(form.remark || "").trim()
   };
 }
@@ -3254,12 +3282,15 @@ function openQuickEdit(item) {
   state.quickEditTab = "quick-exit";
   state.quickEditSaving = false;
   setQuickEditError("");
+  const packNotationParts = splitPackNotation(item.packNotation);
   state.quickEditForm = {
     tailInput: formatTailDisplay(item.tail),
     unitsPerBoxInput: formatUnitsPerBoxDisplay(item.unitsPerBox),
     itemBoxes: sanitizeIntegerInput(item.itemBoxes),
     sign: sanitizeSign(item.sign),
     fractionText: sanitizeFractionText(item.fractionText),
+    packNotationSign: packNotationParts.sign || "+",
+    packNotationCount: packNotationParts.count || "",
     remark: ""
   };
   state.quickEditTailOpen = hasQuickEditTailValue(state.quickEditForm);
@@ -3312,6 +3343,10 @@ function handleQuickEditFieldChange(field, value) {
   if (!state.quickEditForm) return;
   if (field === "tailInput" || field === "unitsPerBoxInput") {
     state.quickEditForm[field] = String(value || "");
+  } else if (field === "packNotationSign") {
+    state.quickEditForm.packNotationSign = String(value || "").trim() === "-" ? "-" : "+";
+  } else if (field === "packNotationCount") {
+    state.quickEditForm.packNotationCount = sanitizeIntegerInput(value);
   } else if (field === "remark") {
     state.quickEditForm.remark = String(value || "");
   } else if (field === "sign") {
@@ -3345,6 +3380,12 @@ function validateEditPayload() {
   const unitsResult = parseStyledIntegerInput(state.quickEditForm.unitsPerBoxInput, { mode: "units" });
   const itemBoxes = Number(state.quickEditForm.itemBoxes || 0);
   const fractionText = sanitizeFractionText(state.quickEditForm.fractionText);
+  const packNotationFallback = buildCompositePackNotation(getTailNotationFromState(state.quickEditItem), "");
+  const packNotation = buildPackNotationFromParts(
+    state.quickEditForm.packNotationSign,
+    state.quickEditForm.packNotationCount,
+    packNotationFallback
+  );
   const remark = String(state.quickEditForm.remark || "").trim();
   if (!tailResult.valid) {
     setQuickEditError("尾箱 invalide. Exemple attendu: (85p).");
@@ -3367,6 +3408,9 @@ function validateEditPayload() {
     itemBoxes: Math.max(0, Math.trunc(Number.isFinite(itemBoxes) ? itemBoxes : 0)),
     sign: sanitizeSign(state.quickEditForm.sign),
     fractionText: fractionText,
+    packNotationSign: String(state.quickEditForm.packNotationSign || "").trim() === "-" ? "-" : "+",
+    packNotationCount: sanitizeIntegerInput(state.quickEditForm.packNotationCount),
+    packNotation: packNotation,
     remark: remark
   };
 }
@@ -3385,6 +3429,7 @@ function validateQuickExitPayload(item) {
       itemBoxes: 0,
       sign: "",
       fractionText: "",
+      packNotation: "",
       remark: String(state.quickEditForm && state.quickEditForm.remark || "").trim(),
       fractionValue: 0
     };
@@ -3407,6 +3452,7 @@ function validateQuickExitPayload(item) {
     itemBoxes: Math.max(0, Math.trunc(Number(nextState.itemBoxes) || 0)),
     sign: sanitizeSign(nextState.sign),
     fractionText: sanitizeFractionText(nextState.fractionText),
+    packNotation: normalizeCompositePackNotationValue(nextState.packNotation),
     remark: String(state.quickEditForm && state.quickEditForm.remark || "").trim()
   };
 }
@@ -3421,6 +3467,7 @@ function buildOptimisticItemFromRequest(baseItem, request) {
     sign: String(request.sign || "").trim() ? sanitizeSign(request.sign) : "",
     fractionText: nextFractionText,
     fractionValue: parseFractionValue(nextFractionText),
+    packNotation: normalizeCompositePackNotationValue(request.packNotation),
     remark: String(baseItem.remark || "").trim()
   });
   return hydrateItem(nextItem);

@@ -154,6 +154,16 @@
                   <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
                   <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
                 </label>
+                <div class="block">
+                  <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">当前缺包</span>
+                  <div class="grid grid-cols-[5rem_minmax(0,1fr)] gap-2">
+                    <select :value="state.quickEditForm && state.quickEditForm.packNotationSign || '+'" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('packNotationSign', $event.target.value)">
+                      <option value="+">+</option>
+                      <option value="-">-</option>
+                    </select>
+                    <input :value="state.quickEditForm && state.quickEditForm.packNotationCount || ''" class="w-full border-outline-variant/30 bg-surface-container-low px-2 py-2 text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" placeholder="5包" type="text" @input="api.handleQuickEditFieldChange('packNotationCount', $event.target.value)" />
+                  </div>
+                </div>
               </div>
             </template>
 

@@ -225,6 +225,7 @@ function buildInventoryItem_(row, cols, rowIndex) {
   const fractionValue = parseFractionValue_(fractionRaw);
   const sign = normalizeSign_(getRowCell_(row, cols.signRaw));
   const colisage = parsePositiveNumber_(getRowCell_(row, cols.colisage));
+  const packNotation = normalizeCompositePackNotation_(getRowCell_(row, cols.packNotation));
   const remark = String(getRowCell_(row, cols.remark) || "").trim();
   const warehouse = String(getRowCell_(row, cols.warehouse) || "").trim();
   const createdAt = String(getRowCell_(row, cols.createdAt) || "").trim();
@@ -238,6 +239,7 @@ function buildInventoryItem_(row, cols, rowIndex) {
     fractionText: fractionText,
     fractionValue: fractionValue,
     colisage: colisage,
+    packNotation: packNotation,
     remark: remark
   };
 
@@ -253,6 +255,7 @@ function buildInventoryItem_(row, cols, rowIndex) {
     fractionText: fractionText,
     fractionValue: fractionValue,
     colisage: colisage,
+    packNotation: packNotation,
     remark: remark,
     packsPerBox: colisage > 0 ? colisage : 0,
     packCounterText: "",
@@ -268,7 +271,8 @@ function buildInventoryItem_(row, cols, rowIndex) {
       tail: tail,
       unitsPerBox: unitsPerBox,
       itemBoxes: itemBoxes,
-      fractionText: fractionText
+      fractionText: fractionText,
+      packNotation: packNotation
     })
   };
 }
@@ -414,6 +418,7 @@ function resolveInventoryColumns_(headers) {
     signRaw: findColumn_(headers, ["当前signe"]),
     fractionRaw: findColumn_(headers, ["当前箱数分数"]),
     colisage: findColumn_(headers, ["Colisage"]),
+    packNotation: findColumn_(headers, ["当前缺包", "Notation paquets"]),
     remark: findColumn_(headers, ["放位/提醒"]),
     warehouse: findColumn_(headers, ["仓库", "entrepot", "entrepôt"]),
     createdAt: findColumn_(headers, ["date de création", "修改日期", "进货"]),
@@ -606,6 +611,75 @@ function fractionToText_(value) {
   return String(numeric);
 }
 
+function normalizePackNotation_(value, strict) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const match = text.match(/^([+-])\s*(\d+)\s*包$/i);
+  if (!match) {
+    if (strict) throw new Error("当前缺包 invalide. Utilise +N包 ou -N包.");
+    return text;
+  }
+  const count = Math.max(0, Math.trunc(Number(match[2]) || 0));
+  return count > 0 ? match[1] + count + "包" : "";
+}
+
+function normalizeTailRelativeNotation_(value) {
+  const text = String(value || "").trim().replace(/^TAIL:/i, "");
+  if (!text) return "";
+  const packNotation = normalizePackNotation_(text, false);
+  if (/^-\d+包$/.test(packNotation)) return packNotation;
+  const fractionText = normalizeFractionText_(text);
+  return fractionText && parseFractionValue_(fractionText) > 0 ? fractionText : "";
+}
+
+function splitCompositePackNotation_(value) {
+  const text = String(value || "").trim();
+  if (!text) return { tailNotation: "", mainNotation: "" };
+  const parts = text.split("|");
+  let tailNotation = "";
+  let mainNotation = "";
+  parts.forEach(function(part) {
+    const token = String(part || "").trim();
+    if (!token) return;
+    if (/^TAIL:/i.test(token)) {
+      if (!tailNotation) tailNotation = normalizeTailRelativeNotation_(token);
+      return;
+    }
+    const packNotation = normalizePackNotation_(token, false);
+    if (!mainNotation && /^([+-])\d+包$/.test(packNotation)) mainNotation = packNotation;
+  });
+  return { tailNotation: tailNotation, mainNotation: mainNotation };
+}
+
+function buildCompositePackNotation_(tailNotation, mainNotation) {
+  const normalizedTail = normalizeTailRelativeNotation_(tailNotation);
+  const normalizedMain = normalizePackNotation_(mainNotation, false);
+  if (normalizedTail && normalizedMain) return "TAIL:" + normalizedTail + "|" + normalizedMain;
+  if (normalizedTail) return "TAIL:" + normalizedTail;
+  return /^([+-])\d+包$/.test(normalizedMain) ? normalizedMain : "";
+}
+
+function normalizeCompositePackNotation_(value) {
+  const parts = splitCompositePackNotation_(value);
+  const composite = buildCompositePackNotation_(parts.tailNotation, parts.mainNotation);
+  return composite || normalizePackNotation_(value, false);
+}
+
+function getTailNotationFromState_(stateInput) {
+  return splitCompositePackNotation_(stateInput && stateInput.packNotation).tailNotation;
+}
+
+function getMainPackNotationFromState_(stateInput) {
+  return splitCompositePackNotation_(stateInput && stateInput.packNotation).mainNotation;
+}
+
+function parsePackNotation_(value) {
+  const normalized = normalizePackNotation_(value, false);
+  const match = normalized.match(/^([+-])(\d+)包$/);
+  if (!match) return { notation: normalized, sign: "", count: 0, valid: !normalized };
+  return { notation: normalized, sign: match[1], count: Number(match[2]) || 0, valid: true };
+}
+
 function buildStockDisplay_(stateInput) {
   const state = stateInput || {};
   const tail = Math.max(0, parseLooseInteger_(state.tail));
@@ -613,7 +687,9 @@ function buildStockDisplay_(stateInput) {
   const itemBoxes = Math.max(0, parseLooseInteger_(state.itemBoxes));
   const sign = normalizeSign_(state.sign);
   const fractionText = normalizeFractionText_(state.fractionText) || fractionToText_(state.fractionValue);
-  const tailDisplay = tail > 0 ? "(" + tail + "p)" : "";
+  const tailNotation = getTailNotationFromState_(state);
+  const mainPackNotation = getMainPackNotationFromState_(state);
+  const tailDisplay = tail > 0 ? ("(" + tail + "p)" + (tailNotation || "")) : "";
   let core = "";
   if (unitsPerBox > 0 && (itemBoxes > 0 || !!fractionText)) {
     core = String(unitsPerBox) + "p";
@@ -629,7 +705,8 @@ function buildStockDisplay_(stateInput) {
   let display = "";
   if (tailDisplay) display = tailDisplay + (core ? "+" + core : "");
   else display = core || "-";
-  return display;
+  if (!mainPackNotation) return display;
+  return display === "-" ? mainPackNotation : (display + mainPackNotation);
 }
 
 function stateModelToPieces_(stateInput) {
@@ -639,9 +716,15 @@ function stateModelToPieces_(stateInput) {
   const itemBoxes = Math.max(0, parseLooseInteger_(state.itemBoxes));
   const sign = normalizeSign_(state.sign);
   const fractionValue = parseFractionValue_(state.fractionText || state.fractionValue);
+  const colisage = Math.max(0, parsePositiveNumber_(state.colisage));
+  const mainPackNotation = parsePackNotation_(getMainPackNotationFromState_(state));
   let total = tail + (unitsPerBox * itemBoxes);
   if (unitsPerBox > 0 && fractionValue > 0) {
     total += sign === "×" ? Math.round(unitsPerBox * fractionValue * Math.max(1, itemBoxes || 1)) : Math.round(unitsPerBox * fractionValue);
+  }
+  if (mainPackNotation.valid && mainPackNotation.count > 0 && colisage > 0) {
+    const delta = mainPackNotation.count * colisage;
+    total += mainPackNotation.sign === "-" ? -delta : delta;
   }
   return Math.max(0, total);
 }
@@ -891,6 +974,7 @@ function writeQuickEditToStockRow_(sheet, cols, rowIndex, request, beforeItem) {
   writeCellIfPresent_(sheet, rowIndex, cols.boxesRaw, Math.max(0, parseLooseInteger_(request.itemBoxes)));
   writeCellIfPresent_(sheet, rowIndex, cols.signRaw, normalizeSign_(request.sign));
   writeCellIfPresent_(sheet, rowIndex, cols.fractionRaw, normalizeFractionText_(request.fractionText));
+  writeCellIfPresent_(sheet, rowIndex, cols.packNotation, normalizeCompositePackNotation_(request.packNotation));
 }
 
 function writeCellIfPresent_(sheet, rowIndex, columnIndex, value) {
@@ -1068,7 +1152,8 @@ function computeReferenceCompletionStatus_(item) {
   const hasStockInfo = Math.max(0, parseLooseInteger_(item && item.tail)) > 0
     || Math.max(0, parseLooseInteger_(item && item.unitsPerBox)) > 0
     || Math.max(0, parseLooseInteger_(item && item.itemBoxes)) > 0
-    || !!normalizeFractionText_(item && item.fractionText);
+    || !!normalizeFractionText_(item && item.fractionText)
+    || !!normalizeCompositePackNotation_(item && item.packNotation);
   return hasStockInfo ? "complete" : "incomplete";
 }
 
@@ -1439,6 +1524,7 @@ function createReferenceInStock_(request, options) {
   writeCellIfPresent_(sheet, nextRowIndex, cols.boxesRaw, Math.max(0, parseLooseInteger_(initialStock.boxes)));
   writeCellIfPresent_(sheet, nextRowIndex, cols.signRaw, normalizeSign_(initialStock.sign));
   writeCellIfPresent_(sheet, nextRowIndex, cols.fractionRaw, normalizeFractionText_(initialStock.fractionText));
+  writeCellIfPresent_(sheet, nextRowIndex, cols.packNotation, normalizeCompositePackNotation_(initialStock.packNotation));
   writeCellIfPresent_(sheet, nextRowIndex, cols.createdAt, new Date());
 
   const displayRow = sheet.getRange(nextRowIndex, 1, 1, lastCol).getDisplayValues()[0];
@@ -1471,6 +1557,7 @@ function buildEmptyStateForItem_(item) {
     fractionText: "",
     fractionValue: 0,
     colisage: Math.max(0, parseLooseInteger_(item && item.colisage)),
+    packNotation: "",
     stockDisplay: "-",
     remark: String(item && item.remark || "").trim()
   };
