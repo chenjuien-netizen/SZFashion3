@@ -45,7 +45,7 @@
 
       function quickExitInputStyle(segmentId, entry) {
         const placeholder = segmentId === "tail" ? "(x)/3包/1/2" : "2箱/5包/1/2";
-        return fieldStyle(entry, placeholder, 10, 14, 0);
+        return fieldStyle(entry, placeholder, 12, 16, 0);
       }
 
       function isSelected(segmentId) {
@@ -136,7 +136,7 @@
               </div>
 
               <div v-if="!state.quickExitClearSelected" class="mt-4 flex flex-wrap justify-center gap-3">
-                <div v-for="segment in segments.filter(s => isSelected(s.id))" :key="segment.id" class="sz-quick-exit-card rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
+                <div v-for="segment in segments.filter(s => isSelected(s.id))" :key="segment.id" class="sz-quick-exit-card sz-quick-exit-segment rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
                   <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">{{ segment.id === 'tail' ? '尾箱' : '箱' }}</div>
                   <div class="mt-1 text-center text-sm font-semibold text-on-surface">{{ segment.label }}</div>
                   <div class="mt-3 flex justify-center">
@@ -149,7 +149,7 @@
                       @input="updateSegmentEntry(segment.id, $event.target.value)"
                     />
                   </div>
-                  <div class="mt-2 flex max-w-[18rem] flex-wrap justify-center gap-1">
+                  <div class="mt-2 flex flex-wrap justify-center gap-1">
                     <button v-for="suggestion in api.buildQuickExitSuggestions(item, segment, segmentConfig(segment.id).entry || '')" :key="segment.id + '::' + suggestion" class="rounded border border-outline-variant/30 px-2 py-1 text-[10px] font-semibold text-on-surface-variant" type="button" @click="applySuggestion(segment.id, suggestion)">
                       {{ suggestion }}
                     </button>
@@ -166,57 +166,59 @@
 
             <template v-else>
               <div class="sz-quick-edit-expression-wrap overflow-x-auto pb-1">
+                <div class="flex justify-center">
                 <div class="sz-quick-edit-expression inline-flex min-w-fit items-center gap-2">
                   <div v-if="state.quickEditTailOpen" class="sz-quick-edit-token inline-flex items-end gap-2">
                     <label class="block">
                       <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</span>
-                      <input :value="state.quickEditForm && state.quickEditForm.tailInput || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.tailInput || '', '(85p)', 7, 12, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="(85p)" type="text" @input="api.handleQuickEditFieldChange('tailInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('tailInput')" />
+                      <input :value="state.quickEditForm && state.quickEditForm.tailInput || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.tailInput || '', '(85p)', 9, 16, 1)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="(85p)" type="text" @input="api.handleQuickEditFieldChange('tailInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('tailInput')" />
                     </label>
-                    <button class="sz-quick-edit-chip border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" type="button" @click="toggleOptional('tail')">Retirer</button>
+                    <button aria-label="Retirer 尾箱" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('tail')"><span class="material-symbols-outlined !text-[15px]">remove</span></button>
                   </div>
-                  <button v-else class="sz-quick-edit-chip border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" type="button" @click="toggleOptional('tail')">+ 尾箱</button>
+                  <button v-else aria-label="Ajouter 尾箱" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('tail')"><span class="material-symbols-outlined !text-[15px]">add</span></button>
 
                   <span v-if="state.quickEditTailOpen" class="sz-quick-edit-operator">+</span>
 
                   <label class="block">
                     <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</span>
-                    <input :value="state.quickEditForm && state.quickEditForm.unitsPerBoxInput || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.unitsPerBoxInput || '', '144p', 6, 10, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="144p" type="text" @input="api.handleQuickEditFieldChange('unitsPerBoxInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('unitsPerBoxInput')" />
+                    <input :value="state.quickEditForm && state.quickEditForm.unitsPerBoxInput || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.unitsPerBoxInput || '', '144p', 7, 14, 1)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="144p" type="text" @input="api.handleQuickEditFieldChange('unitsPerBoxInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('unitsPerBoxInput')" />
                   </label>
 
                   <span class="sz-quick-edit-operator">×</span>
 
                   <label class="block">
                     <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</span>
-                    <input :value="state.quickEditForm && state.quickEditForm.itemBoxes || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.itemBoxes || '', '1', 4, 7, 1)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" type="number" @input="api.handleQuickEditFieldChange('itemBoxes', $event.target.value)" />
+                    <input :value="state.quickEditForm && state.quickEditForm.itemBoxes || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.itemBoxes || '', '1', 5, 8, 1)" class="sz-quick-edit-input sz-quick-edit-number border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" type="number" @input="api.handleQuickEditFieldChange('itemBoxes', $event.target.value)" />
                   </label>
 
                   <div v-if="state.quickEditPartialOpen" class="sz-quick-edit-token inline-flex items-end gap-2">
                     <div class="inline-flex items-end gap-2">
                       <label class="block">
                         <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
-                        <select :value="state.quickEditForm && state.quickEditForm.sign || '+'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.sign || '+', '+', 4, 5, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('sign', $event.target.value)">
+                        <select :value="state.quickEditForm && state.quickEditForm.sign || '+'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.sign || '+', '+', 5, 6, 1)" class="sz-quick-edit-input sz-quick-edit-select border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('sign', $event.target.value)">
                           <option value="+">+</option>
                           <option value="×">×</option>
                         </select>
                       </label>
                       <label class="block">
                         <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
-                        <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 5, 7, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
+                        <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
                       </label>
                       <label class="block">
                         <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">当前缺包</span>
                         <div class="inline-flex items-center gap-2">
-                          <select :value="state.quickEditForm && state.quickEditForm.packNotationSign || '+'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.packNotationSign || '+', '+', 4, 5, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('packNotationSign', $event.target.value)">
+                          <select :value="state.quickEditForm && state.quickEditForm.packNotationSign || '+'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.packNotationSign || '+', '+', 5, 6, 1)" class="sz-quick-edit-input sz-quick-edit-select border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('packNotationSign', $event.target.value)">
                             <option value="+">+</option>
                             <option value="-">-</option>
                           </select>
-                          <input :value="state.quickEditForm && state.quickEditForm.packNotationCount || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.packNotationCount || '', '5包', 5, 7, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" placeholder="5包" type="text" @input="api.handleQuickEditFieldChange('packNotationCount', $event.target.value)" />
+                          <input :value="state.quickEditForm && state.quickEditForm.packNotationCount || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.packNotationCount || '', '5包', 6, 9, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" placeholder="5包" type="text" @input="api.handleQuickEditFieldChange('packNotationCount', $event.target.value)" />
                         </div>
                       </label>
                     </div>
-                    <button class="sz-quick-edit-chip border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" type="button" @click="toggleOptional('partial')">Retirer</button>
+                    <button aria-label="Retirer bloc partiel" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('partial')"><span class="material-symbols-outlined !text-[15px]">remove</span></button>
                   </div>
-                  <button v-else class="sz-quick-edit-chip border border-outline-variant/30 px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" type="button" @click="toggleOptional('partial')">+ Bloc partiel</button>
+                  <button v-else aria-label="Ajouter bloc partiel" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('partial')"><span class="material-symbols-outlined !text-[15px]">add</span></button>
+                </div>
                 </div>
               </div>
             </template>
