@@ -265,8 +265,8 @@
                     <button v-if="api.canEditPickupTicket(selectedVm.ticket)" class="shrink-0 border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" type="button" @click="editLine(selectedVm.ticket.ticketId, line.lineId)">Modifier</button>
                   </div>
 
-                  <div v-else class="mt-2 grid gap-2">
-                    <div class="grid grid-cols-[minmax(0,5.75rem)_minmax(0,1fr)_auto_auto_auto] items-center gap-2">
+                  <div v-else class="sz-ticket-line-editor mt-2 grid gap-2">
+                    <div class="sz-ticket-line-inputs grid items-center gap-2">
                       <input
                         :data-line-id="line.lineId"
                         data-role="ticket-line-picked-input"
@@ -279,12 +279,20 @@
                         @focus="openLineQuantityDropdown"
                         @input="openLineQuantityDropdown"
                       />
-                      <input :data-line-id="line.lineId" data-role="ticket-line-note-input" v-model="lineDraft(line).lineNote" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" :placeholder="line.status === 'not_found' ? 'Précision introuvable...' : 'Commentaire'" type="text" />
-                      <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" type="button" @click="saveLine(selectedVm.ticket.ticketId, line.lineId)">Confirmer</button>
-                      <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" type="button" @click="markLineNotFound(selectedVm.ticket.ticketId, line.lineId)">Introuvable</button>
-                      <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant" type="button" @click="emptyLine(selectedVm.ticket.ticketId, line.lineId)">Vider</button>
-                      <TicketQuantitySuggestions :active="isLineQuantityActive(line.lineId)" />
+                      <input :data-line-id="line.lineId" data-role="ticket-line-note-input" v-model="lineDraft(line).lineNote" autocomplete="off" class="min-w-0 w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" :placeholder="line.status === 'not_found' ? 'Précision introuvable...' : 'Commentaire'" type="text" />
                     </div>
+                    <div class="sz-ticket-line-actions flex flex-wrap items-center justify-end gap-2">
+                      <button aria-label="Confirmer la ligne" title="Confirmer" class="sz-ticket-line-action-btn border border-outline-variant/30 text-on-surface-variant" type="button" @click="saveLine(selectedVm.ticket.ticketId, line.lineId)">
+                        <span class="material-symbols-outlined !text-[16px]">check</span>
+                      </button>
+                      <button aria-label="Marquer introuvable" title="Introuvable" class="sz-ticket-line-action-btn border border-outline-variant/30 text-on-surface-variant" type="button" @click="markLineNotFound(selectedVm.ticket.ticketId, line.lineId)">
+                        <span class="material-symbols-outlined !text-[16px]">search_off</span>
+                      </button>
+                      <button aria-label="Vider la ligne" title="Vider" class="sz-ticket-line-action-btn border border-outline-variant/30 text-on-surface-variant" type="button" @click="emptyLine(selectedVm.ticket.ticketId, line.lineId)">
+                        <span class="material-symbols-outlined !text-[16px]">backspace</span>
+                      </button>
+                    </div>
+                    <TicketQuantitySuggestions :active="isLineQuantityActive(line.lineId)" />
                     <div v-if="lineDraft(line).error" class="text-[11px] font-medium text-error">{{ lineDraft(line).error }}</div>
                   </div>
                 </article>

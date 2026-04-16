@@ -1574,17 +1574,17 @@ function renderDetailStockStateMarkup(item) {
 }
 
 function renderStockStateHeaderCell(column) {
-  if (column.operator) return '<th class="px-1 py-2"></th>';
+  if (column.operator) return '<th class="px-0.5 py-2"></th>';
   const alignClass = column.align === "right" ? "text-right" : (column.align === "center" ? "text-center" : "");
-  return '<th class="whitespace-nowrap px-3 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant ' + alignClass + '">' + escapeHtml(column.label) + '</th>';
+  return '<th class="whitespace-nowrap px-2 py-2 text-[9px] font-bold uppercase tracking-[0.18em] text-on-surface-variant ' + alignClass + '">' + escapeHtml(column.label) + '</th>';
 }
 
 function renderStockStateValueCell(column) {
   if (column.operator) {
-    return '<td class="whitespace-nowrap px-1 py-3 text-center text-lg font-black text-on-surface-variant/60">' + escapeHtml(column.value || "") + '</td>';
+    return '<td class="whitespace-nowrap px-0.5 py-2 text-center text-lg font-black text-on-surface-variant/60">' + escapeHtml(column.value || "") + '</td>';
   }
   const alignClass = column.align === "right" ? "text-right" : (column.align === "center" ? "text-center" : "");
-  return '<td class="whitespace-nowrap px-3 py-3 text-lg font-black tracking-tight text-on-surface ' + alignClass + '">' + escapeHtml(column.value || "-") + '</td>';
+  return '<td class="whitespace-nowrap px-2 py-2 text-lg font-black tracking-tight text-on-surface ' + alignClass + '">' + escapeHtml(column.value || "-") + '</td>';
 }
 
 function formatMovementDisplayFromPieces(beforePieces, afterPieces, unitsPerBox, colisage) {
