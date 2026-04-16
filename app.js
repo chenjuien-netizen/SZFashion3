@@ -5360,7 +5360,7 @@ function loadPickupTicketData(ticketId, options) {
   if (localViewModel && localViewModel.hasDetail) {
     seedPickupTicketLineDrafts(normalizedTicketId);
   }
-  state.pickupTicketLoading = Boolean(normalizedTicketId && includeDetail && !(localViewModel && localViewModel.hasDetail) && !isOptimisticPickupTicketId(normalizedTicketId));
+  state.pickupTicketLoading = Boolean(normalizedTicketId && includeDetail && !isOptimisticPickupTicketId(normalizedTicketId));
   renderPickupTicketsPage();
   if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) {
     return Promise.resolve(false);
@@ -5372,7 +5372,7 @@ function loadPickupTicketData(ticketId, options) {
     tasks.push(refreshRemotePickupTickets({ silent: true }));
   }
   if (normalizedTicketId && includeDetail) {
-    if (!(localViewModel && localViewModel.hasDetail)) {
+    if (!isOptimisticPickupTicketId(normalizedTicketId)) {
       tasks.push(refreshRemotePickupTicket(normalizedTicketId, { silent: true }));
     } else {
       state.pickupTicketLoading = false;

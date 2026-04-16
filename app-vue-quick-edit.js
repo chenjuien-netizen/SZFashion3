@@ -76,8 +76,20 @@
         api.applyQuickExitSuggestionSelection(segmentId, suggestion);
       }
 
+      function applyQuickExitSelect(segmentId, value, event) {
+        if (!value) return;
+        api.applyQuickExitSuggestionSelection(segmentId, value);
+        if (event && event.target) event.target.value = "";
+      }
+
       function toggleOptional(segment) {
         api.toggleQuickEditSegment(segment);
+      }
+
+      function applyFractionSelect(value, event) {
+        if (!value) return;
+        api.handleQuickEditFieldChange("fractionText", value);
+        if (event && event.target) event.target.value = "";
       }
 
       return {
@@ -93,9 +105,11 @@
         segmentConfig: segmentConfig,
         updateSegmentEntry: updateSegmentEntry,
         applySuggestion: applySuggestion,
+        applyQuickExitSelect: applyQuickExitSelect,
         fieldStyle: fieldStyle,
         quickExitInputStyle: quickExitInputStyle,
-        fractionOptions: fractionOptions
+        fractionOptions: fractionOptions,
+        applyFractionSelect: applyFractionSelect
       };
     },
     template: `
@@ -141,21 +155,21 @@
                 <div class="flex justify-center">
                 <div class="inline-flex min-w-fit justify-center gap-3">
                 <div v-for="segment in segments.filter(s => isSelected(s.id))" :key="segment.id" class="sz-quick-exit-card sz-quick-exit-segment rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
-                  <div class="mt-3 flex justify-center">
+                  <div class="mt-1 flex items-center justify-center gap-2">
                     <input
                       :value="segmentConfig(segment.id).entry || ''"
                       :style="quickExitInputStyle(segment.id, segmentConfig(segment.id).entry || '')"
                       class="sz-quick-exit-input border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[12px] text-on-surface"
-                      :list="'quick-exit-suggestions-' + segment.id"
                       inputmode="numeric"
                       pattern="[0-9/]*"
                       :placeholder="segment.id === 'tail' ? '(x)/3包/1/2' : '2箱/5包/1/2'"
                       type="text"
                       @input="updateSegmentEntry(segment.id, $event.target.value)"
                     />
-                    <datalist :id="'quick-exit-suggestions-' + segment.id">
+                    <select class="sz-quick-exit-select border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[11px] font-semibold text-on-surface-variant" @change="applyQuickExitSelect(segment.id, $event.target.value, $event)">
+                      <option value="">▼</option>
                       <option v-for="suggestion in api.buildQuickExitSuggestions(item, segment, segmentConfig(segment.id).entry || '')" :key="'quick-exit-suggestion::' + segment.id + '::' + suggestion" :value="suggestion">{{ suggestion }}</option>
-                    </datalist>
+                    </select>
                   </div>
                   <div v-if="state.quickExitSegmentErrors && state.quickExitSegmentErrors[segment.id]" class="mt-2 text-center text-[11px] font-medium text-error">{{ state.quickExitSegmentErrors[segment.id] }}</div>
                 </div>
@@ -179,7 +193,9 @@
                           <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</span>
                           <input :value="state.quickEditForm && state.quickEditForm.tailInput || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.tailInput || '', '(85p)', 9, 16, 1)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9]*" placeholder="(85p)" type="text" @focus="api.handleQuickEditFieldFocus('tailInput')" @input="api.handleQuickEditFieldChange('tailInput', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('tailInput')" />
                         </label>
-                        <button v-else aria-label="Ajouter 尾箱" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('tail')"><span class="material-symbols-outlined !text-[15px]">add</span></button>
+                        <div v-else class="sz-quick-edit-add-inline">
+                          <button aria-label="Ajouter 尾箱" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('tail')"><span class="material-symbols-outlined !text-[15px]">add</span></button>
+                        </div>
                       </div>
                       <div class="sz-quick-edit-slot-bottom">
                         <button v-if="state.quickEditTailOpen" aria-label="Retirer 尾箱" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('tail')"><span class="material-symbols-outlined !text-[15px]">remove</span></button>
@@ -227,10 +243,13 @@
                           </label>
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
-                            <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :list="'quick-edit-fraction-options'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
-                            <datalist id="quick-edit-fraction-options">
-                              <option v-for="option in fractionOptions" :key="'fraction-option::' + option" :value="option">{{ option }}</option>
-                            </datalist>
+                            <div class="inline-flex items-center gap-2">
+                              <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
+                              <select class="sz-quick-edit-input sz-quick-edit-select border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="applyFractionSelect($event.target.value, $event)">
+                                <option value="">▼</option>
+                                <option v-for="option in fractionOptions.filter(Boolean)" :key="'fraction-option::' + option" :value="option">{{ option }}</option>
+                              </select>
+                            </div>
                           </label>
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">当前缺包</span>
@@ -243,7 +262,9 @@
                             </div>
                           </label>
                         </div>
-                        <button v-else aria-label="Ajouter bloc partiel" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('partial')"><span class="material-symbols-outlined !text-[15px]">add</span></button>
+                        <div v-else class="sz-quick-edit-add-inline">
+                          <button aria-label="Ajouter bloc partiel" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('partial')"><span class="material-symbols-outlined !text-[15px]">add</span></button>
+                        </div>
                       </div>
                       <div class="sz-quick-edit-slot-bottom">
                         <button v-if="state.quickEditPartialOpen" aria-label="Retirer bloc partiel" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('partial')"><span class="material-symbols-outlined !text-[15px]">remove</span></button>

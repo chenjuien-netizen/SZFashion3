@@ -5,44 +5,8 @@
   if (!vue || !state || !api) return;
   window.SZVueModules = window.SZVueModules || {};
 
-  const TicketQuantitySuggestions = {
-    name: "TicketQuantitySuggestions",
-    props: {
-      active: { type: Boolean, required: true }
-    },
-    computed: {
-      suggestions() {
-        return Array.isArray(state.ticketQuantityDropdown && state.ticketQuantityDropdown.suggestions)
-          ? state.ticketQuantityDropdown.suggestions
-          : [];
-      },
-      highlightedIndex() {
-        return Math.max(-1, Number(state.ticketQuantityDropdown && state.ticketQuantityDropdown.highlightedIndex || -1));
-      }
-    },
-    methods: {
-      selectSuggestion(suggestion) {
-        api.applyTicketQuantitySuggestionSelection(suggestion);
-      }
-    },
-    template: `
-      <div v-if="active && suggestions.length" class="col-span-full flex flex-wrap gap-1 pt-1">
-        <button
-          v-for="(suggestion, index) in suggestions"
-          :key="suggestion + '::' + index"
-          :class="['rounded border px-2 py-1 text-[10px] font-semibold', index === highlightedIndex ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant/30 text-on-surface-variant']"
-          type="button"
-          @click="selectSuggestion(suggestion)"
-        >
-          {{ suggestion }}
-        </button>
-      </div>
-    `
-  };
-
   const TicketsScreen = {
     name: "TicketsScreen",
-    components: { TicketQuantitySuggestions: TicketQuantitySuggestions },
     setup() {
       const filteredTickets = vue.computed(function() {
         return api.filterPickupTickets(state.ticketsQuery, state.ticketsPeriod, state.ticketsStatusFilter);
@@ -64,6 +28,11 @@
       });
       const ticketReferenceSuggestions = vue.computed(function() {
         return api.getReferenceSuggestions(state.ticketCreationDraft && state.ticketCreationDraft.quickReference, { limit: 8 });
+      });
+      const quantitySuggestions = vue.computed(function() {
+        return Array.isArray(state.ticketQuantityDropdown && state.ticketQuantityDropdown.suggestions)
+          ? state.ticketQuantityDropdown.suggestions
+          : [];
       });
 
       function openTicket(ticketId) {
@@ -128,6 +97,12 @@
         return dropdown.open && dropdown.activeField === "line" && String(dropdown.activeLineId || "") === String(lineId || "");
       }
 
+      function applyQuantityDropdownSelection(value, event) {
+        if (!value) return;
+        api.applyTicketQuantitySuggestionSelection(value);
+        if (event && event.target) event.target.value = "";
+      }
+
       function lineDraft(line) {
         return api.getPickupLineDraft(line);
       }
@@ -163,10 +138,12 @@
         validateTicket: validateTicket,
         isCreateQuantityActive: isCreateQuantityActive,
         isLineQuantityActive: isLineQuantityActive,
+        applyQuantityDropdownSelection: applyQuantityDropdownSelection,
         lineDraft: lineDraft,
         linePreview: linePreview,
         getPreviewLines: getPreviewLines,
-        ticketReferenceSuggestions: ticketReferenceSuggestions
+        ticketReferenceSuggestions: ticketReferenceSuggestions,
+        quantitySuggestions: quantitySuggestions
       };
     },
     template: `
@@ -199,14 +176,17 @@
                     <input v-model="state.ticketCreationDraft.title" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" placeholder="Titre (optionnel)" type="text" />
                     <input v-model="state.ticketCreationDraft.globalNote" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" placeholder="Remarque / note (optionnel)" type="text" />
                   </div>
-                  <div class="grid grid-cols-[minmax(0,1fr)_7.5rem_auto] gap-2">
+                  <div class="grid grid-cols-[minmax(0,1fr)_6.5rem_3.25rem_auto] gap-2">
                     <input v-model="state.ticketCreationDraft.quickReference" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" list="ticketReferenceSuggestions" placeholder="Référence" type="text" />
                     <datalist id="ticketReferenceSuggestions">
                       <option v-for="entry in ticketReferenceSuggestions" :key="entry.reference" :value="entry.reference">{{ entry.label }}</option>
                     </datalist>
-                    <input id="pickupTicketQuickQuantityInput" v-model="state.ticketCreationDraft.quickQuantity" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" inputmode="decimal" placeholder="2箱" type="text" @focus="openCreateQuantityDropdown" @input="openCreateQuantityDropdown" />
+                    <input id="pickupTicketQuickQuantityInput" v-model="state.ticketCreationDraft.quickQuantity" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[12px] text-on-surface" inputmode="decimal" placeholder="2箱" type="text" @focus="openCreateQuantityDropdown" @input="openCreateQuantityDropdown" />
+                    <select class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[11px] font-semibold text-on-surface-variant" @change="applyQuantityDropdownSelection($event.target.value, $event)">
+                      <option value="">▼</option>
+                      <option v-for="(suggestion, index) in isCreateQuantityActive() ? quantitySuggestions : []" :key="'create-quantity::' + suggestion + '::' + index" :value="suggestion">{{ suggestion }}</option>
+                    </select>
                     <button class="border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" type="button" @click="addDraftLine">Ajouter</button>
-                    <TicketQuantitySuggestions :active="isCreateQuantityActive()" />
                   </div>
                 </div>
                 <div class="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Saisie rapide</div>
@@ -228,7 +208,14 @@
             </template>
 
             <template v-else-if="state.ticketsSubview === 'detail'">
-              <template v-if="selectedVm && selectedVm.ticket">
+              <section v-if="state.pickupTicketLoading" class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">
+                <div class="mt-3 flex flex-col gap-2">
+                  <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
+                  <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
+                  <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
+                </div>
+              </section>
+              <template v-else-if="selectedVm && selectedVm.ticket && selectedVm.hasDetail">
                 <section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
@@ -266,33 +253,34 @@
                   </div>
 
                   <div v-else class="sz-ticket-line-editor mt-2 grid gap-2">
-                    <div class="sz-ticket-line-inputs grid items-center gap-2">
+                    <div class="sz-ticket-line-row grid items-center gap-2">
                       <input
                         :data-line-id="line.lineId"
                         data-role="ticket-line-picked-input"
                         v-model="lineDraft(line).pickedInput"
                         autocomplete="off"
-                        class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface"
+                        class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-center text-[12px] text-on-surface"
                         inputmode="decimal"
                         placeholder="2箱"
                         type="text"
                         @focus="openLineQuantityDropdown"
                         @input="openLineQuantityDropdown"
                       />
+                      <select class="border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-center text-[11px] font-semibold text-on-surface-variant" @change="applyQuantityDropdownSelection($event.target.value, $event)">
+                        <option value="">▼</option>
+                        <option v-for="(suggestion, index) in isLineQuantityActive(line.lineId) ? quantitySuggestions : []" :key="'line-quantity::' + line.lineId + '::' + suggestion + '::' + index" :value="suggestion">{{ suggestion }}</option>
+                      </select>
                       <input :data-line-id="line.lineId" data-role="ticket-line-note-input" v-model="lineDraft(line).lineNote" autocomplete="off" class="min-w-0 w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" :placeholder="line.status === 'not_found' ? 'Précision introuvable...' : 'Commentaire'" type="text" />
-                    </div>
-                    <div class="sz-ticket-line-actions flex flex-wrap items-center justify-end gap-2">
                       <button aria-label="Confirmer la ligne" title="Confirmer" class="sz-ticket-line-action-btn border border-outline-variant/30 text-on-surface-variant" type="button" @click="saveLine(selectedVm.ticket.ticketId, line.lineId)">
                         <span class="material-symbols-outlined !text-[16px]">check</span>
                       </button>
                       <button aria-label="Marquer introuvable" title="Introuvable" class="sz-ticket-line-action-btn border border-outline-variant/30 text-on-surface-variant" type="button" @click="markLineNotFound(selectedVm.ticket.ticketId, line.lineId)">
-                        <span class="material-symbols-outlined !text-[16px]">search_off</span>
+                        <span class="text-[15px] font-black leading-none">?</span>
                       </button>
                       <button aria-label="Vider la ligne" title="Vider" class="sz-ticket-line-action-btn border border-outline-variant/30 text-on-surface-variant" type="button" @click="emptyLine(selectedVm.ticket.ticketId, line.lineId)">
-                        <span class="material-symbols-outlined !text-[16px]">backspace</span>
+                        <span class="text-[13px] font-black leading-none">空</span>
                       </button>
                     </div>
-                    <TicketQuantitySuggestions :active="isLineQuantityActive(line.lineId)" />
                     <div v-if="lineDraft(line).error" class="text-[11px] font-medium text-error">{{ lineDraft(line).error }}</div>
                   </div>
                 </article>
