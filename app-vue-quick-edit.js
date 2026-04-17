@@ -28,20 +28,6 @@
           : 0;
         return api.buildQuickExitPacksHintMarkup(currentItem && currentItem.colisage, packsPerBox);
       });
-      const fractionOptions = vue.computed(function() {
-        const dynamic = currentEditState.value && Array.isArray(currentEditState.value.dynamicFractions)
-          ? currentEditState.value.dynamicFractions
-          : [];
-        const base = ["1/2", "1/3", "1/4", "2/3", "2/4", "3/4"];
-        const seen = Object.create(null);
-        return base.concat(dynamic).filter(function(entry) {
-          const value = String(entry || "").trim();
-          if (!value || seen[value]) return false;
-          seen[value] = true;
-          return true;
-        });
-      });
-
       function measureWidth(value, fallbackValue, minChars, maxChars, extraChars) {
         const source = String(value || fallbackValue || "").trim();
         const length = source ? source.length : 0;
@@ -107,12 +93,11 @@
         applySuggestion: applySuggestion,
         fieldStyle: fieldStyle,
         quickExitInputStyle: quickExitInputStyle,
-        fractionOptions: fractionOptions
       };
     },
     template: `
       <div v-if="state.quickEditOpen && item" class="fixed inset-0 z-[60] flex items-center justify-center bg-on-background/35 px-3 py-6" @click.self="api.closeQuickEdit()">
-        <div class="relative max-h-[calc(100dvh-2.5rem)] w-full max-w-3xl overflow-hidden border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_48px_rgba(11,15,16,0.18)]">
+        <div id="quickEditModal" class="relative max-h-[calc(100dvh-2.5rem)] w-full max-w-3xl overflow-hidden border border-outline-variant/20 bg-surface-container-lowest shadow-[0_18px_48px_rgba(11,15,16,0.18)]">
           <div class="border-b border-outline-variant/20 px-4 py-4">
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
@@ -129,7 +114,7 @@
             </div>
           </div>
 
-          <div class="inventory-scroll max-h-[calc(100dvh-12rem)] overflow-y-auto px-4 py-4">
+          <div id="quickEditBody" class="inventory-scroll max-h-[calc(100dvh-12rem)] overflow-y-auto px-4 py-4">
             <template v-if="state.quickEditTab === 'quick-exit'">
               <div class="sz-quick-exit-card rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
                 <div class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Stock courant</div>
@@ -241,10 +226,7 @@
                           </label>
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
-                            <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :list="'quick-edit-fraction-options'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
-                            <datalist id="quick-edit-fraction-options">
-                              <option v-for="option in fractionOptions" :key="'fraction-option::' + option" :value="option">{{ option }}</option>
-                            </datalist>
+                            <input id="quickEditFractionInput" :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @focus="api.openCustomInputDropdown('quick-edit-fraction', $event.target.value || '')" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value); api.openCustomInputDropdown('quick-edit-fraction', $event.target.value || '')" @keydown="api.handleCustomInputDropdownKeydown($event, 'quick-edit-fraction')" @blur="api.normalizeQuickEditFieldOnBlur('fractionText'); api.deferCloseCustomInputDropdown('quick-edit-fraction')" />
                           </label>
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">当前缺包</span>
@@ -279,9 +261,16 @@
             <p v-if="state.quickEditError" class="mt-3 rounded border border-error/20 bg-error-container/20 px-3 py-2 text-[11px] font-medium text-on-error-container">{{ state.quickEditError }}</p>
           </div>
 
-          <div class="grid grid-cols-2 gap-3 border-t border-outline-variant/20 bg-surface-container-low px-4 py-4">
+          <div id="quickEditFooter" class="grid grid-cols-2 gap-3 border-t border-outline-variant/20 bg-surface-container-low px-4 py-4">
             <button class="border border-outline-variant/30 py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="api.closeQuickEdit()">ANNULER</button>
             <button class="bg-surface-tint py-3 text-[11px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" type="button" @click="api.handleQuickEditSave()">{{ state.quickEditTab === 'quick-exit' ? 'APPLIQUER LA SORTIE' : 'ENREGISTRER' }}</button>
+          </div>
+          <div v-if="api.isCustomInputDropdownScopeOpen('quick-edit')" class="pointer-events-none absolute inset-0 z-20">
+            <div class="pointer-events-auto absolute overflow-y-auto rounded border border-outline-variant/40 bg-surface-container-lowest shadow-[0_16px_32px_rgba(11,15,16,0.24)]" :style="api.getCustomInputDropdownStyle()">
+              <button v-for="(entry, index) in state.customInputDropdown.suggestions" :key="entry.key || entry.value || index" :class="['flex w-full items-center border-b border-outline-variant/10 px-3 py-2 text-left text-[12px] font-medium transition-colors duration-150 last:border-b-0', index === state.customInputDropdown.highlightedIndex ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container']" type="button" @mousedown.prevent @click="api.applyCustomInputSuggestionSelection(entry)">
+                <span>{{ entry.display || entry.value }}</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

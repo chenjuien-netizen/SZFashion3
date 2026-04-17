@@ -107,9 +107,6 @@
       const filteredItems = vue.computed(function() {
         return api.filterInventoryItems(state.query);
       });
-      const referenceSuggestions = vue.computed(function() {
-        return api.getReferenceSuggestions(state.query, { limit: 8 });
-      });
       const inventorySummary = vue.computed(function() {
         return api.getInventorySummary(filteredItems.value);
       });
@@ -166,12 +163,11 @@
           return online.value ? "En ligne" : "Hors ligne";
         }),
         columns: columns,
-        buildEntries: buildEntries,
-        referenceSuggestions: referenceSuggestions
+        buildEntries: buildEntries
       };
     },
     template: `
-      <main class="flex h-full min-h-0 flex-col overflow-hidden">
+      <main id="inventoryScreenRoot" class="relative flex h-full min-h-0 flex-col overflow-hidden">
         <div class="sticky top-0 z-40 shrink-0 bg-background">
           <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
             <div class="flex items-center gap-3">
@@ -187,12 +183,9 @@
             </div>
           </header>
           <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-1.5 shadow-ledger">
-            <div class="flex items-center gap-2">
+            <div id="inventoryReferenceSearchWrap" class="flex items-center gap-2">
               <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
-              <input v-model="state.query" autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" list="inventoryReferenceSuggestions" placeholder="RECHERCHE RÉFÉRENCE / STOCK..." type="search" />
-              <datalist id="inventoryReferenceSuggestions">
-                <option v-for="entry in referenceSuggestions" :key="entry.reference" :value="entry.reference">{{ entry.label }}</option>
-              </datalist>
+              <input id="inventoryReferenceSearchInput" v-model="state.query" autocomplete="off" class="w-full border-none bg-transparent p-0 text-[10px] font-medium tracking-tight text-on-surface placeholder:text-outline focus:ring-0" placeholder="RECHERCHE RÉFÉRENCE / STOCK..." type="search" @focus="api.openCustomInputDropdown('inventory-reference', $event.target.value || '')" @input="api.openCustomInputDropdown('inventory-reference', $event.target.value || '')" @keydown="api.handleCustomInputDropdownKeydown($event, 'inventory-reference')" @blur="api.deferCloseCustomInputDropdown('inventory-reference')" />
             </div>
             <div class="mt-1.5 grid grid-cols-2 gap-2">
               <select v-model="state.inventoryStockFilter" class="border-outline-variant/30 bg-surface-container-lowest py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-on-surface">
@@ -254,6 +247,13 @@
             <p class="mt-1 text-[12px] text-on-surface-variant">Ajuste la recherche pour afficher des references.</p>
           </div>
         </section>
+        <div v-if="api.isCustomInputDropdownScopeOpen('inventory')" class="pointer-events-none absolute inset-0 z-20">
+          <div class="pointer-events-auto absolute overflow-y-auto rounded border border-outline-variant/40 bg-surface-container-lowest shadow-[0_16px_32px_rgba(11,15,16,0.24)]" :style="api.getCustomInputDropdownStyle()">
+            <button v-for="(entry, index) in state.customInputDropdown.suggestions" :key="entry.key || entry.value || index" :class="['flex w-full items-center border-b border-outline-variant/10 px-3 py-2 text-left text-[12px] font-medium transition-colors duration-150 last:border-b-0', index === state.customInputDropdown.highlightedIndex ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container']" type="button" @mousedown.prevent @click="api.applyCustomInputSuggestionSelection(entry)">
+              <span class="truncate">{{ entry.display || entry.value }}</span>
+            </button>
+          </div>
+        </div>
       </main>
     `
   };
