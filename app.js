@@ -80,14 +80,6 @@ const baseState = {
     suggestions: [],
     highlightedIndex: -1
   },
-  customInputDropdown: {
-    open: false,
-    kind: "",
-    lineId: "",
-    entry: "",
-    suggestions: [],
-    highlightedIndex: -1
-  },
   ticketReferenceDrafts: [],
   quickEditOpen: false,
   quickEditTab: "quick-exit",
@@ -3309,7 +3301,6 @@ function replaceItem(nextItem) {
 
 function openQuickEdit(item) {
   if (!item) return;
-  closeCustomInputDropdown_();
   state.quickEditItem = item;
   state.quickEditItemId = item.id;
   state.quickEditOpen = true;
@@ -3336,7 +3327,6 @@ function openQuickEdit(item) {
 }
 
 function closeQuickEdit() {
-  closeCustomInputDropdown_();
   const els = getQuickEditElements();
   resetQuickEditInlineWidths_();
   if (els.quickEditExpressionMeasure) {
@@ -4248,291 +4238,16 @@ function getQuickEditFractionOptions_() {
   });
 }
 
-function normalizeCustomDropdownKind_(kind) {
-  return String(kind || "").trim();
+function buildTicketQuantitySuggestionsForCreate_(reference, entry) {
+  const normalizedReference = normalizeReference(reference);
+  const item = normalizedReference ? getInventoryByReference(normalizedReference) : null;
+  return buildTicketQuantitySuggestions_(item, entry);
 }
 
-function normalizeCustomDropdownLineId_(lineId) {
-  return String(lineId || "").trim();
-}
-
-function isSameCustomInputDropdownTarget_(kind, options) {
-  const dropdownState = state.customInputDropdown || {};
-  const currentKind = normalizeCustomDropdownKind_(dropdownState.kind);
-  const nextKind = normalizeCustomDropdownKind_(kind);
-  const currentLineId = normalizeCustomDropdownLineId_(dropdownState.lineId);
-  const nextLineId = normalizeCustomDropdownLineId_(options && options.lineId);
-  return currentKind === nextKind && currentLineId === nextLineId;
-}
-
-function getCustomInputDropdownScope_(kind) {
-  const normalizedKind = normalizeCustomDropdownKind_(kind);
-  if (normalizedKind === "inventory-reference") return "inventory";
-  if (normalizedKind === "quick-edit-fraction") return "quick-edit";
-  if (normalizedKind.indexOf("ticket-") === 0) return "tickets";
-  return "";
-}
-
-function getCustomInputDropdownTarget_(kind, options) {
-  const normalizedKind = normalizeCustomDropdownKind_(kind);
-  const lineId = normalizeCustomDropdownLineId_(options && options.lineId);
-  if (normalizedKind === "inventory-reference") {
-    return document.getElementById("inventoryReferenceSearchInput");
-  }
-  if (normalizedKind === "ticket-reference") {
-    return document.getElementById("pickupTicketQuickReferenceInput");
-  }
-  if (normalizedKind === "ticket-quantity-create") {
-    return document.getElementById("pickupTicketQuickQuantityInput");
-  }
-  if (normalizedKind === "ticket-quantity-line" && lineId) {
-    return document.querySelector('[data-role="ticket-line-picked-input"][data-line-id="' + CSS.escape(lineId) + '"]');
-  }
-  if (normalizedKind === "quick-edit-fraction") {
-    return document.getElementById("quickEditFractionInput");
-  }
-  return null;
-}
-
-function getCustomInputDropdownWrap_(kind) {
-  const scope = getCustomInputDropdownScope_(kind);
-  if (scope === "inventory") return document.getElementById("inventoryScreenRoot");
-  if (scope === "tickets") return document.getElementById("pickupTicketsContentWrap");
-  if (scope === "quick-edit") return document.getElementById("quickEditModal");
-  return null;
-}
-
-function buildFractionDropdownSuggestions_(entry) {
-  const normalized = String(entry || "").trim();
-  if (!normalized) return [];
-  return getQuickEditFractionOptions_().filter(function(option) {
-    return String(option || "").toLowerCase().indexOf(normalized.toLowerCase()) === 0;
-  }).map(function(option) {
-    return {
-      value: option,
-      display: option,
-      key: "fraction::" + option
-    };
-  });
-}
-
-function buildReferenceDropdownSuggestions_(entry, options) {
-  return getReferenceSuggestions(entry, options).map(function(suggestion) {
-    const reference = String(suggestion && suggestion.reference || "").trim();
-    return {
-      value: reference,
-      display: reference,
-      key: "reference::" + reference,
-      reference: reference
-    };
-  });
-}
-
-function buildTicketQuantityDropdownSuggestions_(target, entry) {
-  const context = resolveTicketQuantityContext_(target);
-  if (!context.fieldType) return [];
-  return buildTicketQuantitySuggestions_(context.item, entry).map(function(suggestion) {
-    return {
-      value: suggestion,
-      display: suggestion,
-      key: "ticket-quantity::" + suggestion
-    };
-  });
-}
-
-function buildCustomInputDropdownSuggestions_(kind, entry, options) {
-  const normalizedKind = normalizeCustomDropdownKind_(kind);
-  if (normalizedKind === "quick-edit-fraction") {
-    return buildFractionDropdownSuggestions_(entry);
-  }
-  if (normalizedKind === "inventory-reference") {
-    return buildReferenceDropdownSuggestions_(entry, { limit: 8 });
-  }
-  if (normalizedKind === "ticket-reference") {
-    return buildReferenceDropdownSuggestions_(entry, { limit: 8 });
-  }
-  if (normalizedKind === "ticket-quantity-create" || normalizedKind === "ticket-quantity-line") {
-    const target = getCustomInputDropdownTarget_(normalizedKind, options);
-    return buildTicketQuantityDropdownSuggestions_(target, entry);
-  }
-  return [];
-}
-
-function setCustomInputDropdownState_(patch) {
-  state.customInputDropdown = Object.assign({}, state.customInputDropdown || {}, patch || {});
-}
-
-function closeCustomInputDropdown_(options) {
-  const settings = options || {};
-  const activeKind = normalizeCustomDropdownKind_((state.customInputDropdown || {}).kind);
-  const target = activeKind ? getCustomInputDropdownTarget_(activeKind, state.customInputDropdown) : null;
-  setCustomInputDropdownState_({
-    open: false,
-    kind: settings.preserveKind ? activeKind : "",
-    lineId: settings.preserveKind ? normalizeCustomDropdownLineId_((state.customInputDropdown || {}).lineId) : "",
-    entry: settings.preserveEntry ? String((state.customInputDropdown || {}).entry || "") : "",
-    suggestions: [],
-    highlightedIndex: -1
-  });
-  if (target && target.closest && target.closest("#quickEditModal")) {
-    const body = document.getElementById("quickEditBody");
-    if (body) {
-      body.classList.remove("dropdown-open");
-      body.classList.remove("overflow-hidden");
-      body.classList.add("overflow-y-auto");
-    }
-  }
-}
-
-function syncQuickEditDropdownScrollLock_() {
-  const body = document.getElementById("quickEditBody");
-  if (!body) return;
-  const dropdownState = state.customInputDropdown || {};
-  const shouldLock = dropdownState.open && getCustomInputDropdownScope_(dropdownState.kind) === "quick-edit";
-  body.classList.toggle("dropdown-open", !!shouldLock);
-  body.classList.toggle("overflow-hidden", !!shouldLock);
-  body.classList.toggle("overflow-y-auto", !shouldLock);
-}
-
-function openCustomInputDropdown_(kind, entry, options) {
-  const normalizedKind = normalizeCustomDropdownKind_(kind);
-  const normalizedLineId = normalizeCustomDropdownLineId_(options && options.lineId);
-  const nextEntry = String(entry || "");
-  const suggestions = buildCustomInputDropdownSuggestions_(normalizedKind, nextEntry, { lineId: normalizedLineId });
-  setCustomInputDropdownState_({
-    open: suggestions.length > 0,
-    kind: normalizedKind,
-    lineId: normalizedLineId,
-    entry: nextEntry,
-    suggestions: suggestions,
-    highlightedIndex: suggestions.length ? 0 : -1
-  });
-  syncQuickEditDropdownScrollLock_();
-}
-
-function deferCloseCustomInputDropdown_(kind, options) {
-  const normalizedKind = normalizeCustomDropdownKind_(kind);
-  const normalizedLineId = normalizeCustomDropdownLineId_(options && options.lineId);
-  window.setTimeout(function() {
-    if (!isSameCustomInputDropdownTarget_(normalizedKind, { lineId: normalizedLineId })) return;
-    closeCustomInputDropdown_();
-  }, 0);
-}
-
-function moveCustomInputDropdownSelection_(direction) {
-  const dropdownState = state.customInputDropdown || {};
-  const suggestions = Array.isArray(dropdownState.suggestions) ? dropdownState.suggestions : [];
-  if (!dropdownState.open || !suggestions.length) return;
-  const currentIndex = Math.max(-1, Math.min(Number(dropdownState.highlightedIndex || -1), suggestions.length - 1));
-  const nextIndex = direction === "up"
-    ? (currentIndex <= 0 ? suggestions.length - 1 : currentIndex - 1)
-    : (currentIndex >= suggestions.length - 1 ? 0 : currentIndex + 1);
-  setCustomInputDropdownState_({ highlightedIndex: nextIndex });
-}
-
-function applyCustomInputFieldValue_(kind, suggestion, options) {
-  const normalizedKind = normalizeCustomDropdownKind_(kind);
-  const lineId = normalizeCustomDropdownLineId_(options && options.lineId);
-  const value = String(suggestion && suggestion.value != null ? suggestion.value : suggestion || "");
-  if (normalizedKind === "inventory-reference") {
-    state.query = value;
-    return;
-  }
-  if (normalizedKind === "ticket-reference") {
-    state.ticketCreationDraft.quickReference = value;
-    return;
-  }
-  if (normalizedKind === "quick-edit-fraction") {
-    handleQuickEditFieldChange("fractionText", value);
-    return;
-  }
-  if (normalizedKind === "ticket-quantity-create") {
-    const target = document.getElementById("pickupTicketQuickQuantityInput");
-    applyTicketQuantityFieldValue_(target, value);
-    return;
-  }
-  if (normalizedKind === "ticket-quantity-line" && lineId) {
-    const target = document.querySelector('[data-role="ticket-line-picked-input"][data-line-id="' + CSS.escape(lineId) + '"]');
-    applyTicketQuantityFieldValue_(target, value);
-  }
-}
-
-function applyCustomInputSuggestionSelection_(suggestion) {
-  const dropdownState = state.customInputDropdown || {};
-  const activeKind = normalizeCustomDropdownKind_(dropdownState.kind);
-  if (!activeKind) return;
-  const lineId = normalizeCustomDropdownLineId_(dropdownState.lineId);
-  applyCustomInputFieldValue_(activeKind, suggestion, { lineId: lineId });
-  const target = getCustomInputDropdownTarget_(activeKind, { lineId: lineId });
-  closeCustomInputDropdown_();
-  if (target && target.focus) target.focus({ preventScroll: true });
-}
-
-function handleCustomInputDropdownKeydown_(event, kind, options) {
-  if (!event) return;
-  const normalizedKind = normalizeCustomDropdownKind_(kind);
-  const normalizedLineId = normalizeCustomDropdownLineId_(options && options.lineId);
-  const target = event.target || getCustomInputDropdownTarget_(normalizedKind, { lineId: normalizedLineId });
-  const dropdownState = state.customInputDropdown || {};
-  const suggestions = Array.isArray(dropdownState.suggestions) ? dropdownState.suggestions : [];
-  const sameTarget = isSameCustomInputDropdownTarget_(normalizedKind, { lineId: normalizedLineId });
-  if (event.key === "ArrowDown") {
-    event.preventDefault();
-    if (!sameTarget || !dropdownState.open) {
-      openCustomInputDropdown_(normalizedKind, target && target.value || "", { lineId: normalizedLineId });
-      return;
-    }
-    moveCustomInputDropdownSelection_("down");
-    return;
-  }
-  if (event.key === "ArrowUp") {
-    event.preventDefault();
-    if (!sameTarget || !dropdownState.open) {
-      openCustomInputDropdown_(normalizedKind, target && target.value || "", { lineId: normalizedLineId });
-      return;
-    }
-    moveCustomInputDropdownSelection_("up");
-    return;
-  }
-  if (event.key === "Enter" && sameTarget && dropdownState.open && suggestions.length) {
-    const highlightedIndex = Math.max(0, Math.min(Number(dropdownState.highlightedIndex || 0), suggestions.length - 1));
-    if (suggestions[highlightedIndex]) {
-      event.preventDefault();
-      applyCustomInputSuggestionSelection_(suggestions[highlightedIndex]);
-    }
-    return;
-  }
-  if (event.key === "Escape" && sameTarget) {
-    event.preventDefault();
-    closeCustomInputDropdown_();
-    if (target && target.focus) target.focus({ preventScroll: true });
-  }
-}
-
-function getCustomInputDropdownStyle_() {
-  const dropdownState = state.customInputDropdown || {};
-  const activeKind = normalizeCustomDropdownKind_(dropdownState.kind);
-  const target = activeKind ? getCustomInputDropdownTarget_(activeKind, dropdownState) : null;
-  const wrap = activeKind ? getCustomInputDropdownWrap_(activeKind) : null;
-  if (!dropdownState.open || !target || !wrap) return {};
-  const wrapRect = wrap.getBoundingClientRect();
-  const inputRect = target.getBoundingClientRect();
-  const dropdownWidth = Math.max(150, Math.round(inputRect.width));
-  const maxLeft = Math.max(0, Math.round(wrapRect.width - dropdownWidth));
-  const left = Math.max(0, Math.min(Math.round(inputRect.left - wrapRect.left), maxLeft));
-  const top = Math.max(0, Math.round(inputRect.bottom - wrapRect.top + 4));
-  const spaceBelow = Math.max(96, Math.round(wrapRect.bottom - inputRect.bottom - 12));
-  return {
-    left: left + "px",
-    top: top + "px",
-    width: dropdownWidth + "px",
-    maxHeight: Math.min(220, spaceBelow) + "px"
-  };
-}
-
-function isCustomInputDropdownScopeOpen_(scope) {
-  const dropdownState = state.customInputDropdown || {};
-  return !!dropdownState.open && getCustomInputDropdownScope_(dropdownState.kind) === String(scope || "");
+function buildTicketQuantitySuggestionsForLine_(line, entry) {
+  const reference = normalizeReference(line && line.reference);
+  const item = reference ? getInventoryByReference(reference) : null;
+  return buildTicketQuantitySuggestions_(item, entry);
 }
 
 function setTicketQuantityDropdownState_(patch) {
@@ -6326,13 +6041,9 @@ function registerVueBridge() {
     parsePickupQuantityInput: parsePickupQuantityInput,
     resolvePickupParsedQuantityForLine: resolvePickupParsedQuantityForLine,
     buildPickupTicketEmptyResolution: buildPickupTicketEmptyResolution_,
-    openCustomInputDropdown: openCustomInputDropdown_,
-    deferCloseCustomInputDropdown: deferCloseCustomInputDropdown_,
-    closeCustomInputDropdown: closeCustomInputDropdown_,
-    handleCustomInputDropdownKeydown: handleCustomInputDropdownKeydown_,
-    applyCustomInputSuggestionSelection: applyCustomInputSuggestionSelection_,
-    getCustomInputDropdownStyle: getCustomInputDropdownStyle_,
-    isCustomInputDropdownScopeOpen: isCustomInputDropdownScopeOpen_,
+    getQuickEditFractionOptions: getQuickEditFractionOptions_,
+    buildTicketQuantitySuggestionsForCreate: buildTicketQuantitySuggestionsForCreate_,
+    buildTicketQuantitySuggestionsForLine: buildTicketQuantitySuggestionsForLine_,
     loadPickupTicketData: loadPickupTicketData,
     applyLocalPickupTicketsState: applyLocalPickupTicketsState,
     createPickupTicketFromDraft: createPickupTicketFromDraft,

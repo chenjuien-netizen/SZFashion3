@@ -26,6 +26,9 @@
           return list;
         }, []);
       });
+      const ticketReferenceSuggestions = vue.computed(function() {
+        return api.getReferenceSuggestions(state.ticketCreationDraft && state.ticketCreationDraft.quickReference, { limit: 8 });
+      });
       function openTicket(ticketId) {
         api.navigateTo("tickets", { ref: ticketId });
       }
@@ -48,14 +51,6 @@
 
       function createTicket() {
         api.createPickupTicketFromDraft();
-      }
-
-      function openCreateQuantityDropdown(event) {
-        api.openCustomInputDropdown("ticket-quantity-create", event.target.value || "");
-      }
-
-      function openLineQuantityDropdown(event) {
-        api.openCustomInputDropdown("ticket-quantity-line", event.target.value || "", { lineId: event.target.getAttribute("data-line-id") || "" });
       }
 
       function saveLine(ticketId, lineId) {
@@ -104,8 +99,6 @@
         addDraftLine: addDraftLine,
         addDraftTextLines: addDraftTextLines,
         createTicket: createTicket,
-        openCreateQuantityDropdown: openCreateQuantityDropdown,
-        openLineQuantityDropdown: openLineQuantityDropdown,
         saveLine: saveLine,
         markLineNotFound: markLineNotFound,
         emptyLine: emptyLine,
@@ -113,7 +106,8 @@
         validateTicket: validateTicket,
         lineDraft: lineDraft,
         linePreview: linePreview,
-        getPreviewLines: getPreviewLines
+        getPreviewLines: getPreviewLines,
+        ticketReferenceSuggestions: ticketReferenceSuggestions
       };
     },
     template: `
@@ -147,8 +141,14 @@
                     <input v-model="state.ticketCreationDraft.globalNote" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" placeholder="Remarque / note (optionnel)" type="text" />
                   </div>
                   <div class="grid grid-cols-[minmax(0,1fr)_6.5rem_auto] gap-2">
-                    <input id="pickupTicketQuickReferenceInput" v-model="state.ticketCreationDraft.quickReference" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" placeholder="Référence" type="text" @focus="api.openCustomInputDropdown('ticket-reference', $event.target.value || '')" @input="api.openCustomInputDropdown('ticket-reference', $event.target.value || '')" @keydown="api.handleCustomInputDropdownKeydown($event, 'ticket-reference')" @blur="api.deferCloseCustomInputDropdown('ticket-reference')" />
-                    <input id="pickupTicketQuickQuantityInput" v-model="state.ticketCreationDraft.quickQuantity" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[12px] text-on-surface" inputmode="decimal" placeholder="2箱" type="text" @focus="openCreateQuantityDropdown" @input="openCreateQuantityDropdown" @keydown="api.handleCustomInputDropdownKeydown($event, 'ticket-quantity-create')" @blur="api.deferCloseCustomInputDropdown('ticket-quantity-create')" />
+                    <input id="pickupTicketQuickReferenceInput" v-model="state.ticketCreationDraft.quickReference" autocomplete="off" class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-[12px] text-on-surface" list="ticketReferenceSuggestions" placeholder="Référence" type="text" />
+                    <datalist id="ticketReferenceSuggestions">
+                      <option v-for="entry in ticketReferenceSuggestions" :key="entry.reference" :value="entry.reference">{{ entry.reference }}</option>
+                    </datalist>
+                    <input id="pickupTicketQuickQuantityInput" v-model="state.ticketCreationDraft.quickQuantity" autocomplete="off" class="border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[12px] text-on-surface" inputmode="decimal" list="pickupTicketQuickQuantitySuggestions" placeholder="2箱" type="text" />
+                    <datalist id="pickupTicketQuickQuantitySuggestions">
+                      <option v-for="suggestion in api.buildTicketQuantitySuggestionsForCreate(state.ticketCreationDraft && state.ticketCreationDraft.quickReference, state.ticketCreationDraft && state.ticketCreationDraft.quickQuantity)" :key="'pickup-ticket-qty::' + suggestion" :value="suggestion">{{ suggestion }}</option>
+                    </datalist>
                     <button class="border border-outline-variant/30 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant" type="button" @click="addDraftLine">Ajouter</button>
                   </div>
                 </div>
@@ -217,13 +217,13 @@
                         autocomplete="off"
                         class="min-w-0 border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-center text-[12px] text-on-surface"
                         inputmode="decimal"
+                        :list="'ticketLinePickedSuggestions-' + line.lineId"
                         placeholder="2箱"
                         type="text"
-                        @focus="openLineQuantityDropdown"
-                        @input="openLineQuantityDropdown"
-                        @keydown="api.handleCustomInputDropdownKeydown($event, 'ticket-quantity-line', { lineId: line.lineId })"
-                        @blur="api.deferCloseCustomInputDropdown('ticket-quantity-line', { lineId: line.lineId })"
                       />
+                      <datalist :id="'ticketLinePickedSuggestions-' + line.lineId">
+                        <option v-for="suggestion in api.buildTicketQuantitySuggestionsForLine(line, lineDraft(line).pickedInput)" :key="'ticket-line-qty::' + line.lineId + '::' + suggestion" :value="suggestion">{{ suggestion }}</option>
+                      </datalist>
                       <input :data-line-id="line.lineId" data-role="ticket-line-note-input" v-model="lineDraft(line).lineNote" autocomplete="off" class="min-w-0 w-full border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[12px] text-on-surface" :placeholder="line.status === 'not_found' ? 'Précision introuvable...' : 'Commentaire'" type="text" />
                       <button aria-label="Confirmer la ligne" title="Confirmer" class="sz-ticket-line-action-btn border border-outline-variant/30 text-on-surface-variant" type="button" @click="saveLine(selectedVm.ticket.ticketId, line.lineId)">
                         <span class="material-symbols-outlined !text-[16px]">check</span>
@@ -334,13 +334,6 @@
             </template>
           </div>
         </section>
-        <div v-if="api.isCustomInputDropdownScopeOpen('tickets')" class="pointer-events-none absolute inset-0 z-20">
-          <div class="pointer-events-auto absolute overflow-y-auto rounded border border-outline-variant/40 bg-surface-container-lowest shadow-[0_16px_32px_rgba(11,15,16,0.24)]" :style="api.getCustomInputDropdownStyle()">
-            <button v-for="(entry, index) in state.customInputDropdown.suggestions" :key="entry.key || entry.value || index" :class="['flex w-full items-center border-b border-outline-variant/10 px-3 py-2 text-left text-[12px] font-medium transition-colors duration-150 last:border-b-0', index === state.customInputDropdown.highlightedIndex ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container']" type="button" @mousedown.prevent @click="api.applyCustomInputSuggestionSelection(entry)">
-              <span class="truncate">{{ entry.display || entry.value }}</span>
-            </button>
-          </div>
-        </div>
       </main>
     `
   };
