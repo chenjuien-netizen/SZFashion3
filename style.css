@@ -18,17 +18,12 @@ a,
 
 .sz-quick-edit-expression-wrap {
   -webkit-overflow-scrolling: touch;
-  overflow-x: auto;
 }
 
 .sz-quick-edit-layout {
   margin-left: auto;
   margin-right: auto;
   padding-bottom: 0.125rem;
-}
-
-.sz-quick-edit-layout-shell {
-  width: 100%;
 }
 
 .sz-quick-edit-layout > div,
@@ -39,11 +34,6 @@ a,
 
 .sz-quick-edit-token {
   flex: 0 0 auto;
-}
-
-.sz-quick-edit-partial-token {
-  flex-wrap: wrap;
-  justify-content: center;
 }
 
 .sz-quick-edit-slot {
@@ -196,59 +186,6 @@ a,
   #quickEditTailRemoveJoinSlot,
   #quickEditMultiplyRemoveSpacerSlot {
     width: 1rem !important;
-  }
-
-  .sz-quick-edit-expression-wrap {
-    overflow-x: auto;
-  }
-
-  .sz-quick-edit-layout-shell {
-    justify-content: flex-start !important;
-  }
-
-  .sz-quick-edit-layout {
-    margin-left: 0;
-    margin-right: 0;
-    gap: 0.3rem;
-  }
-
-  .sz-quick-edit-add-inline {
-    min-height: 3.45rem;
-  }
-
-  .sz-quick-edit-token {
-    gap: 0.3rem;
-  }
-
-  .sz-quick-edit-slot {
-    gap: 0.3rem;
-  }
-
-  .sz-quick-edit-inline-operator {
-    padding-top: 0.95rem;
-  }
-
-  .sz-quick-edit-operator {
-    padding-bottom: 0.5rem;
-    font-size: 1rem;
-  }
-
-  .sz-quick-edit-slot-top > .block > span,
-  .sz-quick-edit-token > .block > span {
-    margin-bottom: 0.2rem;
-    font-size: 9px;
-    letter-spacing: 0.11em;
-  }
-
-  .sz-quick-edit-slot-spacer,
-  .sz-quick-edit-chip-icon {
-    width: 2.25rem;
-    min-width: 2.25rem;
-    height: 2.25rem;
-  }
-
-  .sz-quick-edit-input {
-    max-width: 100%;
   }
 
   .sz-quick-exit-segment {

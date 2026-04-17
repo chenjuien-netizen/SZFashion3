@@ -182,10 +182,10 @@
             </template>
 
             <template v-else>
-              <div class="sz-quick-edit-expression-wrap pb-1">
+              <div class="sz-quick-edit-expression-wrap overflow-x-auto pb-1">
                 <div class="sz-quick-edit-layout-shell flex justify-center">
                   <div class="sz-quick-edit-layout inline-flex min-w-fit items-start gap-2">
-                    <div class="sz-quick-edit-slot sz-quick-edit-slot-tail">
+                    <div class="sz-quick-edit-slot">
                       <div class="sz-quick-edit-slot-top">
                         <label v-if="state.quickEditTailOpen" class="block">
                           <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">尾箱</span>
@@ -205,7 +205,7 @@
                       <span v-if="state.quickEditTailOpen" class="sz-quick-edit-operator">+</span>
                     </div>
 
-                    <div class="sz-quick-edit-slot sz-quick-edit-slot-units">
+                    <div class="sz-quick-edit-slot">
                       <div class="sz-quick-edit-slot-top">
                         <label class="block">
                           <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">件/箱</span>
@@ -219,7 +219,7 @@
                       <span class="sz-quick-edit-operator">×</span>
                     </div>
 
-                    <div class="sz-quick-edit-slot sz-quick-edit-slot-boxes">
+                    <div class="sz-quick-edit-slot">
                       <div class="sz-quick-edit-slot-top">
                         <label class="block">
                           <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">箱数</span>
@@ -229,9 +229,9 @@
                       <div class="sz-quick-edit-slot-bottom"><div class="sz-quick-edit-slot-spacer" aria-hidden="true"></div></div>
                     </div>
 
-                    <div class="sz-quick-edit-slot sz-quick-edit-slot-partial">
+                    <div class="sz-quick-edit-slot">
                       <div class="sz-quick-edit-slot-top">
-                        <div v-if="state.quickEditPartialOpen" class="sz-quick-edit-token sz-quick-edit-partial-token inline-flex items-end gap-2">
+                        <div v-if="state.quickEditPartialOpen" class="sz-quick-edit-token inline-flex items-end gap-2">
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">符号</span>
                             <select :value="state.quickEditForm && state.quickEditForm.sign || '+'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.sign || '+', '+', 5, 6, 1)" class="sz-quick-edit-input sz-quick-edit-select border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" @change="api.handleQuickEditFieldChange('sign', $event.target.value)">
