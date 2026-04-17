@@ -183,9 +183,8 @@
 
             <template v-else>
               <div class="sz-quick-edit-expression-wrap pb-1">
-                <div class="flex justify-center">
-                  <div class="sz-quick-edit-layout-shell">
-                    <div class="sz-quick-edit-layout inline-flex min-w-fit items-start gap-2">
+                <div class="sz-quick-edit-layout-shell flex justify-center">
+                  <div class="sz-quick-edit-layout inline-flex min-w-fit items-start gap-2">
                     <div class="sz-quick-edit-slot sz-quick-edit-slot-tail">
                       <div class="sz-quick-edit-slot-top">
                         <label v-if="state.quickEditTailOpen" class="block">
@@ -229,9 +228,7 @@
                       </div>
                       <div class="sz-quick-edit-slot-bottom"><div class="sz-quick-edit-slot-spacer" aria-hidden="true"></div></div>
                     </div>
-                    </div>
 
-                    <div class="sz-quick-edit-partial-shell">
                     <div class="sz-quick-edit-slot sz-quick-edit-slot-partial">
                       <div class="sz-quick-edit-slot-top">
                         <div v-if="state.quickEditPartialOpen" class="sz-quick-edit-token sz-quick-edit-partial-token inline-flex items-end gap-2">
@@ -244,7 +241,7 @@
                           </label>
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
-                            <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :list="'quick-edit-fraction-options'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
+                            <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :list="'quick-edit-fraction-options'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input sz-quick-edit-fraction-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
                             <datalist id="quick-edit-fraction-options">
                               <option v-for="option in fractionOptions" :key="'fraction-option::' + option" :value="option">{{ option }}</option>
                             </datalist>
@@ -268,8 +265,6 @@
                         <button v-if="state.quickEditPartialOpen" aria-label="Retirer bloc partiel" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('partial')"><span class="material-symbols-outlined !text-[15px]">remove</span></button>
                         <div v-else class="sz-quick-edit-slot-spacer" aria-hidden="true"></div>
                       </div>
-                    </div>
-                    </div>
                     </div>
                   </div>
                 </div>
