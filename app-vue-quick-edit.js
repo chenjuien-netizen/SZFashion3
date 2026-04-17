@@ -183,9 +183,8 @@
 
             <template v-else>
               <div class="sz-quick-edit-expression-wrap pb-1">
-                <div class="flex justify-center">
-                  <div class="sz-quick-edit-layout-shell">
-                    <div class="sz-quick-edit-layout inline-flex min-w-fit items-start gap-2">
+                <div class="sz-quick-edit-layout-shell flex justify-center">
+                  <div class="sz-quick-edit-layout inline-flex min-w-fit items-start gap-2">
                     <div class="sz-quick-edit-slot sz-quick-edit-slot-tail">
                       <div class="sz-quick-edit-slot-top">
                         <label v-if="state.quickEditTailOpen" class="block">
@@ -229,9 +228,7 @@
                       </div>
                       <div class="sz-quick-edit-slot-bottom"><div class="sz-quick-edit-slot-spacer" aria-hidden="true"></div></div>
                     </div>
-                    </div>
 
-                    <div class="sz-quick-edit-partial-shell">
                     <div class="sz-quick-edit-slot sz-quick-edit-slot-partial">
                       <div class="sz-quick-edit-slot-top">
                         <div v-if="state.quickEditPartialOpen" class="sz-quick-edit-token sz-quick-edit-partial-token inline-flex items-end gap-2">
@@ -268,8 +265,6 @@
                         <button v-if="state.quickEditPartialOpen" aria-label="Retirer bloc partiel" class="sz-quick-edit-chip sz-quick-edit-chip-icon border border-outline-variant/30 text-on-surface-variant" type="button" @click="toggleOptional('partial')"><span class="material-symbols-outlined !text-[15px]">remove</span></button>
                         <div v-else class="sz-quick-edit-slot-spacer" aria-hidden="true"></div>
                       </div>
-                    </div>
-                    </div>
                     </div>
                   </div>
                 </div>
