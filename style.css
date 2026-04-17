@@ -188,7 +188,18 @@ a,
     width: 1rem !important;
   }
 
+  .sz-quick-edit-expression-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .sz-quick-edit-layout-shell {
+    justify-content: flex-start;
+  }
+
   .sz-quick-edit-layout {
+    margin-left: 0;
+    margin-right: 0;
     gap: 0.5rem;
   }
 
