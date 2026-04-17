@@ -4,9 +4,41 @@
   const api = window.__szAppApi;
   if (!vue || !state || !api) return;
   window.SZVueModules = window.SZVueModules || {};
+  function ensurePageHeaderComponent() {
+    if (window.SZVueModules.PageHeader) return window.SZVueModules.PageHeader;
+    const PageHeader = {
+      name: "PageHeader",
+      props: {
+        title: { type: String, default: "" },
+        subtitle: { type: String, default: "" },
+        showBack: { type: Boolean, default: false }
+      },
+      emits: ["back"],
+      template: `
+        <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
+          <div class="flex min-w-0 items-center gap-3">
+            <button v-if="showBack" aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" type="button" @click="$emit('back')">
+              <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div class="min-w-0">
+              <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">{{ title }}</h1>
+              <p v-if="subtitle" class="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">{{ subtitle }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <slot name="actions"></slot>
+          </div>
+        </header>
+      `
+    };
+    window.SZVueModules.PageHeader = PageHeader;
+    return PageHeader;
+  }
+  const PageHeader = ensurePageHeaderComponent();
 
   const DetailScreen = {
     name: "DetailScreen",
+    components: { PageHeader: PageHeader },
     setup() {
       const detailVm = vue.computed(function() {
         return api.getDetailViewModel(state.detailReference);
@@ -51,18 +83,11 @@
     template: `
       <main class="flex h-full min-h-0 flex-col overflow-hidden">
         <div class="sticky top-0 z-40 shrink-0 bg-background">
-          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
-            <div class="flex min-w-0 items-center gap-3">
-              <button aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" type="button" @click="goBack">
-                <span class="material-symbols-outlined">arrow_back</span>
-              </button>
-              <div class="min-w-0">
-                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">{{ item ? (item.reference || 'Fiche produit') : 'Fiche produit' }}</h1>
-                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant"></p>
-              </div>
-            </div>
-            <button v-if="item" class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" type="button" @click="openQuickEdit">Modifier</button>
-          </header>
+          <PageHeader :title="item ? (item.reference || 'Fiche produit') : 'Fiche produit'" :subtitle="item ? 'Fiche produit' : ''" :showBack="true" @back="goBack">
+            <template #actions>
+              <button v-if="item" class="bg-surface-tint px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-on-primary transition-colors duration-150 hover:bg-primary-dim" type="button" @click="openQuickEdit">Modifier</button>
+            </template>
+          </PageHeader>
         </div>
 
         <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-surface px-4 py-4">

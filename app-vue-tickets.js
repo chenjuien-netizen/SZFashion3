@@ -4,9 +4,41 @@
   const api = window.__szAppApi;
   if (!vue || !state || !api) return;
   window.SZVueModules = window.SZVueModules || {};
+  function ensurePageHeaderComponent() {
+    if (window.SZVueModules.PageHeader) return window.SZVueModules.PageHeader;
+    const PageHeader = {
+      name: "PageHeader",
+      props: {
+        title: { type: String, default: "" },
+        subtitle: { type: String, default: "" },
+        showBack: { type: Boolean, default: false }
+      },
+      emits: ["back"],
+      template: `
+        <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
+          <div class="flex min-w-0 items-center gap-3">
+            <button v-if="showBack" aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" type="button" @click="$emit('back')">
+              <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div class="min-w-0">
+              <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">{{ title }}</h1>
+              <p v-if="subtitle" class="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">{{ subtitle }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <slot name="actions"></slot>
+          </div>
+        </header>
+      `
+    };
+    window.SZVueModules.PageHeader = PageHeader;
+    return PageHeader;
+  }
+  const PageHeader = ensurePageHeaderComponent();
 
   const TicketsScreen = {
     name: "TicketsScreen",
+    components: { PageHeader: PageHeader },
     setup() {
       const filteredTickets = vue.computed(function() {
         return api.filterPickupTickets(state.ticketsQuery, state.ticketsPeriod, state.ticketsStatusFilter);
@@ -29,8 +61,18 @@
       const ticketReferenceSuggestions = vue.computed(function() {
         return api.getReferenceSuggestions(state.ticketCreationDraft && state.ticketCreationDraft.quickReference, { limit: 8 });
       });
+      const headerSubtitle = vue.computed(function() {
+        return state.ticketsSubview === "new" ? "Nouveau ticket" : (state.ticketsSubview === "detail" ? "Détail ticket" : "Sorties entrepôt");
+      });
+      const showBackButton = vue.computed(function() {
+        return state.ticketsSubview === "new" || state.ticketsSubview === "detail";
+      });
       function openTicket(ticketId) {
         api.navigateTo("tickets", { ref: ticketId });
+      }
+
+      function goBack() {
+        api.navigateTo("tickets");
       }
 
       function togglePreview(ticketId) {
@@ -90,9 +132,12 @@
       return {
         state: state,
         api: api,
+        headerSubtitle: headerSubtitle,
+        showBackButton: showBackButton,
         filteredTickets: filteredTickets,
         groupedTickets: groupedTickets,
         selectedVm: selectedVm,
+        goBack: goBack,
         openTicket: openTicket,
         togglePreview: togglePreview,
         removeDraftLine: removeDraftLine,
@@ -113,21 +158,12 @@
     template: `
       <main id="pickupTicketsContentWrap" class="relative flex h-full min-h-0 flex-col overflow-hidden">
         <div class="sticky top-0 z-40 shrink-0 bg-background">
-          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
-            <div class="flex min-w-0 items-center gap-3">
-              <button aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" type="button" @click="api.navigateTo('tickets')">
-                <span class="material-symbols-outlined">arrow_back</span>
-              </button>
-              <div class="min-w-0">
-                <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">Tickets sortie</h1>
-                <p class="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">{{ state.ticketsSubview === 'new' ? 'Nouveau ticket' : (state.ticketsSubview === 'detail' ? 'Détail ticket' : 'Sorties entrepôt') }}</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
+          <PageHeader title="Tickets sortie" :subtitle="headerSubtitle" :showBack="showBackButton" @back="goBack">
+            <template #actions>
               <button v-if="state.ticketsSubview === 'list'" class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="api.navigateTo('tickets_new')">Nouveau ticket</button>
               <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="api.loadPickupTicketData(state.pickupTicket, { includeDetail: Boolean(state.pickupTicket), forceBootstrap: true })">Rafraîchir</button>
-            </div>
-          </header>
+            </template>
+          </PageHeader>
         </div>
 
         <section class="inventory-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-outline-variant/20">

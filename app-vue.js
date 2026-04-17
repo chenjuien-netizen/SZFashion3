@@ -31,6 +31,39 @@
 
   window.SZVueModules = window.SZVueModules || {};
 
+  function ensurePageHeaderComponent() {
+    if (window.SZVueModules.PageHeader) return window.SZVueModules.PageHeader;
+    const PageHeader = {
+      name: "PageHeader",
+      props: {
+        title: { type: String, default: "" },
+        subtitle: { type: String, default: "" },
+        showBack: { type: Boolean, default: false }
+      },
+      emits: ["back"],
+      template: `
+        <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
+          <div class="flex min-w-0 items-center gap-3">
+            <button v-if="showBack" aria-label="Retour" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" type="button" @click="$emit('back')">
+              <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div class="min-w-0">
+              <h1 class="truncate text-lg font-extrabold uppercase tracking-tight text-slate-900">{{ title }}</h1>
+              <p v-if="subtitle" class="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">{{ subtitle }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <slot name="actions"></slot>
+          </div>
+        </header>
+      `
+    };
+    window.SZVueModules.PageHeader = PageHeader;
+    return PageHeader;
+  }
+
+  const PageHeader = ensurePageHeaderComponent();
+
   const InventoryCard = {
     name: "InventoryCard",
     props: {
@@ -101,7 +134,7 @@
 
   const InventoryScreen = {
     name: "InventoryScreen",
-    components: { InventoryCard: InventoryCard },
+    components: { InventoryCard: InventoryCard, PageHeader: PageHeader },
     setup() {
       const online = vue.ref(navigator.onLine);
       const filteredItems = vue.computed(function() {
@@ -173,19 +206,14 @@
     template: `
       <main class="flex h-full min-h-0 flex-col overflow-hidden">
         <div class="sticky top-0 z-40 shrink-0 bg-background">
-          <header class="flex h-14 items-center justify-between border-b border-slate-200 bg-slate-50 px-4">
-            <div class="flex items-center gap-3">
-              <div>
-                <h1 class="text-lg font-extrabold uppercase tracking-tight text-slate-900">SZFASHION</h1>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
+          <PageHeader title="SZFASHION">
+            <template #actions>
               <button class="border border-outline-variant/30 bg-surface-container-lowest px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="api.navigateTo('imports')">Import refs</button>
               <button aria-label="Rafraîchir" class="rounded-full p-1 text-slate-700 transition-colors duration-150 hover:bg-slate-100" type="button" @click="api.refreshRemoteSnapshot({ force: false })">
                 <span class="material-symbols-outlined">refresh</span>
               </button>
-            </div>
-          </header>
+            </template>
+          </PageHeader>
           <section class="border-b border-outline-variant/20 bg-surface-container-low px-3 py-1.5 shadow-ledger">
             <div class="flex items-center gap-2">
               <span class="material-symbols-outlined text-on-surface-variant !text-[16px]">search</span>
