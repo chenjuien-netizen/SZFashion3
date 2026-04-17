@@ -28,8 +28,6 @@
           : 0;
         return api.buildQuickExitPacksHintMarkup(currentItem && currentItem.colisage, packsPerBox);
       });
-      const fractionDropdownOpen = vue.ref(false);
-      const fractionInputRef = vue.ref(null);
       const fractionOptions = vue.computed(function() {
         const dynamic = currentEditState.value && Array.isArray(currentEditState.value.dynamicFractions)
           ? currentEditState.value.dynamicFractions
@@ -94,48 +92,6 @@
         api.toggleQuickEditSegment(segment);
       }
 
-      function openQuickExitDropdown(segmentId) {
-        api.updateQuickExitSegmentConfig(segmentId, "dropdownOpen", true);
-        api.updateQuickExitSegmentConfig(segmentId, "highlightedIndex", -1);
-      }
-
-      function closeQuickExitDropdown(segmentId) {
-        api.updateQuickExitSegmentConfig(segmentId, "dropdownOpen", false);
-        api.updateQuickExitSegmentConfig(segmentId, "highlightedIndex", -1);
-      }
-
-      function handleQuickExitBlur(segmentId) {
-        window.setTimeout(function() {
-          closeQuickExitDropdown(segmentId);
-        }, 0);
-      }
-
-      function fractionSuggestions() {
-        return fractionOptions.value;
-      }
-
-      function openFractionDropdown() {
-        fractionDropdownOpen.value = fractionSuggestions().length > 0;
-      }
-
-      function closeFractionDropdown() {
-        fractionDropdownOpen.value = false;
-      }
-
-      function handleFractionBlur() {
-        window.setTimeout(function() {
-          closeFractionDropdown();
-          api.normalizeQuickEditFieldOnBlur("fractionText");
-        }, 0);
-      }
-
-      function applyFractionSuggestion(value) {
-        if (!value) return;
-        api.handleQuickEditFieldChange("fractionText", value);
-        closeFractionDropdown();
-        if (fractionInputRef.value && fractionInputRef.value.focus) fractionInputRef.value.focus({ preventScroll: true });
-      }
-
       return {
         state: state,
         api: api,
@@ -149,18 +105,9 @@
         segmentConfig: segmentConfig,
         updateSegmentEntry: updateSegmentEntry,
         applySuggestion: applySuggestion,
-        openQuickExitDropdown: openQuickExitDropdown,
-        closeQuickExitDropdown: closeQuickExitDropdown,
-        handleQuickExitBlur: handleQuickExitBlur,
         fieldStyle: fieldStyle,
         quickExitInputStyle: quickExitInputStyle,
-        fractionOptions: fractionOptions,
-        fractionDropdownOpen: fractionDropdownOpen,
-        fractionInputRef: fractionInputRef,
-        openFractionDropdown: openFractionDropdown,
-        closeFractionDropdown: closeFractionDropdown,
-        handleFractionBlur: handleFractionBlur,
-        applyFractionSuggestion: applyFractionSuggestion
+        fractionOptions: fractionOptions
       };
     },
     template: `
@@ -206,23 +153,21 @@
                 <div class="flex justify-center">
                 <div class="inline-flex min-w-fit justify-center gap-3">
                 <div v-for="segment in segments.filter(s => isSelected(s.id))" :key="segment.id" class="sz-quick-exit-card sz-quick-exit-segment rounded border border-outline-variant/20 bg-surface-container-low px-3 py-3">
-                  <div class="relative mt-1 flex justify-center">
+                  <div class="mt-1 flex justify-center">
                     <input
                       :value="segmentConfig(segment.id).entry || ''"
+                      :list="'quick-exit-suggestions-' + segment.id"
                       :style="quickExitInputStyle(segment.id, segmentConfig(segment.id).entry || '')"
                       class="sz-quick-exit-input border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[12px] text-on-surface"
                       inputmode="numeric"
                       pattern="[0-9/]*"
                       :placeholder="segment.id === 'tail' ? '(x)/3包/1/2' : '2箱/5包/1/2'"
                       type="text"
-                      @focus="openQuickExitDropdown(segment.id)"
-                      @input="updateSegmentEntry(segment.id, $event.target.value); openQuickExitDropdown(segment.id)"
-                      @blur="handleQuickExitBlur(segment.id)"
-                      @keydown.escape.prevent="closeQuickExitDropdown(segment.id)"
+                      @input="updateSegmentEntry(segment.id, $event.target.value)"
                     />
-                    <div v-if="segmentConfig(segment.id).dropdownOpen && api.buildQuickExitSuggestions(item, segment, segmentConfig(segment.id).entry || '').length" class="sz-input-dropdown">
-                      <button v-for="suggestion in api.buildQuickExitSuggestions(item, segment, segmentConfig(segment.id).entry || '')" :key="'quick-exit-suggestion::' + segment.id + '::' + suggestion" class="sz-input-dropdown-option" type="button" @mousedown.prevent @click="applySuggestion(segment.id, suggestion)">{{ suggestion }}</button>
-                    </div>
+                    <datalist :id="'quick-exit-suggestions-' + segment.id">
+                      <option v-for="suggestion in api.buildQuickExitSuggestions(item, segment, segmentConfig(segment.id).entry || '')" :key="'quick-exit-suggestion::' + segment.id + '::' + suggestion" :value="suggestion">{{ suggestion }}</option>
+                    </datalist>
                   </div>
                   <div v-if="state.quickExitSegmentErrors && state.quickExitSegmentErrors[segment.id]" class="mt-2 text-center text-[11px] font-medium text-error">{{ state.quickExitSegmentErrors[segment.id] }}</div>
                 </div>
@@ -296,12 +241,10 @@
                           </label>
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
-                            <div class="relative inline-flex items-center">
-                              <input ref="fractionInputRef" :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @focus="openFractionDropdown" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value); openFractionDropdown()" @blur="handleFractionBlur" @keydown.escape.prevent="closeFractionDropdown()" />
-                              <div v-if="fractionDropdownOpen && fractionOptions.length" class="sz-input-dropdown">
-                                <button v-for="option in fractionOptions" :key="'fraction-option::' + option" class="sz-input-dropdown-option" type="button" @mousedown.prevent @click="applyFractionSuggestion(option)">{{ option }}</button>
-                              </div>
-                            </div>
+                            <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :list="'quick-edit-fraction-options'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
+                            <datalist id="quick-edit-fraction-options">
+                              <option v-for="option in fractionOptions" :key="'fraction-option::' + option" :value="option">{{ option }}</option>
+                            </datalist>
                           </label>
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">当前缺包</span>
