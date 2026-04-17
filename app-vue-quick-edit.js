@@ -29,7 +29,12 @@
         return api.buildQuickExitPacksHintMarkup(currentItem && currentItem.colisage, packsPerBox);
       });
       const fractionOptions = vue.computed(function() {
-        return api.getQuickEditFractionOptions();
+        const entry = String(state.quickEditForm && state.quickEditForm.fractionText || "").trim();
+        if (!entry) return [];
+        const lowerEntry = entry.toLowerCase();
+        return api.getQuickEditFractionOptions().filter(function(option) {
+          return String(option || "").toLowerCase().indexOf(lowerEntry) === 0;
+        });
       });
       function measureWidth(value, fallbackValue, minChars, maxChars, extraChars) {
         const source = String(value || fallbackValue || "").trim();
