@@ -253,7 +253,7 @@
                                 <option value="+">+</option>
                                 <option value="-">-</option>
                               </select>
-                              <input :value="state.quickEditForm && state.quickEditForm.packNotationCount || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.packNotationCount || '', '5包', 6, 9, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" placeholder="5包" type="text" @input="api.handleQuickEditFieldChange('packNotationCount', $event.target.value)" />
+                              <input :value="state.quickEditForm && state.quickEditForm.packNotationCount || ''" :style="fieldStyle(state.quickEditForm && state.quickEditForm.packNotationCount || '', '5包', 6, 9, 0)" class="sz-quick-edit-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" placeholder="5包" type="text" @focus="api.handleQuickEditFieldFocus('packNotationCount')" @input="api.handleQuickEditFieldChange('packNotationCount', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('packNotationCount')" />
                             </div>
                           </label>
                         </div>
