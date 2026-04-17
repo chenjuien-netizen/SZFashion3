@@ -2867,7 +2867,6 @@ function buildQuickExitSuggestions_(item, segment, entry) {
   if (!currentItem || !segment) return [];
   const rawEntry = String(entry || "");
   const normalized = rawEntry.trim();
-  if (!normalized) return [];
   const normalizedNumeric = /^\d+$/.test(normalized) ? Math.max(0, Math.trunc(Number(normalized) || 0)) : 0;
   const tailPiecesText = segment.id === "tail" ? String(Math.max(0, Math.trunc(Number(segment.availablePieces) || 0))) : "";
   const isTailNumericPrefixMatch = segment.id === "tail" && !!segment.label && normalizedNumeric > 0 && tailPiecesText.indexOf(String(normalizedNumeric)) === 0;
