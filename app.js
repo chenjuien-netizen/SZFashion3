@@ -1101,6 +1101,11 @@ function formatUnitsPerBoxDisplay(value) {
   return safeValue > 0 ? (safeValue + "p") : "";
 }
 
+function formatPackNotationCountDisplay(value) {
+  const safeValue = Math.max(0, toInt(value));
+  return safeValue > 0 ? (safeValue + "包") : "";
+}
+
 function parseStyledIntegerInput(value, options) {
   const text = String(value == null ? "" : value).trim();
   if (!text) return { valid: true, value: 0 };
@@ -2862,6 +2867,7 @@ function buildQuickExitSuggestions_(item, segment, entry) {
   if (!currentItem || !segment) return [];
   const rawEntry = String(entry || "");
   const normalized = rawEntry.trim();
+  if (!normalized) return [];
   const normalizedNumeric = /^\d+$/.test(normalized) ? Math.max(0, Math.trunc(Number(normalized) || 0)) : 0;
   const tailPiecesText = segment.id === "tail" ? String(Math.max(0, Math.trunc(Number(segment.availablePieces) || 0))) : "";
   const isTailNumericPrefixMatch = segment.id === "tail" && !!segment.label && normalizedNumeric > 0 && tailPiecesText.indexOf(String(normalizedNumeric)) === 0;
@@ -3381,6 +3387,8 @@ function handleQuickEditFieldFocus(field) {
   } else if (field === "unitsPerBoxInput") {
     const parsed = parseStyledIntegerInput(state.quickEditForm.unitsPerBoxInput, { mode: "units" });
     if (parsed.valid) state.quickEditForm.unitsPerBoxInput = parsed.value > 0 ? String(parsed.value) : "";
+  } else if (field === "packNotationCount") {
+    state.quickEditForm.packNotationCount = sanitizeIntegerInput(state.quickEditForm.packNotationCount);
   }
   renderQuickEdit();
 }
@@ -3393,6 +3401,8 @@ function normalizeQuickEditFieldOnBlur(field) {
   } else if (field === "unitsPerBoxInput") {
     const parsed = parseStyledIntegerInput(state.quickEditForm.unitsPerBoxInput, { mode: "units" });
     if (parsed.valid) state.quickEditForm.unitsPerBoxInput = formatUnitsPerBoxDisplay(parsed.value);
+  } else if (field === "packNotationCount") {
+    state.quickEditForm.packNotationCount = formatPackNotationCountDisplay(state.quickEditForm.packNotationCount);
   } else if (field === "fractionText") {
     state.quickEditForm.fractionText = sanitizeFractionText(state.quickEditForm.fractionText);
   }

@@ -18,12 +18,17 @@ a,
 
 .sz-quick-edit-expression-wrap {
   -webkit-overflow-scrolling: touch;
+  overflow-x: visible;
 }
 
 .sz-quick-edit-layout {
   margin-left: auto;
   margin-right: auto;
   padding-bottom: 0.125rem;
+}
+
+.sz-quick-edit-layout-shell {
+  width: 100%;
 }
 
 .sz-quick-edit-layout > div,
@@ -34,6 +39,11 @@ a,
 
 .sz-quick-edit-token {
   flex: 0 0 auto;
+}
+
+.sz-quick-edit-partial-token {
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .sz-quick-edit-slot {
@@ -88,6 +98,10 @@ a,
   min-width: 0;
   box-sizing: border-box;
   overflow: visible;
+}
+
+.sz-datalist-input {
+  padding-right: 2rem !important;
 }
 
 .sz-quick-edit-operator {
@@ -189,11 +203,16 @@ a,
   }
 
   .sz-quick-edit-layout {
-    gap: 0.5rem;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem 0.5rem;
   }
 
   .sz-quick-edit-inline-operator {
-    padding-top: 1.05rem;
+    display: none;
   }
 
   .sz-quick-edit-add-inline {
@@ -202,12 +221,61 @@ a,
 
   .sz-quick-edit-token {
     gap: 0.5rem;
+    width: 100%;
   }
 
   .sz-quick-edit-layout > div,
   .sz-quick-edit-token > label,
   .sz-quick-edit-token > div {
-    flex-shrink: 0;
+    flex-shrink: 1;
+  }
+
+  .sz-quick-edit-slot {
+    flex: 1 1 9.5rem;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .sz-quick-edit-slot-top,
+  .sz-quick-edit-slot-bottom {
+    width: 100%;
+  }
+
+  .sz-quick-edit-slot-top > .block,
+  .sz-quick-edit-slot-top > .sz-quick-edit-add-inline,
+  .sz-quick-edit-partial-token > .block {
+    width: 100%;
+  }
+
+  .sz-quick-edit-slot-tail,
+  .sz-quick-edit-slot-units,
+  .sz-quick-edit-slot-boxes {
+    flex-basis: min(12rem, calc(50% - 0.25rem));
+  }
+
+  .sz-quick-edit-slot-partial {
+    flex-basis: 100%;
+  }
+
+  .sz-quick-edit-partial-token {
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .sz-quick-edit-partial-token > label {
+    flex: 1 1 8rem;
+    min-width: 0;
+  }
+
+  .sz-quick-edit-pack-notation {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sz-quick-edit-pack-notation > *:last-child {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .sz-quick-exit-segment {
