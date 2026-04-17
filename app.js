@@ -57,7 +57,7 @@ const baseState = {
   pickupTicket: null,
   pickupTicketData: null,
   pickupTicketsLoaded: false,
-  pickupTicketsBootstrapReady: false,
+  pickupTicketsBootstrapState: "idle",
   pickupTicketLoading: false,
   pickupTicketMissingConfirmed: false,
   pickupTicketCreatePending: false,
@@ -378,6 +378,11 @@ function refreshRemotePickupTickets(options) {
 function refreshRemotePickupTicketsBootstrap(options) {
   if (!isRemoteReadAllowed(options) || !remoteDataSource.fetchPickupTicketsBootstrap) {
     if (navigator.onLine === false) state.syncStatus = "offline";
+    if (!remoteDataSource || !remoteDataSource.fetchPickupTicketsBootstrap) {
+      state.pickupTicketsBootstrapState = "ready";
+    } else if (navigator.onLine === false) {
+      state.pickupTicketsBootstrapState = "error";
+    }
     bootLog_("remote tickets bootstrap skipped", {
       online: navigator.onLine,
       configured: Boolean(remoteDataSource && remoteDataSource.fetchPickupTicketsBootstrap)
@@ -386,6 +391,7 @@ function refreshRemotePickupTicketsBootstrap(options) {
   }
   if (remotePickupTicketsRefreshPromise) return remotePickupTicketsRefreshPromise;
 
+  state.pickupTicketsBootstrapState = "loading";
   remotePickupTicketsRefreshPromise = remoteDataSource.fetchPickupTicketsBootstrap().then(function(payload) {
     if (dataSource && dataSource.savePickupTicketsBootstrap) {
       dataSource.savePickupTicketsBootstrap(payload);
@@ -398,7 +404,7 @@ function refreshRemotePickupTicketsBootstrap(options) {
         });
       }
     }
-    state.pickupTicketsBootstrapReady = true;
+    state.pickupTicketsBootstrapState = "ready";
     bootLog_("after remote tickets bootstrap", {
       ticketsCount: Array.isArray(state.pickupTickets) ? state.pickupTickets.length : 0,
       pendingMutations: Array.isArray(state.pendingMutations) ? state.pendingMutations.length : 0,
@@ -408,7 +414,7 @@ function refreshRemotePickupTicketsBootstrap(options) {
     return true;
   }).catch(function(error) {
     console.warn("Pickup tickets bootstrap refresh failed", error);
-    state.pickupTicketsBootstrapReady = true;
+    state.pickupTicketsBootstrapState = "error";
     bootLog_("remote tickets bootstrap failed", {
       message: error && error.message ? error.message : String(error || ""),
       syncStatus: navigator.onLine ? "error" : "offline"
@@ -5681,32 +5687,60 @@ function loadReferenceImportData(batchId) {
 
 function loadPickupTicketData(ticketId, options) {
   const includeDetail = !(options && options.includeDetail === false);
+  const forceBootstrap = !!(options && options.forceBootstrap);
   const normalizedTicketId = String(ticketId || "").trim();
   applyLocalPickupTicketsState(ticketId);
   state.pickupTicketMissingConfirmed = false;
-  const localViewModel = normalizedTicketId ? getPickupTicketViewModel(normalizedTicketId) : null;
+  let localViewModel = normalizedTicketId ? getPickupTicketViewModel(normalizedTicketId) : null;
   if (localViewModel && localViewModel.hasDetail) {
     seedPickupTicketLineDrafts(normalizedTicketId);
   }
-  state.pickupTicketLoading = Boolean(normalizedTicketId && includeDetail && !(localViewModel && localViewModel.hasDetail) && !isOptimisticPickupTicketId(normalizedTicketId));
+  const bootstrapState = String(state.pickupTicketsBootstrapState || "idle");
+  const needsDetail = Boolean(normalizedTicketId && includeDetail && !(localViewModel && localViewModel.hasDetail) && !isOptimisticPickupTicketId(normalizedTicketId));
+  state.pickupTicketLoading = Boolean(needsDetail && bootstrapState !== "ready");
   renderPickupTicketsPage();
   if (!remoteDataSource || !remoteDataSource.isConfigured || !remoteDataSource.isConfigured()) {
+    state.pickupTicketsBootstrapState = "ready";
+    state.pickupTicketLoading = false;
     return Promise.resolve(false);
   }
-  const tasks = [];
-  if (includeDetail || !state.pickupTicketsLoaded || !Array.isArray(state.pickupTickets) || !state.pickupTickets.length) {
-    tasks.push(refreshRemotePickupTicketsBootstrap({ silent: true }));
-  } else {
-    tasks.push(refreshRemotePickupTickets({ silent: true }));
-  }
-  if (normalizedTicketId && includeDetail) {
-    if (localViewModel && localViewModel.hasDetail) {
-      state.pickupTicketLoading = false;
-    }
-  } else {
+  const needsBootstrap = forceBootstrap
+    || bootstrapState === "idle"
+    || (!state.pickupTicketsLoaded || !Array.isArray(state.pickupTickets) || !state.pickupTickets.length);
+  const bootstrapTask = needsBootstrap ? refreshRemotePickupTicketsBootstrap({ silent: true }) : Promise.resolve(false);
+  if (!normalizedTicketId || !includeDetail || isOptimisticPickupTicketId(normalizedTicketId)) {
     state.pickupTicketLoading = false;
+    return bootstrapTask.then(function() {
+      renderPickupTicketsPage();
+      return true;
+    });
   }
-  return Promise.all(tasks).then(function() {
+
+  return bootstrapTask.then(function() {
+    applyLocalPickupTicketsState(normalizedTicketId);
+    localViewModel = getPickupTicketViewModel(normalizedTicketId);
+    if (localViewModel && localViewModel.hasDetail) {
+      seedPickupTicketLineDrafts(normalizedTicketId);
+      state.pickupTicketLoading = false;
+      renderPickupTicketsPage();
+      return true;
+    }
+    if (String(state.pickupTicketsBootstrapState || "idle") !== "ready") {
+      state.pickupTicketLoading = String(state.pickupTicketsBootstrapState || "idle") === "loading";
+      renderPickupTicketsPage();
+      return true;
+    }
+    state.pickupTicketLoading = true;
+    renderPickupTicketsPage();
+    return refreshRemotePickupTicket(normalizedTicketId, { silent: true }).then(function(result) {
+      applyLocalPickupTicketsState(normalizedTicketId);
+      const nextViewModel = getPickupTicketViewModel(normalizedTicketId);
+      if (nextViewModel && nextViewModel.hasDetail) seedPickupTicketLineDrafts(normalizedTicketId);
+      state.pickupTicketLoading = false;
+      renderPickupTicketsPage();
+      return result;
+    });
+  }).then(function() {
     renderPickupTicketsPage();
     return true;
   });
@@ -6346,7 +6380,7 @@ function initApp() {
   state.items = Array.isArray(inventoryResult.items) ? inventoryResult.items : [];
   state.historyItems = Array.isArray(historyResult.items) ? historyResult.items : [];
   state.pickupTickets = Array.isArray(pickupTicketsResult.items) ? pickupTicketsResult.items : [];
-  state.pickupTicketsBootstrapReady = !(remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured());
+  state.pickupTicketsBootstrapState = (remoteDataSource && remoteDataSource.isConfigured && remoteDataSource.isConfigured()) ? "idle" : "ready";
   applyDataMeta(inventoryResult.meta);
   bootLog_("after local load", getBootDiagnostics_());
   state.columnCount = getColumnCount();

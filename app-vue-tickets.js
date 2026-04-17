@@ -131,7 +131,7 @@
             </div>
             <div class="flex items-center gap-2">
               <button v-if="state.ticketsSubview === 'list'" class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="api.navigateTo('tickets_new')">Nouveau ticket</button>
-              <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="api.loadPickupTicketData(state.pickupTicket, { includeDetail: Boolean(state.pickupTicket) })">Rafraîchir</button>
+              <button class="border border-outline-variant/30 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors duration-150 hover:bg-surface-container" type="button" @click="api.loadPickupTicketData(state.pickupTicket, { includeDetail: Boolean(state.pickupTicket), forceBootstrap: true })">Rafraîchir</button>
             </div>
           </header>
         </div>
@@ -250,7 +250,8 @@
                   <div v-else class="mt-2 text-[11px] text-on-surface-variant">Aucun événement.</div>
                 </section>
               </template>
-              <div v-else-if="state.pickupTicketMissingConfirmed" class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Ticket introuvable.</div>
+              <div v-else-if="state.pickupTicketMissingConfirmed && state.pickupTicketsBootstrapState === 'ready' && !state.pickupTicketLoading" class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Ticket introuvable.</div>
+              <div v-else-if="state.pickupTicketsBootstrapState === 'error' && !state.pickupTicketLoading" class="border border-outline-variant/20 bg-surface-container-lowest px-4 py-5 text-center text-[12px] text-on-surface-variant">Détail ticket indisponible pour le moment.</div>
               <section v-else class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">
                 <div class="mt-3 flex flex-col gap-2">
                   <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
@@ -261,7 +262,7 @@
             </template>
 
             <template v-else>
-              <template v-if="!state.pickupTicketsBootstrapReady">
+              <template v-if="state.pickupTicketsBootstrapState === 'idle' || state.pickupTicketsBootstrapState === 'loading'">
                 <section class="border border-outline-variant/20 bg-surface-container-lowest p-3 shadow-ledger">
                   <div class="mt-1 flex flex-col gap-2">
                     <div class="h-14 animate-pulse border border-outline-variant/20 bg-surface-container-low"></div>
