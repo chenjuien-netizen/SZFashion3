@@ -2889,9 +2889,17 @@ function buildQuickExitSuggestions_(item, segment, entry) {
   });
   if (segment.id === "tail" && /^\($/.test(normalized) && segment.label) suggestions.unshift(segment.label);
   const lower = normalized.toLowerCase();
+  const normalizedTailPrefix = segment.id === "tail"
+    ? lower.replace(/[()]/g, "")
+    : "";
   return dedupeQuickExitSuggestions_(suggestions).filter(function(suggestion) {
     if (!normalized) return true;
     if (isTailNumericPrefixMatch && suggestion === segment.label) return true;
+    if (segment.id === "tail" && normalizedTailPrefix) {
+      const tailSuggestionLower = String(suggestion || "").toLowerCase();
+      const tailSuggestionCompact = tailSuggestionLower.replace(/[()]/g, "");
+      if (tailSuggestionCompact.indexOf(normalizedTailPrefix) === 0) return true;
+    }
     return suggestion.toLowerCase().indexOf(lower) === 0;
   }).filter(function(suggestion) {
     const result = parseQuickExitSegmentEntry_(currentItem, segment, { entry: suggestion });
