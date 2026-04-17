@@ -18,12 +18,28 @@ a,
 
 .sz-quick-edit-expression-wrap {
   -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
 }
 
 .sz-quick-edit-layout {
   margin-left: auto;
   margin-right: auto;
   padding-bottom: 0.125rem;
+}
+
+.sz-quick-edit-layout-shell {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.sz-quick-edit-partial-shell {
+  display: inline-flex;
+  flex: 0 0 auto;
 }
 
 .sz-quick-edit-layout > div,
@@ -34,6 +50,11 @@ a,
 
 .sz-quick-edit-token {
   flex: 0 0 auto;
+}
+
+.sz-quick-edit-partial-token {
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .sz-quick-edit-slot {
@@ -186,6 +207,75 @@ a,
   #quickEditTailRemoveJoinSlot,
   #quickEditMultiplyRemoveSpacerSlot {
     width: 1rem !important;
+  }
+
+  .sz-quick-edit-expression-wrap {
+    overflow-x: auto;
+  }
+
+  .sz-quick-edit-layout {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .sz-quick-edit-layout-shell {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .sz-quick-edit-partial-shell {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sz-quick-edit-add-inline {
+    min-height: 4rem;
+  }
+
+  .sz-quick-edit-token {
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .sz-quick-edit-slot-partial {
+    width: 100%;
+    min-width: 0;
+    align-items: flex-start;
+  }
+
+  .sz-quick-edit-partial-token {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .sz-quick-edit-partial-token > label {
+    flex: 1 1 8rem;
+    min-width: 0;
+  }
+
+  .sz-quick-edit-slot-partial .sz-quick-edit-slot-top,
+  .sz-quick-edit-slot-partial .sz-quick-edit-slot-bottom {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .sz-quick-edit-pack-notation {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sz-quick-edit-pack-notation > *:last-child {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .sz-quick-exit-segment {
