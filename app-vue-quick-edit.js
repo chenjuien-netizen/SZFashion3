@@ -158,7 +158,7 @@
                       :value="segmentConfig(segment.id).entry || ''"
                       :list="'quick-exit-suggestions-' + segment.id"
                       :style="quickExitInputStyle(segment.id, segmentConfig(segment.id).entry || '')"
-                      class="sz-quick-exit-input sz-datalist-input border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[12px] text-on-surface"
+                      class="sz-quick-exit-input border-outline-variant/30 bg-surface-container-lowest px-2 py-2 text-center text-[12px] text-on-surface"
                       inputmode="numeric"
                       pattern="[0-9/]*"
                       :placeholder="segment.id === 'tail' ? '(x)/3包/1/2' : '2箱/5包/1/2'"
@@ -241,7 +241,7 @@
                           </label>
                           <label class="block">
                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Fraction</span>
-                            <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :list="'quick-edit-fraction-options'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input sz-datalist-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
+                            <input :value="state.quickEditForm && state.quickEditForm.fractionText || ''" :list="'quick-edit-fraction-options'" :style="fieldStyle(state.quickEditForm && state.quickEditForm.fractionText || '', '1/2', 6, 8, 0)" class="sz-quick-edit-input sz-quick-edit-fraction-input border-outline-variant/30 bg-surface-container-low px-2 py-2 text-center text-[16px] leading-tight font-medium text-on-surface md:text-sm" inputmode="numeric" pattern="[0-9/]*" placeholder="1/2" type="text" @input="api.handleQuickEditFieldChange('fractionText', $event.target.value)" @blur="api.normalizeQuickEditFieldOnBlur('fractionText')" />
                             <datalist id="quick-edit-fraction-options">
                               <option v-for="option in fractionOptions" :key="'fraction-option::' + option" :value="option">{{ option }}</option>
                             </datalist>
