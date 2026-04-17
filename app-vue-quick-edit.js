@@ -177,7 +177,7 @@
 
             <template v-else>
               <div class="sz-quick-edit-expression-wrap overflow-x-auto pb-1">
-                <div class="sz-quick-edit-layout-shell flex justify-center">
+                <div class="sz-quick-edit-layout-shell flex justify-start md:justify-center">
                   <div class="sz-quick-edit-layout inline-flex min-w-fit items-start gap-2">
                     <div class="sz-quick-edit-slot">
                       <div class="sz-quick-edit-slot-top">
