@@ -1241,6 +1241,35 @@ function fractionTextFromPieces(pieces, unitsPerBox) {
   return reduced.num + "/" + reduced.den;
 }
 
+function getSimpleAllowedFractionTextForPieces(pieces, unitsPerBox) {
+  const safePieces = Math.max(0, toInt(pieces));
+  const safeUnits = Math.max(0, toInt(unitsPerBox));
+  if (!(safePieces > 0) || !(safeUnits > 0)) return "";
+  const candidates = ["1/2", "1/3", "1/4", "2/3", "2/4", "3/4"];
+  for (let i = 0; i < candidates.length; i += 1) {
+    const fractionText = candidates[i];
+    const fractionPieces = safeUnits * parseFractionValue(fractionText);
+    if (fractionPieces > 0 && Math.round(fractionPieces) === safePieces) return fractionText;
+  }
+  return "";
+}
+
+function getPackFriendlyFractionTextForPieces(pieces, unitsPerBox, colisage) {
+  const safePieces = Math.max(0, toInt(pieces));
+  const safeUnits = Math.max(0, toInt(unitsPerBox));
+  const safeColisage = Math.max(0, toInt(colisage));
+  const packsPerBox = computePacksPerBox(safeUnits, safeColisage);
+  if (!(safePieces > 0) || !(safeUnits > 0) || !(safeColisage > 0) || !(packsPerBox > 0)) return "";
+  if (safePieces >= safeUnits || safePieces % safeColisage !== 0) return "";
+  const packCount = safePieces / safeColisage;
+  return packCount > 0 && packCount < packsPerBox ? (packCount + "/" + packsPerBox) : "";
+}
+
+function getRestrictedFractionTextForPieces(pieces, unitsPerBox, colisage) {
+  return getPackFriendlyFractionTextForPieces(pieces, unitsPerBox, colisage)
+    || getSimpleAllowedFractionTextForPieces(pieces, unitsPerBox);
+}
+
 function buildSimpleStateFromPieces(totalPiecesInput, options) {
   const totalPieces = Math.max(0, Number(totalPiecesInput || 0));
   const unitsPerBox = Math.max(0, toInt(options && options.unitsPerBox));
@@ -1262,6 +1291,35 @@ function buildSimpleStateFromPieces(totalPiecesInput, options) {
     sign: wholeBoxes > 0 ? "+" : "×",
     fractionText: fractionTextFromPieces(remainderPieces, unitsPerBox),
     fractionValue: remainderPieces / unitsPerBox,
+    colisage: colisage,
+    remark: remark
+  });
+}
+
+function buildRestrictedStateFromPieces(totalPiecesInput, options) {
+  const totalPieces = Math.max(0, Number(totalPiecesInput || 0));
+  const unitsPerBox = Math.max(0, toInt(options && options.unitsPerBox));
+  const colisage = Math.max(0, toInt(options && options.colisage));
+  const remark = String(options && options.remark || "").trim();
+  if (!(unitsPerBox > 0)) throw new Error("Sortie rapide impossible sans 件/箱.");
+
+  const wholeBoxes = Math.floor(totalPieces / unitsPerBox);
+  const remainderPieces = Math.max(0, totalPieces - (wholeBoxes * unitsPerBox));
+
+  if (!(remainderPieces > 0)) {
+    return normalizeStateModel({ tail: 0, unitsPerBox: unitsPerBox, itemBoxes: wholeBoxes, sign: "", fractionText: "", fractionValue: 0, colisage: colisage, remark: remark });
+  }
+
+  const fractionText = getRestrictedFractionTextForPieces(remainderPieces, unitsPerBox, colisage);
+  if (!fractionText) return null;
+
+  return normalizeStateModel({
+    tail: 0,
+    unitsPerBox: unitsPerBox,
+    itemBoxes: wholeBoxes > 0 ? wholeBoxes : 1,
+    sign: wholeBoxes > 0 ? "+" : "×",
+    fractionText: fractionText,
+    fractionValue: parseFractionValue(fractionText),
     colisage: colisage,
     remark: remark
   });
@@ -1299,6 +1357,8 @@ function buildPackFriendlyStateFromPieces(totalPiecesInput, options) {
 
 function buildStateFromPieces(totalPiecesInput, options) {
   const reconstructionMode = String(options && options.reconstructionMode || "").trim();
+  const restrictDisplayFractions = !!(options && options.restrictDisplayFractions);
+  if (restrictDisplayFractions) return buildRestrictedStateFromPieces(totalPiecesInput, options);
   return reconstructionMode === "packs"
     ? buildPackFriendlyStateFromPieces(totalPiecesInput, options)
     : buildSimpleStateFromPieces(totalPiecesInput, options);
@@ -2513,7 +2573,8 @@ function buildQuickExitComputedState_(item, options) {
         unitsPerBox: currentItem.unitsPerBox,
         colisage: currentItem.colisage,
         remark: remark,
-        reconstructionMode: result.mode
+        reconstructionMode: result.mode,
+        restrictDisplayFractions: true
       });
       if (!rebuiltMainState) {
         if (strict) {
@@ -2744,16 +2805,10 @@ function buildSharedQuantitySuggestions_(item, entry, options) {
     if (allowPacks) suggestions.unshift(normalizeQuickExitEntry_(normalized));
   } else if (/^\d+件$/.test(normalized)) {
     if (allowPieces) suggestions.unshift(normalizeQuickExitEntry_(normalized));
-  } else if (/^1\/?$/.test(normalized)) {
-    ["1/2", "1/3", "1/4"].forEach(function(fractionText) {
-      if (allowedFractions.indexOf(fractionText) >= 0) suggestions.unshift(fractionText);
+  } else if (/^\d+\/?$/.test(normalized)) {
+    allowedFractions.forEach(function(fractionText) {
+      if (fractionText.indexOf(normalized) === 0) suggestions.unshift(fractionText);
     });
-  } else if (/^2\/?$/.test(normalized)) {
-    ["2/3", "2/4"].forEach(function(fractionText) {
-      if (allowedFractions.indexOf(fractionText) >= 0) suggestions.unshift(fractionText);
-    });
-  } else if (/^3\/?$/.test(normalized) && allowedFractions.indexOf("3/4") >= 0) {
-    suggestions.unshift("3/4");
   }
 
   const lower = normalized.toLowerCase();
@@ -2781,11 +2836,33 @@ function getQuickExitFractionCandidates_(item, segment) {
   if (!currentItem || !segment) return [];
   if (segment.id === "tail") return getAllowedQuickExitFractions_().slice();
   const currentFractionText = sanitizeFractionText(currentItem.fractionText);
-  if (!currentFractionText) return getAllowedQuickExitFractions_().slice();
+  if (!currentFractionText) {
+    const currentMainState = buildQuickExitCurrentMainState_(currentItem, state.quickEditForm && state.quickEditForm.remark);
+    const unitsPerBox = Math.max(0, Math.trunc(Number(currentItem.unitsPerBox) || 0));
+    const colisage = Math.max(0, Math.trunc(Number(currentItem.colisage) || 0));
+    const currentMainPieces = Math.max(0, Math.round(stateModelToPieces(currentMainState)));
+    const remainderPieces = unitsPerBox > 0 ? Math.max(0, currentMainPieces % unitsPerBox) : 0;
+    const packFriendlyText = getPackFriendlyFractionTextForPieces(remainderPieces, unitsPerBox, colisage);
+    if (packFriendlyText) {
+      const packMatch = packFriendlyText.match(/^(\d+)\/(\d+)$/);
+      if (!packMatch) return [];
+      const numerator = Math.max(0, Math.trunc(Number(packMatch[1]) || 0));
+      const denominator = Math.max(0, Math.trunc(Number(packMatch[2]) || 0));
+      const suggestions = [];
+      for (let num = 1; num <= numerator; num += 1) suggestions.push(num + "/" + denominator);
+      return suggestions;
+    }
+    return getAllowedQuickExitFractions_().slice();
+  }
   const match = currentFractionText.match(/^(\d+)\/(\d+)$/);
   if (!match) return [];
   const numerator = Math.max(0, Math.trunc(Number(match[1]) || 0));
   const denominator = Math.max(0, Math.trunc(Number(match[2]) || 0));
+  if (getAllowedQuickExitFractions_().indexOf(currentFractionText) === -1) {
+    const suggestions = [];
+    for (let num = 1; num <= numerator; num += 1) suggestions.push(num + "/" + denominator);
+    return suggestions;
+  }
   return getAllowedQuickExitFractions_().filter(function(fractionText) {
     const parts = fractionText.match(/^(\d+)\/(\d+)$/);
     if (!parts) return false;
@@ -2834,7 +2911,8 @@ function getQuickExitFractionPieces_(item, segment, fractionText) {
     unitsPerBox: currentItem.unitsPerBox,
     colisage: currentItem.colisage,
     remark: state.quickEditForm && state.quickEditForm.remark,
-    reconstructionMode: "fraction"
+    reconstructionMode: "fraction",
+    restrictDisplayFractions: true
   });
   return nextState ? pieces : 0;
 }
@@ -2856,7 +2934,7 @@ function getQuickExitDefaultSuggestions_(item, segment) {
   const packLimit = getQuickExitPackLimit_(currentItem, segment);
   const defaultPackMax = Math.min(packLimit, 3);
   for (let count = 1; count <= defaultPackMax; count++) suggestions.push(count + "包");
-  getAllowedQuickExitFractions_().forEach(function(fractionText) {
+  getQuickExitFractionCandidates_(currentItem, segment).forEach(function(fractionText) {
     if (isQuickExitFractionAllowed_(currentItem, segment, fractionText)) suggestions.push(fractionText);
   });
   return suggestions;
@@ -2883,7 +2961,7 @@ function buildQuickExitSuggestions_(item, segment, entry) {
     boxLimit: segment.id === "main" ? getQuickExitWholeBoxesLimit_(currentItem, segment) : 0,
     packLimit: getQuickExitPackLimit_(currentItem, segment),
     pieceLimit: 0,
-    allowedFractions: getAllowedQuickExitFractions_().filter(function(fractionText) {
+    allowedFractions: getQuickExitFractionCandidates_(currentItem, segment).filter(function(fractionText) {
       return isQuickExitFractionAllowed_(currentItem, segment, fractionText);
     })
   });
