@@ -2886,6 +2886,15 @@ function normalizeQuickExitEntry_(entry) {
   return normalized;
 }
 
+function resolveQuickExitTailShortcutEntry_(segment, rawEntry) {
+  if (!segment || segment.id !== "tail") return rawEntry;
+  const normalized = String(rawEntry || "").trim();
+  if (!/^\d+$/.test(normalized) || !segment.label) return rawEntry;
+  const numeric = String(Math.max(0, Math.trunc(Number(normalized) || 0)));
+  const availablePieces = String(Math.max(0, Math.trunc(Number(segment.availablePieces) || 0)));
+  return numeric === availablePieces ? String(segment.label) : rawEntry;
+}
+
 function getQuickExitFractionPieces_(item, segment, fractionText) {
   const currentItem = item || state.quickEditItem;
   if (!currentItem || !segment) return 0;
@@ -2990,7 +2999,7 @@ function parseQuickExitSegmentEntry_(item, segment, config) {
   if (!currentItem || !segment || !config) return { valid: false, pieces: 0, message: "" };
   const unitsPerBox = Math.max(0, Math.trunc(Number(currentItem.unitsPerBox) || 0));
   const colisage = Math.max(0, Math.trunc(Number(currentItem.colisage) || 0));
-  const rawEntry = normalizeQuickExitEntry_(config.entry);
+  const rawEntry = resolveQuickExitTailShortcutEntry_(segment, normalizeQuickExitEntry_(config.entry));
   if (!rawEntry) {
     return { valid: false, pieces: 0, message: 'Format invalide. Utilise 2箱, 5包, 1/2 ou ' + (segment.id === "tail" ? segment.label : "une valeur explicite") + '.' };
   }
