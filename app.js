@@ -2895,6 +2895,38 @@ function resolveQuickExitTailShortcutEntry_(segment, rawEntry) {
   return numeric === availablePieces ? String(segment.label) : rawEntry;
 }
 
+function handleQuickExitTailEntryFocus_(segmentId) {
+  const segment = getQuickExitSegmentMap_()[segmentId];
+  const config = getQuickExitSelectionConfig_(segmentId);
+  if (!segment || segment.id !== "tail" || !config) return;
+  const entry = String(config.entry || "").trim();
+  const match = entry.match(/^\((\d+)p\)$/i);
+  if (!match) return;
+  setQuickExitSegmentConfig_(segmentId, {
+    entry: String(Math.max(0, Math.trunc(Number(match[1]) || 0))),
+    dropdownOpen: false,
+    highlightedIndex: -1
+  });
+  resetQuickExitErrors_();
+  renderQuickExitSegmentUi_(segmentId);
+  renderQuickExitPreviewUi_();
+}
+
+function normalizeQuickExitTailEntryOnBlur_(segmentId) {
+  const segment = getQuickExitSegmentMap_()[segmentId];
+  const config = getQuickExitSelectionConfig_(segmentId);
+  if (!segment || segment.id !== "tail" || !config) return;
+  const normalizedEntry = resolveQuickExitTailShortcutEntry_(segment, normalizeQuickExitEntry_(config.entry));
+  setQuickExitSegmentConfig_(segmentId, {
+    entry: String(normalizedEntry || ""),
+    dropdownOpen: false,
+    highlightedIndex: -1
+  });
+  resetQuickExitErrors_();
+  renderQuickExitSegmentUi_(segmentId);
+  renderQuickExitPreviewUi_();
+}
+
 function getQuickExitFractionPieces_(item, segment, fractionText) {
   const currentItem = item || state.quickEditItem;
   if (!currentItem || !segment) return 0;
@@ -2974,6 +3006,7 @@ function buildQuickExitSuggestions_(item, segment, entry) {
       return isQuickExitFractionAllowed_(currentItem, segment, fractionText);
     })
   });
+  if (segment.id === "tail" && segment.label && isTailNumericPrefixMatch) suggestions.unshift(segment.label);
   if (segment.id === "tail" && /^\($/.test(normalized) && segment.label) suggestions.unshift(segment.label);
   const lower = normalized.toLowerCase();
   const normalizedTailPrefix = segment.id === "tail"
@@ -6082,6 +6115,8 @@ function registerVueBridge() {
     getQuickExitSelectionConfig: getQuickExitSelectionConfig_,
     updateQuickExitSegmentConfig: updateQuickExitSegmentConfig_,
     setQuickExitSegmentConfig: setQuickExitSegmentConfig_,
+    handleQuickExitTailEntryFocus: handleQuickExitTailEntryFocus_,
+    normalizeQuickExitTailEntryOnBlur: normalizeQuickExitTailEntryOnBlur_,
     buildQuickExitSuggestions: buildQuickExitSuggestions_,
     applyQuickExitSuggestionSelection: applyQuickExitSuggestionSelection_,
     setQuickExitClearSelected: setQuickExitClearSelected_,

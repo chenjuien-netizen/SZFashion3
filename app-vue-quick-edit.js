@@ -157,7 +157,9 @@
                       pattern="[0-9/]*"
                       :placeholder="segment.id === 'tail' ? '(x)/3包/1/2' : '2箱/5包/1/2'"
                       type="text"
+                      @focus="segment.id === 'tail' ? api.handleQuickExitTailEntryFocus(segment.id) : null"
                       @input="updateSegmentEntry(segment.id, $event.target.value)"
+                      @blur="segment.id === 'tail' ? api.normalizeQuickExitTailEntryOnBlur(segment.id) : null"
                     />
                     <datalist :id="'quick-exit-suggestions-' + segment.id">
                       <option v-for="suggestion in api.buildQuickExitSuggestions(item, segment, segmentConfig(segment.id).entry || '')" :key="'quick-exit-suggestion::' + segment.id + '::' + suggestion" :value="suggestion">{{ suggestion }}</option>
