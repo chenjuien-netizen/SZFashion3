@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InventoryRootView: View {
     @State private var model: InventoryScreenModel
+    @State private var filterDraft: InventoryFilterDraft?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(dependencies: AppDependencies) {
@@ -29,10 +30,10 @@ struct InventoryRootView: View {
             } else {
                 NavigationStack {
                     inventoryList
-                        .navigationDestination(for: String.self) { reference in
+                        .navigationDestination(for: InventoryItem.self) { item in
                             ReferenceDetailScreen(
                                 model: ReferenceDetailScreenModel(
-                                    reference: reference,
+                                    reference: item.reference,
                                     repository: dependencies.referenceRepository,
                                     syncMetadataStore: dependencies.syncMetadataStore
                                 )
@@ -44,6 +45,14 @@ struct InventoryRootView: View {
         .task {
             await model.load()
         }
+        .sheet(item: $filterDraft) { draft in
+            InventoryFilterSheet(draft: draft) { sortMode, stockFilter in
+                model.selectedSortMode = sortMode
+                model.stockFilter = stockFilter
+            } onReset: {
+                model.resetFilters()
+            }
+        }
     }
 
     @Environment(AppDependencies.self) private var dependencies
@@ -54,9 +63,10 @@ struct InventoryRootView: View {
                 InventoryRow(item: item)
                     .tag(item.reference)
             } else {
-                NavigationLink(value: item.reference) {
+                NavigationLink(value: item) {
                     InventoryRow(item: item)
                 }
+                .contentShape(Rectangle())
             }
         }
         .overlay {
@@ -73,14 +83,10 @@ struct InventoryRootView: View {
         .searchable(text: $model.searchText, prompt: "Recherche référence / stock")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if model.isRefreshing {
-                    ProgressView()
-                } else {
-                    Button {
-                        Task { await model.refresh() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
+                Button {
+                    filterDraft = InventoryFilterDraft(sortMode: model.selectedSortMode, stockFilter: model.stockFilter)
+                } label: {
+                    Label("Filtrer", systemImage: "line.3.horizontal.decrease.circle")
                 }
             }
         }
@@ -93,28 +99,34 @@ struct InventoryRootView: View {
     }
 }
 
+private struct InventoryFilterDraft: Identifiable {
+    let id = UUID()
+    var sortMode: InventoryScreenModel.SortMode
+    var stockFilter: InventoryScreenModel.StockFilter
+}
+
 private struct InventoryHeader: View {
     let model: InventoryScreenModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(model.summaryText)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            Picker("Tri", selection: Binding(get: { model.selectedSortMode }, set: { model.selectedSortMode = $0 })) {
-                ForEach(InventoryScreenModel.SortMode.allCases) { mode in
-                    Text(mode.label).tag(mode)
+            HStack(alignment: .firstTextBaseline) {
+                Text(model.summaryText)
+                    .font(.footnote.weight(.semibold))
+                Spacer()
+                if model.isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
                 }
             }
-            .pickerStyle(.segmented)
+            .foregroundStyle(.secondary)
 
             HStack {
-                Text("Dernière sync")
+                Text(model.filterSummaryText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(model.lastSyncAt.map(DateFormatters.relativeString(from:)) ?? "Jamais")
+                Text("Sync \(model.lastSyncAt.map(DateFormatters.relativeString(from:)) ?? "jamais")")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }
@@ -122,6 +134,75 @@ private struct InventoryHeader: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(.thinMaterial)
+    }
+}
+
+private struct InventoryFilterSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var sortMode: InventoryScreenModel.SortMode
+    @State private var stockFilter: InventoryScreenModel.StockFilter
+
+    let onApply: (InventoryScreenModel.SortMode, InventoryScreenModel.StockFilter) -> Void
+    let onReset: () -> Void
+
+    init(
+        draft: InventoryFilterDraft,
+        onApply: @escaping (InventoryScreenModel.SortMode, InventoryScreenModel.StockFilter) -> Void,
+        onReset: @escaping () -> Void
+    ) {
+        _sortMode = State(initialValue: draft.sortMode)
+        _stockFilter = State(initialValue: draft.stockFilter)
+        self.onApply = onApply
+        self.onReset = onReset
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Tri") {
+                    Picker("Tri", selection: $sortMode) {
+                        ForEach(InventoryScreenModel.SortMode.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
+
+                Section("Stock") {
+                    Picker("Stock", selection: $stockFilter) {
+                        ForEach(InventoryScreenModel.StockFilter.allCases) { filter in
+                            Text(filter.label).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
+
+                Section {
+                    Button("Réinitialiser", role: .destructive) {
+                        sortMode = .arrival
+                        stockFilter = .all
+                        onReset()
+                        dismiss()
+                    }
+                }
+            }
+            .navigationTitle("Filtrer")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Appliquer") {
+                        onApply(sortMode, stockFilter)
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

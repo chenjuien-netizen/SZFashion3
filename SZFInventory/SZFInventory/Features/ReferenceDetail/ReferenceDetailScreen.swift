@@ -65,19 +65,6 @@ struct ReferenceDetailScreen: View {
                 ContentUnavailableView("Fiche indisponible", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
             }
         }
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                if model.isRefreshing {
-                    ProgressView()
-                } else {
-                    Button {
-                        Task { await model.refresh() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-            }
-        }
         .refreshable {
             await model.refresh()
         }

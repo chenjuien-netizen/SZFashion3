@@ -39,8 +39,12 @@ final class HistoryScreenModel {
             ("Entrées", "entry"),
             ("Sorties", "exit"),
             ("Ajustements", "adjustment"),
-            ("Pickup", "pickup_ticket")
+            ("Tickets", "pickup_ticket")
         ]
+    }
+
+    var actionFilterLabel: String {
+        availableFilters.first { $0.value == actionFilter }?.label ?? "Tous"
     }
 
     func load() async {

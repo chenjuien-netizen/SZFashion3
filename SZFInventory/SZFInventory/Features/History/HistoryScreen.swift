@@ -12,8 +12,12 @@ struct HistoryRootView: View {
     var body: some View {
         NavigationStack {
             List(model.visibleEntries) { entry in
-                NavigationLink(value: entry.reference) {
+                if entry.reference.isEmpty {
                     HistoryRow(entry: entry)
+                } else {
+                    NavigationLink(value: entry.reference) {
+                        HistoryRow(entry: entry)
+                    }
                 }
             }
             .overlay {
@@ -41,14 +45,20 @@ struct HistoryRootView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    if model.isRefreshing {
-                        ProgressView()
-                    } else {
-                        Button {
-                            Task { await model.refresh() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
+                    Menu {
+                        ForEach(model.availableFilters, id: \.value) { filter in
+                            Button {
+                                model.actionFilter = filter.value
+                            } label: {
+                                if model.actionFilter == filter.value {
+                                    Label(filter.label, systemImage: "checkmark")
+                                } else {
+                                    Text(filter.label)
+                                }
+                            }
                         }
+                    } label: {
+                        Label("Type", systemImage: "line.3.horizontal.decrease.circle")
                     }
                 }
             }
@@ -67,12 +77,16 @@ private struct HistoryHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Picker("Type", selection: Binding(get: { model.actionFilter }, set: { model.actionFilter = $0 })) {
-                ForEach(model.availableFilters, id: \.value) { filter in
-                    Text(filter.label).tag(filter.value)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Type : \(model.actionFilterLabel)")
+                    .font(.footnote.weight(.semibold))
+                Spacer()
+                if model.isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
                 }
             }
-            .pickerStyle(.segmented)
+            .foregroundStyle(.secondary)
 
             HStack {
                 Text("Dernière sync")

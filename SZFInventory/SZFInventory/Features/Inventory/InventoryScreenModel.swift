@@ -22,12 +22,29 @@ final class InventoryScreenModel {
         }
     }
 
+    enum StockFilter: String, CaseIterable, Identifiable {
+        case all
+        case inStock
+        case outOfStock
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .all: return "Tous"
+            case .inStock: return "En stock"
+            case .outOfStock: return "Rupture"
+            }
+        }
+    }
+
     private let repository: InventoryRepository
     private let syncMetadataStore: SyncMetadataStore
 
     var allItems: [InventoryItem] = []
     var searchText = ""
     var selectedSortMode: SortMode = .arrival
+    var stockFilter: StockFilter = .all
     var isLoading = false
     var isRefreshing = false
     var errorMessage: String?
@@ -43,7 +60,19 @@ final class InventoryScreenModel {
     var visibleItems: [InventoryItem] {
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let filtered = allItems.filter { item in
+            let matchesStockFilter: Bool
+            switch stockFilter {
+            case .all:
+                matchesStockFilter = true
+            case .inStock:
+                matchesStockFilter = item.stockState == .inStock
+            case .outOfStock:
+                matchesStockFilter = item.stockState == .outOfStock
+            }
+
+            guard matchesStockFilter else { return false }
             guard !trimmedQuery.isEmpty else { return true }
+
             return [item.reference, item.warehouse, item.arrivalNote, item.stockDisplay, item.remark]
                 .joined(separator: " ")
                 .lowercased()
@@ -65,6 +94,18 @@ final class InventoryScreenModel {
     var summaryText: String {
         let inStockCount = visibleItems.filter { $0.stockState == .inStock }.count
         return "\(visibleItems.count) refs • \(inStockCount) en stock"
+    }
+
+    var filterSummaryText: String {
+        if selectedSortMode == .arrival && stockFilter == .all {
+            return "Tri : 到货单"
+        }
+        return "Tri : \(selectedSortMode.label) • Stock : \(stockFilter.label)"
+    }
+
+    func resetFilters() {
+        selectedSortMode = .arrival
+        stockFilter = .all
     }
 
     func load() async {
