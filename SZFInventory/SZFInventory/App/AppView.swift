@@ -4,30 +4,34 @@ import SwiftUI
 struct AppView: View {
     @Environment(AppDependencies.self) private var dependencies
     @State private var selectedTab: AppTab = .inventory
+    @State private var isSideMenuPresented = false
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            InventoryRootView(dependencies: dependencies)
-                .tag(AppTab.inventory)
-                .tabItem {
-                    Label("Inventaire", systemImage: "shippingbox")
+        ZStack {
+            currentTabContent
+                .safeAreaInset(edge: .bottom) {
+                    BottomTabBar(selectedTab: $selectedTab)
                 }
 
-            HistoryRootView(dependencies: dependencies)
-                .tag(AppTab.history)
-                .tabItem {
-                    Label("Historique", systemImage: "clock.arrow.circlepath")
-                }
-
-            TicketsPlaceholderView()
-                .tag(AppTab.tickets)
-                .tabItem {
-                    Label("Tickets", systemImage: "ticket")
-                }
+            SideMenuOverlay(isPresented: $isSideMenuPresented)
         }
-        .toolbar(.hidden, for: .tabBar)
-        .safeAreaInset(edge: .bottom) {
-            BottomTabBar(selectedTab: $selectedTab)
+    }
+
+    @ViewBuilder
+    private var currentTabContent: some View {
+        switch selectedTab {
+        case .inventory:
+            InventoryRootView(dependencies: dependencies, onMenuTap: showSideMenu)
+        case .history:
+            HistoryRootView(dependencies: dependencies, onMenuTap: showSideMenu)
+        case .tickets:
+            TicketsPlaceholderView(onMenuTap: showSideMenu)
+        }
+    }
+
+    private func showSideMenu() {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
+            isSideMenuPresented = true
         }
     }
 }
@@ -64,19 +68,75 @@ enum AppTab: String, CaseIterable, Identifiable {
     }
 }
 
-struct AppMenuSheet: View {
+private struct SideMenuOverlay: View {
+    @Binding var isPresented: Bool
+
     var body: some View {
-        NavigationStack {
-            List {
-                Label("Paramètres", systemImage: "gearshape")
-                Label("Sync", systemImage: "arrow.triangle.2.circlepath")
-                Label("À propos", systemImage: "info.circle")
-                Label("Debug", systemImage: "ladybug")
+        ZStack(alignment: .leading) {
+            if isPresented {
+                Color.black.opacity(0.28)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        hide()
+                    }
+                    .transition(.opacity)
+
+                SideMenuPanel()
+                    .frame(width: 300)
+                    .frame(maxHeight: .infinity)
+                    .transition(.move(edge: .leading))
             }
-            .navigationTitle("Menu")
-            .navigationBarTitleDisplayMode(.inline)
         }
-        .presentationDetents([.medium])
+        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: isPresented)
+        .allowsHitTesting(isPresented)
+    }
+
+    private func hide() {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
+            isPresented = false
+        }
+    }
+}
+
+private struct SideMenuPanel: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 6) {
+                Image(systemName: "shippingbox.fill")
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Text("SZF Inventory")
+                    .font(.title3.weight(.bold))
+                Text("Menu bientôt disponible")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 18) {
+                SideMenuRow(title: "Paramètres", systemImage: "gearshape")
+                SideMenuRow(title: "Sync", systemImage: "arrow.triangle.2.circlepath")
+                SideMenuRow(title: "À propos", systemImage: "info.circle")
+                SideMenuRow(title: "Debug", systemImage: "ladybug")
+            }
+
+            Spacer()
+        }
+        .padding(.top, 64)
+        .padding(.horizontal, 22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(.regularMaterial)
+        .ignoresSafeArea()
+    }
+}
+
+private struct SideMenuRow: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.headline)
+            .foregroundStyle(.primary)
     }
 }
 
@@ -118,7 +178,7 @@ private struct BottomTabBar: View {
 }
 
 struct TicketsPlaceholderView: View {
-    @State private var isMenuPresented = false
+    let onMenuTap: () -> Void
 
     var body: some View {
         NavigationStack {
@@ -132,15 +192,12 @@ struct TicketsPlaceholderView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        isMenuPresented = true
+                        onMenuTap()
                     } label: {
                         Label("Menu", systemImage: "line.3.horizontal")
                     }
                 }
             }
-        }
-        .sheet(isPresented: $isMenuPresented) {
-            AppMenuSheet()
         }
     }
 }

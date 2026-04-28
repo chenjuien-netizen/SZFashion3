@@ -137,8 +137,10 @@ final class InventoryScreenModel {
         guard refreshTask == nil else { return }
         refreshTask = Task { [weak self] in
             guard let self else { return }
+            defer {
+                self.refreshTask = nil
+            }
             await self.refresh()
-            self.refreshTask = nil
         }
     }
 

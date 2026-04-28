@@ -3,11 +3,12 @@ import SwiftUI
 struct InventoryRootView: View {
     @State private var model: InventoryScreenModel
     @State private var filterDraft: InventoryFilterDraft?
-    @State private var isMenuPresented = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    let onMenuTap: () -> Void
 
-    init(dependencies: AppDependencies) {
+    init(dependencies: AppDependencies, onMenuTap: @escaping () -> Void = {}) {
         _model = State(initialValue: InventoryScreenModel(repository: dependencies.inventoryRepository, syncMetadataStore: dependencies.syncMetadataStore))
+        self.onMenuTap = onMenuTap
     }
 
     var body: some View {
@@ -54,9 +55,6 @@ struct InventoryRootView: View {
                 model.resetFilters()
             }
         }
-        .sheet(isPresented: $isMenuPresented) {
-            AppMenuSheet()
-        }
     }
 
     @Environment(AppDependencies.self) private var dependencies
@@ -93,7 +91,7 @@ struct InventoryRootView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
-                    isMenuPresented = true
+                    onMenuTap()
                 } label: {
                     Label("Menu", systemImage: "line.3.horizontal")
                 }

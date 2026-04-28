@@ -15,6 +15,7 @@ final class HistoryScreenModel {
     var errorMessage: String?
     var lastSyncAt: Date?
     private var hasLoaded = false
+    private var refreshTask: Task<Void, Never>?
 
     init(repository: HistoryRepository, syncMetadataStore: SyncMetadataStore) {
         self.repository = repository
@@ -66,8 +67,23 @@ final class HistoryScreenModel {
         await refresh()
     }
 
+    func triggerBackgroundRefresh() {
+        guard refreshTask == nil else { return }
+        refreshTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.refreshTask = nil
+            }
+            await self.refresh()
+        }
+    }
+
     func refresh() async {
         isRefreshing = true
+        defer {
+            isRefreshing = false
+        }
+
         errorMessage = nil
         do {
             allEntries = try await repository.refreshHistory()
@@ -77,7 +93,6 @@ final class HistoryScreenModel {
                 errorMessage = error.localizedDescription
             }
         }
-        isRefreshing = false
     }
 
     private var shouldRefresh: Bool {

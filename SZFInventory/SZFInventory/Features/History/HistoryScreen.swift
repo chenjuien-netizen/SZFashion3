@@ -2,10 +2,11 @@ import SwiftUI
 
 struct HistoryRootView: View {
     @State private var model: HistoryScreenModel
-    @State private var isMenuPresented = false
+    let onMenuTap: () -> Void
 
-    init(dependencies: AppDependencies) {
+    init(dependencies: AppDependencies, onMenuTap: @escaping () -> Void = {}) {
         _model = State(initialValue: HistoryScreenModel(repository: dependencies.historyRepository, syncMetadataStore: dependencies.syncMetadataStore))
+        self.onMenuTap = onMenuTap
     }
 
     @Environment(AppDependencies.self) private var dependencies
@@ -48,7 +49,7 @@ struct HistoryRootView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        isMenuPresented = true
+                        onMenuTap()
                     } label: {
                         Label("Menu", systemImage: "line.3.horizontal")
                     }
@@ -72,14 +73,11 @@ struct HistoryRootView: View {
                 }
             }
             .refreshable {
-                await model.refresh()
+                model.triggerBackgroundRefresh()
             }
         }
         .task {
             await model.load()
-        }
-        .sheet(isPresented: $isMenuPresented) {
-            AppMenuSheet()
         }
     }
 }
@@ -93,10 +91,6 @@ private struct HistoryHeader: View {
                 Text("Type : \(model.actionFilterLabel)")
                     .font(.footnote.weight(.semibold))
                 Spacer()
-                if model.isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                }
             }
             .foregroundStyle(.secondary)
 
