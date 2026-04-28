@@ -44,6 +44,7 @@ struct HistoryRootView: View {
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
                             }
+                            .buttonStyle(.plain)
                             .contentShape(Rectangle())
                         }
                         Divider()

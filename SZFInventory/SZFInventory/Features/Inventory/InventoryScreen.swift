@@ -88,6 +88,7 @@ struct InventoryRootView: View {
                             .padding(.vertical, 8)
                             .background(.background)
                     }
+                    .buttonStyle(.plain)
                     .contentShape(Rectangle())
                     Divider()
                 }

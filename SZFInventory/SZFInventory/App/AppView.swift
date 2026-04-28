@@ -10,7 +10,7 @@ struct AppView: View {
 
     var body: some View {
         ZStack {
-            currentTabContent
+            tabContentStack
                 .safeAreaInset(edge: .bottom) {
                     BottomTabBar(selectedTab: $selectedTab)
                         .offset(y: isChromeHidden ? 88 : 0)
@@ -31,17 +31,22 @@ struct AppView: View {
         .sheet(isPresented: $isAddReferencePresented) {
             AddReferencePlaceholderView()
         }
+        .tint(.primary)
     }
 
-    @ViewBuilder
-    private var currentTabContent: some View {
-        switch selectedTab {
-        case .inventory:
+    private var tabContentStack: some View {
+        ZStack {
             InventoryRootView(dependencies: dependencies, onMenuTap: showSideMenu, onChromeVisibilityChange: setChromeHidden)
-        case .history:
+                .opacity(selectedTab == .inventory ? 1 : 0)
+                .allowsHitTesting(selectedTab == .inventory)
+
             HistoryRootView(dependencies: dependencies, onMenuTap: showSideMenu, onChromeVisibilityChange: setChromeHidden)
-        case .tickets:
+                .opacity(selectedTab == .history ? 1 : 0)
+                .allowsHitTesting(selectedTab == .history)
+
             TicketsPlaceholderView(onMenuTap: showSideMenu, onChromeVisibilityChange: setChromeHidden)
+                .opacity(selectedTab == .tickets ? 1 : 0)
+                .allowsHitTesting(selectedTab == .tickets)
         }
     }
 
@@ -213,6 +218,7 @@ struct AppTopBar<Trailing: View>: View {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 18, weight: .semibold))
                     .frame(width: 36, height: 36)
+                    .foregroundStyle(.primary)
             }
             .buttonStyle(.plain)
 
@@ -223,6 +229,7 @@ struct AppTopBar<Trailing: View>: View {
             Spacer()
 
             trailing()
+                .foregroundStyle(.primary)
         }
         .padding(.horizontal, 14)
         .frame(height: 44)
