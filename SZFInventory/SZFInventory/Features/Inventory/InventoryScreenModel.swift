@@ -51,6 +51,7 @@ final class InventoryScreenModel {
     var lastSyncAt: Date?
     var selectedReference: String?
     private var hasLoaded = false
+    private var refreshTask: Task<Void, Never>?
 
     init(repository: InventoryRepository, syncMetadataStore: SyncMetadataStore) {
         self.repository = repository
@@ -130,6 +131,15 @@ final class InventoryScreenModel {
     func refreshIfNeeded(force: Bool) async {
         guard force || shouldRefresh else { return }
         await refresh()
+    }
+
+    func triggerBackgroundRefresh() {
+        guard refreshTask == nil else { return }
+        refreshTask = Task { [weak self] in
+            guard let self else { return }
+            await self.refresh()
+            self.refreshTask = nil
+        }
     }
 
     func refresh() async {

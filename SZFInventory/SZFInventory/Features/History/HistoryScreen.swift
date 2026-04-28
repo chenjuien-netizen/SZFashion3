@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryRootView: View {
     @State private var model: HistoryScreenModel
+    @State private var isMenuPresented = false
 
     init(dependencies: AppDependencies) {
         _model = State(initialValue: HistoryScreenModel(repository: dependencies.historyRepository, syncMetadataStore: dependencies.syncMetadataStore))
@@ -30,6 +31,7 @@ struct HistoryRootView: View {
                 }
             }
             .navigationTitle("Historique")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { reference in
                 ReferenceDetailScreen(
                     model: ReferenceDetailScreenModel(
@@ -44,6 +46,13 @@ struct HistoryRootView: View {
                 HistoryHeader(model: model)
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        isMenuPresented = true
+                    } label: {
+                        Label("Menu", systemImage: "line.3.horizontal")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         ForEach(model.availableFilters, id: \.value) { filter in
@@ -69,6 +78,9 @@ struct HistoryRootView: View {
         .task {
             await model.load()
         }
+        .sheet(isPresented: $isMenuPresented) {
+            AppMenuSheet()
+        }
     }
 }
 
@@ -93,7 +105,7 @@ private struct HistoryHeader: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(model.lastSyncAt.map(DateFormatters.relativeString(from:)) ?? "Jamais")
+                Text(model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }

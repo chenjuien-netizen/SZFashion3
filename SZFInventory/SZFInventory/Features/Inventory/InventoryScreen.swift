@@ -3,6 +3,7 @@ import SwiftUI
 struct InventoryRootView: View {
     @State private var model: InventoryScreenModel
     @State private var filterDraft: InventoryFilterDraft?
+    @State private var isMenuPresented = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     init(dependencies: AppDependencies) {
@@ -53,6 +54,9 @@ struct InventoryRootView: View {
                 model.resetFilters()
             }
         }
+        .sheet(isPresented: $isMenuPresented) {
+            AppMenuSheet()
+        }
     }
 
     @Environment(AppDependencies.self) private var dependencies
@@ -84,8 +88,16 @@ struct InventoryRootView: View {
         }
         .listStyle(.plain)
         .navigationTitle("Inventaire")
+        .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $model.searchText, prompt: "Recherche référence / stock")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    isMenuPresented = true
+                } label: {
+                    Label("Menu", systemImage: "line.3.horizontal")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     filterDraft = InventoryFilterDraft(sortMode: model.selectedSortMode, stockFilter: model.stockFilter)
@@ -98,7 +110,7 @@ struct InventoryRootView: View {
             }
         }
         .refreshable {
-            await model.refresh()
+            model.triggerBackgroundRefresh()
         }
     }
 }
@@ -119,7 +131,7 @@ private struct InventoryStatusRow: View {
                 Text("Filtres actifs")
             }
             Spacer(minLength: 8)
-            Text("Sync \(model.lastSyncAt.map(DateFormatters.relativeString(from:)) ?? "jamais")")
+            Text(DateFormatters.syncLabel(prefix: "Sync", from: model.lastSyncAt))
                 .multilineTextAlignment(.trailing)
         }
         .font(.caption.weight(.medium))
