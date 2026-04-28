@@ -99,7 +99,7 @@ private struct HistoryHeader: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais")
+                Text(model.isRefreshing ? "Sync en cours…" : (model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais"))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }

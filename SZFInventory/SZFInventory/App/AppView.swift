@@ -144,36 +144,32 @@ private struct BottomTabBar: View {
     @Binding var selectedTab: AppTab
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(AppTab.allCases) { tab in
-                Button {
-                    selectedTab = tab
-                } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: selectedTab == tab ? tab.selectedSystemImage : tab.systemImage)
-                            .font(.system(size: 18, weight: .semibold))
-                        Text(tab.label)
-                            .font(.caption2.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .foregroundStyle(selectedTab == tab ? .primary : .secondary)
-                    .background {
-                        if selectedTab == tab {
-                            Capsule()
-                                .fill(.primary.opacity(0.09))
+        VStack(spacing: 0) {
+            Divider()
+
+            HStack(spacing: 0) {
+                ForEach(AppTab.allCases) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: selectedTab == tab ? tab.selectedSystemImage : tab.systemImage)
+                                .font(.system(size: 20, weight: .semibold))
+                            Text(tab.label)
+                                .font(.caption2.weight(selectedTab == tab ? .bold : .semibold))
                         }
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .contentShape(Rectangle())
+                        .foregroundStyle(selectedTab == tab ? .primary : .secondary)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tab.label)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.label)
             }
+            .padding(.top, 5)
+            .padding(.bottom, 3)
         }
-        .padding(6)
-        .background(.regularMaterial, in: Capsule())
-        .padding(.horizontal, 18)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        .background(.bar)
     }
 }
 
