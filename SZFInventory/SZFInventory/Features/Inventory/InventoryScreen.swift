@@ -58,15 +58,19 @@ struct InventoryRootView: View {
     @Environment(AppDependencies.self) private var dependencies
 
     private var inventoryList: some View {
-        List(model.visibleItems, selection: $model.selectedReference) { item in
-            if horizontalSizeClass == .regular {
-                InventoryRow(item: item)
-                    .tag(item.reference)
-            } else {
-                NavigationLink(value: item) {
+        List(selection: $model.selectedReference) {
+            InventoryStatusRow(model: model)
+
+            ForEach(model.visibleItems) { item in
+                if horizontalSizeClass == .regular {
                     InventoryRow(item: item)
+                        .tag(item.reference)
+                } else {
+                    NavigationLink(value: item) {
+                        InventoryRow(item: item)
+                    }
+                    .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
             }
         }
         .overlay {
@@ -86,12 +90,12 @@ struct InventoryRootView: View {
                 Button {
                     filterDraft = InventoryFilterDraft(sortMode: model.selectedSortMode, stockFilter: model.stockFilter)
                 } label: {
-                    Label("Filtrer", systemImage: "line.3.horizontal.decrease.circle")
+                    Label(
+                        model.hasActiveFilters ? "Filtres actifs" : "Filtrer",
+                        systemImage: model.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+                    )
                 }
             }
-        }
-        .safeAreaInset(edge: .top) {
-            InventoryHeader(model: model)
         }
         .refreshable {
             await model.refresh()
@@ -105,35 +109,25 @@ private struct InventoryFilterDraft: Identifiable {
     var stockFilter: InventoryScreenModel.StockFilter
 }
 
-private struct InventoryHeader: View {
+private struct InventoryStatusRow: View {
     let model: InventoryScreenModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(model.summaryText)
-                    .font(.footnote.weight(.semibold))
-                Spacer()
-                if model.isRefreshing {
-                    ProgressView()
-                        .controlSize(.small)
-                }
+        HStack(spacing: 8) {
+            Text(model.summaryText)
+            if model.hasActiveFilters {
+                Text("Filtres actifs")
             }
-            .foregroundStyle(.secondary)
-
-            HStack {
-                Text(model.filterSummaryText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("Sync \(model.lastSyncAt.map(DateFormatters.relativeString(from:)) ?? "jamais")")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
+            Spacer(minLength: 8)
+            Text("Sync \(model.lastSyncAt.map(DateFormatters.relativeString(from:)) ?? "jamais")")
+                .multilineTextAlignment(.trailing)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.thinMaterial)
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 2, trailing: 16))
+        .listRowSeparator(.hidden)
+        .accessibilityElement(children: .combine)
     }
 }
 

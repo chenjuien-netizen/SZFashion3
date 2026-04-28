@@ -103,6 +103,10 @@ final class InventoryScreenModel {
         return "Tri : \(selectedSortMode.label) • Stock : \(stockFilter.label)"
     }
 
+    var hasActiveFilters: Bool {
+        selectedSortMode != .arrival || stockFilter != .all
+    }
+
     func resetFilters() {
         selectedSortMode = .arrival
         stockFilter = .all
@@ -130,6 +134,10 @@ final class InventoryScreenModel {
 
     func refresh() async {
         isRefreshing = true
+        defer {
+            isRefreshing = false
+        }
+
         errorMessage = nil
         do {
             allItems = try await repository.refreshInventory()
@@ -139,7 +147,6 @@ final class InventoryScreenModel {
                 errorMessage = error.localizedDescription
             }
         }
-        isRefreshing = false
     }
 
     private var shouldRefresh: Bool {
