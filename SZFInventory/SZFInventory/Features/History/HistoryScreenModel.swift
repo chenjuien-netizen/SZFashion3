@@ -6,6 +6,7 @@ import Observation
 final class HistoryScreenModel {
     private let repository: HistoryRepository
     private let syncMetadataStore: SyncMetadataStore
+    private let refreshCoordinator: RefreshCoordinator
 
     var allEntries: [HistoryEntry] = []
     var searchText = ""
@@ -17,9 +18,10 @@ final class HistoryScreenModel {
     private var hasLoaded = false
     private var refreshTask: Task<Void, Never>?
 
-    init(repository: HistoryRepository, syncMetadataStore: SyncMetadataStore) {
+    init(repository: HistoryRepository, syncMetadataStore: SyncMetadataStore, refreshCoordinator: RefreshCoordinator) {
         self.repository = repository
         self.syncMetadataStore = syncMetadataStore
+        self.refreshCoordinator = refreshCoordinator
     }
 
     var visibleEntries: [HistoryEntry] {
@@ -68,7 +70,7 @@ final class HistoryScreenModel {
     }
 
     func triggerBackgroundRefresh() {
-        guard refreshTask == nil else { return }
+        guard !isRefreshing, refreshTask == nil, !refreshCoordinator.isRefreshing else { return }
         refreshTask = Task { [weak self] in
             guard let self else { return }
             defer {
@@ -79,15 +81,18 @@ final class HistoryScreenModel {
     }
 
     func refresh() async {
+        let resource = SyncMetadataStore.ResourceKey.history.rawValue
+        guard refreshCoordinator.begin(resource) else { return }
         isRefreshing = true
         defer {
             isRefreshing = false
+            refreshCoordinator.end(resource)
         }
 
         errorMessage = nil
         do {
             allEntries = try await repository.refreshHistory()
-            lastSyncAt = syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.history.rawValue)
+            lastSyncAt = syncMetadataStore.syncDate(for: resource)
         } catch {
             if allEntries.isEmpty {
                 errorMessage = error.localizedDescription

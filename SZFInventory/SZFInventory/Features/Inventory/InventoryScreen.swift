@@ -3,12 +3,20 @@ import SwiftUI
 struct InventoryRootView: View {
     @State private var model: InventoryScreenModel
     @State private var filterDraft: InventoryFilterDraft?
+    @State private var isChromeHidden = false
+    @State private var lastScrollOffset: CGFloat = 0
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let onMenuTap: () -> Void
+    let onChromeVisibilityChange: (Bool) -> Void
 
-    init(dependencies: AppDependencies, onMenuTap: @escaping () -> Void = {}) {
-        _model = State(initialValue: InventoryScreenModel(repository: dependencies.inventoryRepository, syncMetadataStore: dependencies.syncMetadataStore))
+    init(
+        dependencies: AppDependencies,
+        onMenuTap: @escaping () -> Void = {},
+        onChromeVisibilityChange: @escaping (Bool) -> Void = { _ in }
+    ) {
+        _model = State(initialValue: InventoryScreenModel(repository: dependencies.inventoryRepository, syncMetadataStore: dependencies.syncMetadataStore, refreshCoordinator: dependencies.refreshCoordinator))
         self.onMenuTap = onMenuTap
+        self.onChromeVisibilityChange = onChromeVisibilityChange
     }
 
     var body: some View {
@@ -22,7 +30,8 @@ struct InventoryRootView: View {
                             model: ReferenceDetailScreenModel(
                                 reference: reference,
                                 repository: dependencies.referenceRepository,
-                                syncMetadataStore: dependencies.syncMetadataStore
+                                syncMetadataStore: dependencies.syncMetadataStore,
+                                refreshCoordinator: dependencies.refreshCoordinator
                             )
                         )
                     } else {
@@ -37,7 +46,8 @@ struct InventoryRootView: View {
                                 model: ReferenceDetailScreenModel(
                                     reference: item.reference,
                                     repository: dependencies.referenceRepository,
-                                    syncMetadataStore: dependencies.syncMetadataStore
+                                    syncMetadataStore: dependencies.syncMetadataStore,
+                                    refreshCoordinator: dependencies.refreshCoordinator
                                 )
                             )
                         }
@@ -60,21 +70,31 @@ struct InventoryRootView: View {
     @Environment(AppDependencies.self) private var dependencies
 
     private var inventoryList: some View {
-        List(selection: $model.selectedReference) {
-            InventoryStatusRow(model: model)
+        ScrollView {
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: ScrollOffsetPreferenceKey.self, value: proxy.frame(in: .named("inventory-scroll")).minY)
+            }
+            .frame(height: 0)
 
-            ForEach(model.visibleItems) { item in
-                if horizontalSizeClass == .regular {
-                    InventoryRow(item: item)
-                        .tag(item.reference)
-                } else {
+            LazyVStack(spacing: 0) {
+                InventoryStatusRow(model: model)
+
+                ForEach(model.visibleItems) { item in
                     NavigationLink(value: item) {
                         InventoryRow(item: item)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.background)
                     }
                     .contentShape(Rectangle())
+                    Divider()
                 }
             }
         }
+        .coordinateSpace(name: "inventory-scroll")
+        .onPreferenceChange(ScrollOffsetPreferenceKey.self, perform: updateChromeVisibility)
         .overlay {
             if model.isLoading && model.visibleItems.isEmpty {
                 ProgressView("Chargement inventaire…")
@@ -84,31 +104,43 @@ struct InventoryRootView: View {
                 ContentUnavailableView.search(text: model.searchText)
             }
         }
-        .listStyle(.plain)
         .navigationTitle("Inventaire")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $model.searchText, prompt: "Recherche référence / stock")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button {
-                    onMenuTap()
-                } label: {
-                    Label("Menu", systemImage: "line.3.horizontal")
+        .toolbar(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top) {
+            if !isChromeHidden {
+                VStack(spacing: 0) {
+                    AppTopBar(title: "Inventaire", onMenuTap: onMenuTap) {
+                        Button {
+                            filterDraft = InventoryFilterDraft(sortMode: model.selectedSortMode, stockFilter: model.stockFilter)
+                        } label: {
+                            Label(
+                                model.hasActiveFilters ? "Filtres actifs" : "Filtrer",
+                                systemImage: model.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ChromeSearchField(prompt: "Recherche référence / stock", text: $model.searchText)
                 }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    filterDraft = InventoryFilterDraft(sortMode: model.selectedSortMode, stockFilter: model.stockFilter)
-                } label: {
-                    Label(
-                        model.hasActiveFilters ? "Filtres actifs" : "Filtrer",
-                        systemImage: model.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
-                    )
-                }
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .refreshable {
             model.triggerBackgroundRefresh()
+        }
+    }
+
+    private func updateChromeVisibility(_ offset: CGFloat) {
+        let delta = offset - lastScrollOffset
+        lastScrollOffset = offset
+
+        guard abs(delta) > 8 else { return }
+        let shouldHide = delta < 0 && offset < -24
+        if shouldHide != isChromeHidden {
+            isChromeHidden = shouldHide
+            onChromeVisibilityChange(shouldHide)
         }
     }
 }

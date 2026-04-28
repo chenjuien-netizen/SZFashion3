@@ -6,6 +6,7 @@ import SwiftUI
 @Observable
 final class AppDependencies {
     let apiClient: APIClient
+    let refreshCoordinator: RefreshCoordinator
     let syncMetadataStore: SyncMetadataStore
     let inventoryRepository: InventoryRepository
     let historyRepository: HistoryRepository
@@ -14,7 +15,9 @@ final class AppDependencies {
 
     init(modelContext: ModelContext, apiClient: APIClient) {
         let syncMetadataStore = SyncMetadataStore(modelContext: modelContext)
+        let refreshCoordinator = RefreshCoordinator()
         self.apiClient = apiClient
+        self.refreshCoordinator = refreshCoordinator
         self.syncMetadataStore = syncMetadataStore
         self.inventoryRepository = LiveInventoryRepository(modelContext: modelContext, apiClient: apiClient, syncMetadataStore: syncMetadataStore)
         self.historyRepository = LiveHistoryRepository(modelContext: modelContext, apiClient: apiClient, syncMetadataStore: syncMetadataStore)

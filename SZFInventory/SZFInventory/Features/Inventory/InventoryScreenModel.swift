@@ -40,6 +40,7 @@ final class InventoryScreenModel {
 
     private let repository: InventoryRepository
     private let syncMetadataStore: SyncMetadataStore
+    private let refreshCoordinator: RefreshCoordinator
 
     var allItems: [InventoryItem] = []
     var searchText = ""
@@ -53,9 +54,10 @@ final class InventoryScreenModel {
     private var hasLoaded = false
     private var refreshTask: Task<Void, Never>?
 
-    init(repository: InventoryRepository, syncMetadataStore: SyncMetadataStore) {
+    init(repository: InventoryRepository, syncMetadataStore: SyncMetadataStore, refreshCoordinator: RefreshCoordinator) {
         self.repository = repository
         self.syncMetadataStore = syncMetadataStore
+        self.refreshCoordinator = refreshCoordinator
     }
 
     var visibleItems: [InventoryItem] {
@@ -134,7 +136,7 @@ final class InventoryScreenModel {
     }
 
     func triggerBackgroundRefresh() {
-        guard refreshTask == nil else { return }
+        guard !isRefreshing, refreshTask == nil, !refreshCoordinator.isRefreshing else { return }
         refreshTask = Task { [weak self] in
             guard let self else { return }
             defer {
@@ -145,15 +147,18 @@ final class InventoryScreenModel {
     }
 
     func refresh() async {
+        let resource = SyncMetadataStore.ResourceKey.inventory.rawValue
+        guard refreshCoordinator.begin(resource) else { return }
         isRefreshing = true
         defer {
             isRefreshing = false
+            refreshCoordinator.end(resource)
         }
 
         errorMessage = nil
         do {
             allItems = try await repository.refreshInventory()
-            lastSyncAt = syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.inventory.rawValue)
+            lastSyncAt = syncMetadataStore.syncDate(for: resource)
         } catch {
             if allItems.isEmpty {
                 errorMessage = error.localizedDescription

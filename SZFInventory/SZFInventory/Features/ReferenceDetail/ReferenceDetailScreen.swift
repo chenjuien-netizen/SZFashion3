@@ -53,7 +53,7 @@ struct ReferenceDetailScreen: View {
             }
 
             Section {
-                detailRow("Dernière sync", model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais")
+                detailRow("Dernière sync", model.isRefreshing ? "Sync en cours…" : (model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais"))
             }
         }
         .navigationTitle(model.reference)
@@ -66,7 +66,7 @@ struct ReferenceDetailScreen: View {
             }
         }
         .refreshable {
-            await model.refresh()
+            model.triggerBackgroundRefresh()
         }
         .task {
             await model.load()

@@ -5,15 +5,31 @@ struct AppView: View {
     @Environment(AppDependencies.self) private var dependencies
     @State private var selectedTab: AppTab = .inventory
     @State private var isSideMenuPresented = false
+    @State private var isChromeHidden = false
+    @State private var isAddReferencePresented = false
 
     var body: some View {
         ZStack {
             currentTabContent
                 .safeAreaInset(edge: .bottom) {
                     BottomTabBar(selectedTab: $selectedTab)
+                        .offset(y: isChromeHidden ? 88 : 0)
+                        .opacity(isChromeHidden ? 0 : 1)
+                        .animation(.spring(response: 0.28, dampingFraction: 0.9), value: isChromeHidden)
                 }
 
+            FloatingAddButton {
+                isAddReferencePresented = true
+            }
+            .offset(y: isChromeHidden ? 96 : 0)
+            .opacity(isChromeHidden ? 0 : 1)
+            .animation(.spring(response: 0.28, dampingFraction: 0.9), value: isChromeHidden)
+
             SideMenuOverlay(isPresented: $isSideMenuPresented)
+        }
+        .simultaneousGesture(edgeMenuGesture)
+        .sheet(isPresented: $isAddReferencePresented) {
+            AddReferencePlaceholderView()
         }
     }
 
@@ -21,11 +37,11 @@ struct AppView: View {
     private var currentTabContent: some View {
         switch selectedTab {
         case .inventory:
-            InventoryRootView(dependencies: dependencies, onMenuTap: showSideMenu)
+            InventoryRootView(dependencies: dependencies, onMenuTap: showSideMenu, onChromeVisibilityChange: setChromeHidden)
         case .history:
-            HistoryRootView(dependencies: dependencies, onMenuTap: showSideMenu)
+            HistoryRootView(dependencies: dependencies, onMenuTap: showSideMenu, onChromeVisibilityChange: setChromeHidden)
         case .tickets:
-            TicketsPlaceholderView(onMenuTap: showSideMenu)
+            TicketsPlaceholderView(onMenuTap: showSideMenu, onChromeVisibilityChange: setChromeHidden)
         }
     }
 
@@ -33,6 +49,21 @@ struct AppView: View {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
             isSideMenuPresented = true
         }
+    }
+
+    private func setChromeHidden(_ hidden: Bool) {
+        guard isChromeHidden != hidden else { return }
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
+            isChromeHidden = hidden
+        }
+    }
+
+    private var edgeMenuGesture: some Gesture {
+        DragGesture(minimumDistance: 24, coordinateSpace: .global)
+            .onEnded { value in
+                guard value.startLocation.x < 24, value.translation.width > 70, abs(value.translation.height) < 60 else { return }
+                showSideMenu()
+            }
     }
 }
 
@@ -152,13 +183,13 @@ private struct BottomTabBar: View {
                     Button {
                         selectedTab = tab
                     } label: {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 2) {
                             Image(systemName: selectedTab == tab ? tab.selectedSystemImage : tab.systemImage)
-                                .font(.system(size: 20, weight: .semibold))
+                                .font(.system(size: 19, weight: .semibold))
                             Text(tab.label)
-                                .font(.caption2.weight(selectedTab == tab ? .bold : .semibold))
+                                .font(.system(size: 10, weight: selectedTab == tab ? .bold : .semibold))
                         }
-                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .frame(maxWidth: .infinity, minHeight: 46, maxHeight: 46)
                         .contentShape(Rectangle())
                         .foregroundStyle(selectedTab == tab ? .primary : .secondary)
                     }
@@ -166,15 +197,114 @@ private struct BottomTabBar: View {
                     .accessibilityLabel(tab.label)
                 }
             }
-            .padding(.top, 5)
-            .padding(.bottom, 3)
         }
         .background(.bar)
     }
 }
 
+struct AppTopBar<Trailing: View>: View {
+    let title: String
+    let onMenuTap: () -> Void
+    @ViewBuilder let trailing: () -> Trailing
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onMenuTap) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.plain)
+
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .lineLimit(1)
+
+            Spacer()
+
+            trailing()
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(.bar)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+    }
+}
+
+struct ChromeSearchField: View {
+    let prompt: String
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(prompt, text: $text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+        }
+        .font(.subheadline)
+        .padding(.horizontal, 12)
+        .frame(height: 36)
+        .background(.quaternary, in: Capsule())
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(.bar)
+    }
+}
+
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct FloatingAddButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button(action: action) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(.primary, in: Circle())
+                        .shadow(color: .black.opacity(0.22), radius: 12, x: 0, y: 6)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 18)
+                .padding(.bottom, 68)
+            }
+        }
+    }
+}
+
+private struct AddReferencePlaceholderView: View {
+    var body: some View {
+        NavigationStack {
+            ContentUnavailableView {
+                Label("Ajouter une référence", systemImage: "plus.circle")
+            } description: {
+                Text("Ajout de référence bientôt disponible.")
+            }
+            .navigationTitle("Ajouter")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium])
+    }
+}
+
 struct TicketsPlaceholderView: View {
     let onMenuTap: () -> Void
+    let onChromeVisibilityChange: (Bool) -> Void
 
     var body: some View {
         NavigationStack {
@@ -183,17 +313,15 @@ struct TicketsPlaceholderView: View {
             } description: {
                 Text("Le backend et les modèles sont prêts. La prochaine étape sera de brancher la liste et le détail des tickets pickup.")
             }
-            .navigationTitle("Tickets")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        onMenuTap()
-                    } label: {
-                        Label("Menu", systemImage: "line.3.horizontal")
-                    }
-                }
+        }
+        .safeAreaInset(edge: .top) {
+            AppTopBar(title: "Tickets", onMenuTap: onMenuTap) {
+                EmptyView()
             }
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            onChromeVisibilityChange(false)
         }
     }
 }

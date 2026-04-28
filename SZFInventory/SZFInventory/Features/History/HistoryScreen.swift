@@ -2,26 +2,56 @@ import SwiftUI
 
 struct HistoryRootView: View {
     @State private var model: HistoryScreenModel
+    @State private var isChromeHidden = false
+    @State private var lastScrollOffset: CGFloat = 0
     let onMenuTap: () -> Void
+    let onChromeVisibilityChange: (Bool) -> Void
 
-    init(dependencies: AppDependencies, onMenuTap: @escaping () -> Void = {}) {
-        _model = State(initialValue: HistoryScreenModel(repository: dependencies.historyRepository, syncMetadataStore: dependencies.syncMetadataStore))
+    init(
+        dependencies: AppDependencies,
+        onMenuTap: @escaping () -> Void = {},
+        onChromeVisibilityChange: @escaping (Bool) -> Void = { _ in }
+    ) {
+        _model = State(initialValue: HistoryScreenModel(repository: dependencies.historyRepository, syncMetadataStore: dependencies.syncMetadataStore, refreshCoordinator: dependencies.refreshCoordinator))
         self.onMenuTap = onMenuTap
+        self.onChromeVisibilityChange = onChromeVisibilityChange
     }
 
     @Environment(AppDependencies.self) private var dependencies
 
     var body: some View {
         NavigationStack {
-            List(model.visibleEntries) { entry in
-                if entry.reference.isEmpty {
-                    HistoryRow(entry: entry)
-                } else {
-                    NavigationLink(value: entry.reference) {
-                        HistoryRow(entry: entry)
+            ScrollView {
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(key: ScrollOffsetPreferenceKey.self, value: proxy.frame(in: .named("history-scroll")).minY)
+                }
+                .frame(height: 0)
+
+                LazyVStack(spacing: 0) {
+                    HistoryStatusRow(model: model)
+
+                    ForEach(model.visibleEntries) { entry in
+                        if entry.reference.isEmpty {
+                            HistoryRow(entry: entry)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                        } else {
+                            NavigationLink(value: entry.reference) {
+                                HistoryRow(entry: entry)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        Divider()
                     }
                 }
             }
+            .coordinateSpace(name: "history-scroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self, perform: updateChromeVisibility)
             .overlay {
                 if model.isLoading && model.visibleEntries.isEmpty {
                     ProgressView("Chargement historique…")
@@ -38,38 +68,37 @@ struct HistoryRootView: View {
                     model: ReferenceDetailScreenModel(
                         reference: reference,
                         repository: dependencies.referenceRepository,
-                        syncMetadataStore: dependencies.syncMetadataStore
+                        syncMetadataStore: dependencies.syncMetadataStore,
+                        refreshCoordinator: dependencies.refreshCoordinator
                     )
                 )
             }
-            .searchable(text: $model.searchText, prompt: "Recherche référence / remarque")
+            .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top) {
-                HistoryHeader(model: model)
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        onMenuTap()
-                    } label: {
-                        Label("Menu", systemImage: "line.3.horizontal")
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ForEach(model.availableFilters, id: \.value) { filter in
-                            Button {
-                                model.actionFilter = filter.value
-                            } label: {
-                                if model.actionFilter == filter.value {
-                                    Label(filter.label, systemImage: "checkmark")
-                                } else {
-                                    Text(filter.label)
+                if !isChromeHidden {
+                    VStack(spacing: 0) {
+                        AppTopBar(title: "Historique", onMenuTap: onMenuTap) {
+                            Menu {
+                                ForEach(model.availableFilters, id: \.value) { filter in
+                                    Button {
+                                        model.actionFilter = filter.value
+                                    } label: {
+                                        if model.actionFilter == filter.value {
+                                            Label(filter.label, systemImage: "checkmark")
+                                        } else {
+                                            Text(filter.label)
+                                        }
+                                    }
                                 }
+                            } label: {
+                                Label("Type", systemImage: "line.3.horizontal.decrease.circle")
                             }
+                            .buttonStyle(.plain)
                         }
-                    } label: {
-                        Label("Type", systemImage: "line.3.horizontal.decrease.circle")
+
+                        ChromeSearchField(prompt: "Recherche référence / remarque", text: $model.searchText)
                     }
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
             .refreshable {
@@ -80,33 +109,36 @@ struct HistoryRootView: View {
             await model.load()
         }
     }
+
+    private func updateChromeVisibility(_ offset: CGFloat) {
+        let delta = offset - lastScrollOffset
+        lastScrollOffset = offset
+
+        guard abs(delta) > 8 else { return }
+        let shouldHide = delta < 0 && offset < -24
+        if shouldHide != isChromeHidden {
+            isChromeHidden = shouldHide
+            onChromeVisibilityChange(shouldHide)
+        }
+    }
 }
 
-private struct HistoryHeader: View {
+private struct HistoryStatusRow: View {
     let model: HistoryScreenModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Type : \(model.actionFilterLabel)")
-                    .font(.footnote.weight(.semibold))
-                Spacer()
-            }
-            .foregroundStyle(.secondary)
-
-            HStack {
-                Text("Dernière sync")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(model.isRefreshing ? "Sync en cours…" : (model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais"))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
+        HStack(spacing: 8) {
+            Text("Type : \(model.actionFilterLabel)")
+            Spacer(minLength: 8)
+            Text(model.isRefreshing ? "Sync en cours…" : (model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais"))
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.thinMaterial)
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 2, trailing: 16))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 5)
+        .accessibilityElement(children: .combine)
     }
 }
 
