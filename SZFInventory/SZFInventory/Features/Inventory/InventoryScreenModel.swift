@@ -110,6 +110,10 @@ final class InventoryScreenModel {
         selectedSortMode != .arrival || stockFilter != .all
     }
 
+    var isSyncInProgress: Bool {
+        isRefreshing || refreshCoordinator.isRefreshing
+    }
+
     func resetFilters() {
         selectedSortMode = .arrival
         stockFilter = .all

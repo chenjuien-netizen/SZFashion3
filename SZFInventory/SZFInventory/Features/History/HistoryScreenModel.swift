@@ -50,6 +50,10 @@ final class HistoryScreenModel {
         availableFilters.first { $0.value == actionFilter }?.label ?? "Tous"
     }
 
+    var isSyncInProgress: Bool {
+        isRefreshing || refreshCoordinator.isRefreshing
+    }
+
     func load() async {
         guard !hasLoaded else { return }
         isLoading = true

@@ -44,6 +44,10 @@ final class ReferenceDetailScreenModel {
         await refresh()
     }
 
+    var isSyncInProgress: Bool {
+        isRefreshing || refreshCoordinator.isRefreshing
+    }
+
     func triggerBackgroundRefresh() {
         guard !isRefreshing, refreshTask == nil, !refreshCoordinator.isRefreshing else { return }
         refreshTask = Task { [weak self] in
