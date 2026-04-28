@@ -54,6 +54,10 @@ final class HistoryScreenModel {
         isRefreshing || refreshCoordinator.isRefreshing
     }
 
+    var syncInProgressLabel: String {
+        refreshCoordinator.activeSyncLabel ?? "Sync en cours…"
+    }
+
     func load() async {
         guard !hasLoaded else { return }
         isLoading = true

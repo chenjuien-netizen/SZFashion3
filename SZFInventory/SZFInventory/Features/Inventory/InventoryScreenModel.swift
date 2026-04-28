@@ -114,6 +114,10 @@ final class InventoryScreenModel {
         isRefreshing || refreshCoordinator.isRefreshing
     }
 
+    var syncInProgressLabel: String {
+        refreshCoordinator.activeSyncLabel ?? "Sync en cours…"
+    }
+
     func resetFilters() {
         selectedSortMode = .arrival
         stockFilter = .all

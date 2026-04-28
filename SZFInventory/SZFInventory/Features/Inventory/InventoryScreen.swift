@@ -162,7 +162,7 @@ private struct InventoryStatusRow: View {
                 Text("Filtres actifs")
             }
             Spacer(minLength: 8)
-            Text(model.isSyncInProgress ? "Sync en cours…" : DateFormatters.syncLabel(prefix: "Sync", from: model.lastSyncAt))
+            Text(model.isSyncInProgress ? model.syncInProgressLabel : DateFormatters.syncLabel(prefix: "Sync", from: model.lastSyncAt))
                 .multilineTextAlignment(.trailing)
         }
         .font(.caption.weight(.medium))

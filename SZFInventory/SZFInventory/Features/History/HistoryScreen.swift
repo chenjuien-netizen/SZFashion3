@@ -131,7 +131,7 @@ private struct HistoryStatusRow: View {
         HStack(spacing: 8) {
             Text("Type : \(model.actionFilterLabel)")
             Spacer(minLength: 8)
-            Text(model.isSyncInProgress ? "Sync en cours…" : (model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais"))
+            Text(model.isSyncInProgress ? model.syncInProgressLabel : (model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais"))
         }
         .font(.caption.weight(.medium))
         .foregroundStyle(.secondary)
