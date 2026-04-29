@@ -159,21 +159,122 @@ final class LiveReferenceRepository: ReferenceRepository {
 
 @MainActor
 final class LivePickupTicketRepository: PickupTicketRepository {
+    private let modelContext: ModelContext
     private let apiClient: APIClient
     private let syncMetadataStore: SyncMetadataStore
 
     init(modelContext: ModelContext, apiClient: APIClient, syncMetadataStore: SyncMetadataStore) {
+        self.modelContext = modelContext
         self.apiClient = apiClient
         self.syncMetadataStore = syncMetadataStore
     }
 
     func loadPickupTickets() async throws -> [PickupTicket] {
-        []
+        let descriptor = FetchDescriptor<PickupTicketRecord>(sortBy: [SortDescriptor(\PickupTicketRecord.createdAt, order: .reverse)])
+        return try modelContext.fetch(descriptor).map(\.domainModel)
+    }
+
+    func loadPickupTicketDetail(ticketID: String) async throws -> PickupTicketDetail? {
+        let ticketDescriptor = FetchDescriptor<PickupTicketRecord>(predicate: #Predicate { $0.ticketId == ticketID })
+        guard let ticket = try modelContext.fetch(ticketDescriptor).first?.domainModel else {
+            return nil
+        }
+
+        let lineDescriptor = FetchDescriptor<PickupTicketLineRecord>(
+            predicate: #Predicate { $0.ticketId == ticketID },
+            sortBy: [SortDescriptor(\PickupTicketLineRecord.lineNumber)]
+        )
+        let eventDescriptor = FetchDescriptor<PickupTicketEventRecord>(
+            predicate: #Predicate { $0.ticketId == ticketID },
+            sortBy: [SortDescriptor(\PickupTicketEventRecord.createdAt)]
+        )
+        let lines = try modelContext.fetch(lineDescriptor).map(\.domainModel)
+        let events = try modelContext.fetch(eventDescriptor).map(\.domainModel)
+        return PickupTicketDetail(ticket: ticket, lines: lines, events: events)
     }
 
     func refreshPickupTickets() async throws -> [PickupTicket] {
-        let response = try await apiClient.fetchPickupTickets()
-        syncMetadataStore.setSyncDate(Date(), for: "pickup_tickets")
-        return response.items.map(PickupTicket.init(dto:))
+        let response = try await apiClient.fetchPickupTicketsBootstrap()
+        try replacePickupTicketCache(with: response)
+        syncMetadataStore.setSyncDate(Date(), for: SyncMetadataStore.ResourceKey.pickupTickets.rawValue)
+        return try await loadPickupTickets()
+    }
+
+    private func replacePickupTicketCache(with response: PickupTicketsBootstrapResponseDTO) throws {
+        let existingEvents = try modelContext.fetch(FetchDescriptor<PickupTicketEventRecord>())
+        for record in existingEvents {
+            modelContext.delete(record)
+        }
+        let existingLines = try modelContext.fetch(FetchDescriptor<PickupTicketLineRecord>())
+        for record in existingLines {
+            modelContext.delete(record)
+        }
+        let existingTickets = try modelContext.fetch(FetchDescriptor<PickupTicketRecord>())
+        for record in existingTickets {
+            modelContext.delete(record)
+        }
+
+        var ticketsById: [String: PickupTicket] = [:]
+        for dto in response.items {
+            ticketsById[dto.ticketId] = PickupTicket(dto: dto)
+        }
+        for ticket in ticketsById.values {
+            modelContext.insert(PickupTicketRecord(ticket: ticket))
+        }
+        for (ticketId, detail) in response.detailsById {
+            if let detailTicketDTO = detail.ticket, ticketsById[detailTicketDTO.ticketId] == nil {
+                modelContext.insert(PickupTicketRecord(ticket: PickupTicket(dto: detailTicketDTO)))
+            }
+            for lineDTO in detail.lines {
+                let line = normalizedLine(from: lineDTO, fallbackTicketId: ticketId)
+                modelContext.insert(PickupTicketLineRecord(line: line))
+            }
+            for eventDTO in detail.events {
+                let event = normalizedEvent(from: eventDTO, fallbackTicketId: ticketId)
+                modelContext.insert(PickupTicketEventRecord(event: event))
+            }
+        }
+        try modelContext.save()
+    }
+
+    private func normalizedLine(from dto: PickupTicketLineDTO, fallbackTicketId: String) -> PickupTicketLine {
+        let line = PickupTicketLine(dto: dto)
+        guard line.ticketId.isEmpty else { return line }
+        return PickupTicketLine(
+            lineId: line.lineId,
+            ticketId: fallbackTicketId,
+            lineNumber: line.lineNumber,
+            reference: line.reference,
+            status: line.status,
+            requestUnit: line.requestUnit,
+            requestQuantity: line.requestQuantity,
+            requestedDisplay: line.requestedDisplay,
+            pickedUnit: line.pickedUnit,
+            pickedQuantity: line.pickedQuantity,
+            pickedDisplay: line.pickedDisplay,
+            stockAvailablePiecesSnapshot: line.stockAvailablePiecesSnapshot,
+            stockAvailableDisplaySnapshot: line.stockAvailableDisplaySnapshot,
+            warehouseHelpDisplay: line.warehouseHelpDisplay,
+            arrivalNoteSnapshot: line.arrivalNoteSnapshot,
+            lineNote: line.lineNote,
+            stockMutationId: line.stockMutationId,
+            createdAt: line.createdAt,
+            updatedAt: line.updatedAt
+        )
+    }
+
+    private func normalizedEvent(from dto: PickupTicketEventDTO, fallbackTicketId: String) -> PickupTicketEvent {
+        let event = PickupTicketEvent(dto: dto)
+        guard event.ticketId.isEmpty else { return event }
+        return PickupTicketEvent(
+            eventId: event.eventId,
+            ticketId: fallbackTicketId,
+            lineId: event.lineId,
+            eventType: event.eventType,
+            actor: event.actor,
+            createdAt: event.createdAt,
+            message: event.message,
+            payload: event.payload
+        )
     }
 }

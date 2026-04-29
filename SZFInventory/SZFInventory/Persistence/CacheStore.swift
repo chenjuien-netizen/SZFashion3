@@ -7,6 +7,7 @@ final class SyncMetadataStore {
         case globalSync = "sync"
         case inventory
         case history
+        case pickupTickets = "pickup_tickets"
         case detailPrefix = "detail"
 
         static func detail(reference: String) -> String {

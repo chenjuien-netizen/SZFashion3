@@ -81,3 +81,107 @@ extension HistoryEntry {
         self.businessLineId = businessLineId
     }
 }
+
+extension PickupTicket {
+    init(
+        ticketId: String,
+        ticketNumber: String,
+        status: PickupTicketStatus,
+        createdAt: String,
+        createdBy: String,
+        updatedAt: String?,
+        validatedAt: String?,
+        validatedBy: String?,
+        title: String,
+        requestTextRaw: String,
+        globalNote: String,
+        lineCount: Int,
+        resolvedLineCount: Int,
+        blockedLineCount: Int,
+        clientTicketId: String?,
+        version: Int
+    ) {
+        self.ticketId = ticketId
+        self.ticketNumber = ticketNumber
+        self.status = status
+        self.createdAt = createdAt
+        self.createdBy = createdBy
+        self.updatedAt = updatedAt
+        self.validatedAt = validatedAt
+        self.validatedBy = validatedBy
+        self.title = title
+        self.requestTextRaw = requestTextRaw
+        self.globalNote = globalNote
+        self.lineCount = lineCount
+        self.resolvedLineCount = resolvedLineCount
+        self.blockedLineCount = blockedLineCount
+        self.clientTicketId = clientTicketId
+        self.version = version
+    }
+}
+
+extension PickupTicketLine {
+    init(
+        lineId: String,
+        ticketId: String,
+        lineNumber: Int,
+        reference: String,
+        status: PickupTicketLineStatus,
+        requestUnit: String,
+        requestQuantity: Double?,
+        requestedDisplay: String,
+        pickedUnit: String?,
+        pickedQuantity: Double?,
+        pickedDisplay: String?,
+        stockAvailablePiecesSnapshot: Double?,
+        stockAvailableDisplaySnapshot: String?,
+        warehouseHelpDisplay: String,
+        arrivalNoteSnapshot: String,
+        lineNote: String,
+        stockMutationId: String?,
+        createdAt: String,
+        updatedAt: String?
+    ) {
+        self.lineId = lineId
+        self.ticketId = ticketId
+        self.lineNumber = lineNumber
+        self.reference = reference
+        self.status = status
+        self.requestUnit = requestUnit
+        self.requestQuantity = requestQuantity
+        self.requestedDisplay = requestedDisplay
+        self.pickedUnit = pickedUnit
+        self.pickedQuantity = pickedQuantity
+        self.pickedDisplay = pickedDisplay
+        self.stockAvailablePiecesSnapshot = stockAvailablePiecesSnapshot
+        self.stockAvailableDisplaySnapshot = stockAvailableDisplaySnapshot
+        self.warehouseHelpDisplay = warehouseHelpDisplay
+        self.arrivalNoteSnapshot = arrivalNoteSnapshot
+        self.lineNote = lineNote
+        self.stockMutationId = stockMutationId
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+extension PickupTicketEvent {
+    init(
+        eventId: String,
+        ticketId: String,
+        lineId: String?,
+        eventType: String,
+        actor: String,
+        createdAt: String,
+        message: String,
+        payload: Data?
+    ) {
+        self.eventId = eventId
+        self.ticketId = ticketId
+        self.lineId = lineId
+        self.eventType = eventType
+        self.actor = actor
+        self.createdAt = createdAt
+        self.message = message
+        self.payload = payload
+    }
+}

@@ -3,6 +3,7 @@ import Foundation
 struct SyncResponseDTO: Codable {
     let inventory: InventoryResponseDTO
     let history: HistoryResponseDTO
+    let ticketsBootstrap: PickupTicketsBootstrapResponseDTO?
     let generatedAt: String?
     let source: String?
 }
@@ -166,6 +167,42 @@ struct PickupTicketEventDTO: Codable {
     let createdAt: String?
     let payload: [String: String]?
     let message: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case eventId
+        case ticketId
+        case lineId
+        case eventType
+        case actor
+        case createdAt
+        case payload
+        case message
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        eventId = try container.decode(String.self, forKey: .eventId)
+        ticketId = try container.decodeIfPresent(String.self, forKey: .ticketId)
+        lineId = try container.decodeIfPresent(String.self, forKey: .lineId)
+        eventType = try container.decodeIfPresent(String.self, forKey: .eventType)
+        actor = try container.decodeIfPresent(String.self, forKey: .actor)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        // Payload values can contain nulls/numbers from Apps Script; we do not render them in the read-only MVP.
+        payload = nil
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(eventId, forKey: .eventId)
+        try container.encodeIfPresent(ticketId, forKey: .ticketId)
+        try container.encodeIfPresent(lineId, forKey: .lineId)
+        try container.encodeIfPresent(eventType, forKey: .eventType)
+        try container.encodeIfPresent(actor, forKey: .actor)
+        try container.encodeIfPresent(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(payload, forKey: .payload)
+        try container.encodeIfPresent(message, forKey: .message)
+    }
 }
 
 struct PickupTicketsBootstrapResponseDTO: Codable {

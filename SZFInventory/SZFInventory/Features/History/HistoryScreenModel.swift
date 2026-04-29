@@ -38,6 +38,19 @@ final class HistoryScreenModel {
         }
     }
 
+    var visibleSections: [HistoryDateSection] {
+        var sections: [HistoryDateSection] = []
+        for entry in visibleEntries {
+            let label = DateFormatters.historyGroupLabel(timestampRaw: entry.timestampRaw)
+            if sections.last?.title == label {
+                sections[sections.count - 1].entries.append(entry)
+            } else {
+                sections.append(HistoryDateSection(title: label, entries: [entry]))
+            }
+        }
+        return sections
+    }
+
     var availableFilters: [(label: String, value: String)] {
         [
             ("Tous", ""),
@@ -113,5 +126,17 @@ final class HistoryScreenModel {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+}
+
+struct HistoryDateSection: Identifiable {
+    let id: String
+    let title: String
+    var entries: [HistoryEntry]
+
+    init(title: String, entries: [HistoryEntry]) {
+        id = title
+        self.title = title
+        self.entries = entries
     }
 }

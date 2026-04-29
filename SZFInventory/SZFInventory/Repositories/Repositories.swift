@@ -21,5 +21,6 @@ protocol ReferenceRepository: AnyObject {
 
 protocol PickupTicketRepository: AnyObject {
     func loadPickupTickets() async throws -> [PickupTicket]
+    func loadPickupTicketDetail(ticketID: String) async throws -> PickupTicketDetail?
     func refreshPickupTickets() async throws -> [PickupTicket]
 }

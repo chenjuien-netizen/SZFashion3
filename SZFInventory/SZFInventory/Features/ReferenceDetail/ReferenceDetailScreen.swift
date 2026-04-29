@@ -53,7 +53,7 @@ struct ReferenceDetailScreen: View {
             }
 
             Section {
-                detailRow("Dernière sync", model.isSyncInProgress ? model.syncInProgressLabel : (model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais"))
+                detailRow("Dernière sync", model.isSyncInProgress ? model.syncInProgressLabel : DateFormatters.syncLabel(prefix: "Sync", from: model.lastSyncAt))
             }
         }
         .navigationTitle(model.reference)

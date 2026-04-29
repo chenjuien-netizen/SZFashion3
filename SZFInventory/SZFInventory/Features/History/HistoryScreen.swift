@@ -31,23 +31,27 @@ struct HistoryRootView: View {
                 LazyVStack(spacing: 0) {
                     HistoryStatusRow(model: model)
 
-                    ForEach(model.visibleEntries) { entry in
-                        if entry.reference.isEmpty {
-                            HistoryRow(entry: entry)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                        } else {
-                            NavigationLink(value: entry.reference) {
+                    ForEach(model.visibleSections) { section in
+                        HistoryDateHeader(title: section.title)
+
+                        ForEach(section.entries) { entry in
+                            if entry.reference.isEmpty {
                                 HistoryRow(entry: entry)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 16)
+                                    .padding(.horizontal, 12)
                                     .padding(.vertical, 8)
+                            } else {
+                                NavigationLink(value: entry.reference) {
+                                    HistoryRow(entry: entry)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.plain)
+                                .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
-                            .contentShape(Rectangle())
+                            Divider()
                         }
-                        Divider()
                     }
                 }
             }
@@ -136,7 +140,7 @@ private struct HistoryStatusRow: View {
         HStack(spacing: 8) {
             Text("Type : \(model.actionFilterLabel)")
             Spacer(minLength: 8)
-            Text(model.isSyncInProgress ? model.syncInProgressLabel : (model.lastSyncAt.map(DateFormatters.syncTimeString(from:)) ?? "Jamais"))
+            Text(model.isSyncInProgress ? model.syncInProgressLabel : DateFormatters.syncLabel(prefix: "Sync", from: model.lastSyncAt))
         }
         .font(.caption.weight(.medium))
         .foregroundStyle(.secondary)
@@ -152,28 +156,134 @@ private struct HistoryRow: View {
     let entry: HistoryEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(entry.reference.isEmpty ? "-" : entry.reference)
-                    .font(.headline)
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(1)
                 Spacer()
-                Text(entry.actionType.label)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                HistoryActionBadge(actionType: entry.actionType)
             }
-            Text(entry.afterDisplay.isEmpty ? "-" : entry.afterDisplay)
-                .font(.system(.subheadline, design: .monospaced))
-            HStack {
-                Text(entry.timestampLabel ?? entry.timestampRaw)
-                Spacer()
+
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    HistoryValueLine(
+                        leading: DateFormatters.historyDateTime(timestampRaw: entry.beforeTimestampRaw, fallback: entry.beforeTimestampLabel),
+                        value: entry.beforeDisplay,
+                        valueStyle: .secondary
+                    )
+                    HistoryValueLine(
+                        leading: "→",
+                        value: entry.movementDisplay ?? "",
+                        valueStyle: .primary
+                    )
+                    HistoryValueLine(
+                        leading: DateFormatters.historyDateTime(timestampRaw: entry.timestampRaw, fallback: entry.timestampLabel),
+                        value: entry.afterDisplay,
+                        valueStyle: .accent
+                    )
+                }
+
                 if !entry.remark.isEmpty {
                     Text(entry.remark)
-                        .lineLimit(1)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .padding(.leading, 8)
+                        .overlay(alignment: .leading) {
+                            Rectangle()
+                                .fill(.quaternary)
+                                .frame(width: 1)
+                        }
                 }
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+    }
+}
+
+private struct HistoryDateHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.caption2.weight(.black))
+            .tracking(1.4)
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(.quaternary)
+    }
+}
+
+private struct HistoryValueLine: View {
+    enum ValueStyle {
+        case primary
+        case secondary
+        case accent
+    }
+
+    let leading: String
+    let value: String
+    let valueStyle: ValueStyle
+
+    var body: some View {
+        Grid(horizontalSpacing: 8, verticalSpacing: 0) {
+            GridRow(alignment: .firstTextBaseline) {
+                Text(leading.isEmpty ? "—" : leading)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 86, alignment: .leading)
+                    .lineLimit(1)
+                Text(value.isEmpty ? "-" : value)
+                    .font(.system(size: 12, weight: valueStyle == .secondary ? .medium : .semibold, design: .monospaced))
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var color: Color {
+        switch valueStyle {
+        case .primary: return .primary
+        case .secondary: return .secondary
+        case .accent: return .teal
+        }
+    }
+}
+
+private struct HistoryActionBadge: View {
+    let actionType: HistoryActionType
+
+    var body: some View {
+        Text(actionType.label)
+            .font(.system(size: 9, weight: .bold))
+            .tracking(0.6)
+            .textCase(.uppercase)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(background, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+
+    private var foreground: Color {
+        switch actionType {
+        case .exit: return .red
+        case .entry: return .green
+        case .pickupTicket: return .secondary
+        case .adjustment, .other: return .secondary
+        }
+    }
+
+    private var background: Color {
+        switch actionType {
+        case .exit: return .red.opacity(0.12)
+        case .entry: return .green.opacity(0.12)
+        case .pickupTicket: return .secondary.opacity(0.14)
+        case .adjustment, .other: return .secondary.opacity(0.12)
+        }
     }
 }

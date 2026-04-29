@@ -39,9 +39,11 @@ function doGet(e) {
 function getSyncPayload_() {
   const inventory = getInventoryPayload_();
   const history = getHistoryPayload_({ loadAll: true });
+  const ticketsBootstrap = getPickupTicketsBootstrapPayload_();
   return {
     inventory: inventory,
     history: history,
+    ticketsBootstrap: ticketsBootstrap,
     generatedAt: inventory.generatedAt || history.generatedAt || new Date().toISOString(),
     source: "apps_script_sync"
   };

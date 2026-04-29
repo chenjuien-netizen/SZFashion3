@@ -48,7 +48,7 @@ struct AppView: View {
                 .opacity(selectedTab == .history ? 1 : 0)
                 .allowsHitTesting(selectedTab == .history)
 
-            TicketsPlaceholderView(onMenuTap: showSideMenu, onChromeVisibilityChange: setChromeHidden)
+            TicketsRootView(dependencies: dependencies, onMenuTap: showSideMenu, onChromeVisibilityChange: setChromeHidden)
                 .opacity(selectedTab == .tickets ? 1 : 0)
                 .allowsHitTesting(selectedTab == .tickets)
         }
@@ -141,6 +141,13 @@ private struct SideMenuOverlay: View {
                 SideMenuPanel()
                     .frame(width: 300)
                     .frame(maxHeight: .infinity)
+                    .gesture(
+                        DragGesture(minimumDistance: 20)
+                            .onEnded { value in
+                                guard value.translation.width < -60 else { return }
+                                hide()
+                            }
+                    )
                     .transition(.move(edge: .leading))
             }
         }
@@ -159,9 +166,14 @@ private struct SideMenuPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: 34, weight: .semibold))
-                    .foregroundStyle(.primary)
+                Circle()
+                    .fill(.primary)
+                    .frame(width: 46, height: 46)
+                    .overlay {
+                        Image(systemName: "shippingbox.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.background)
+                    }
                 Text("SZF Inventory")
                     .font(.title3.weight(.bold))
                 Text("Menu bientôt disponible")
@@ -181,7 +193,7 @@ private struct SideMenuPanel: View {
         .padding(.top, 64)
         .padding(.horizontal, 22)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background(.regularMaterial)
+        .background(.background)
         .ignoresSafeArea()
     }
 }
@@ -209,13 +221,19 @@ private struct BottomTabBar: View {
                     Button {
                         selectedTab = tab
                     } label: {
-                        VStack(spacing: 2) {
+                        VStack(spacing: 1) {
                             Image(systemName: selectedTab == tab ? tab.selectedSystemImage : tab.systemImage)
-                                .font(.system(size: 19, weight: .semibold))
+                                .font(.system(size: 18, weight: .semibold))
                             Text(tab.label)
-                                .font(.system(size: 10, weight: selectedTab == tab ? .bold : .semibold))
+                                .font(.system(size: 9, weight: selectedTab == tab ? .bold : .semibold))
                         }
-                        .frame(maxWidth: .infinity, minHeight: 46, maxHeight: 46)
+                        .overlay(alignment: .top) {
+                            Capsule()
+                                .fill(selectedTab == tab ? Color.primary : Color.clear)
+                                .frame(width: 18, height: 2)
+                                .offset(y: -6)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 42, maxHeight: 42)
                         .contentShape(Rectangle())
                         .foregroundStyle(selectedTab == tab ? .primary : .secondary)
                     }
@@ -224,7 +242,7 @@ private struct BottomTabBar: View {
                 }
             }
         }
-        .background(.bar)
+        .background(.background)
     }
 }
 
@@ -238,7 +256,7 @@ struct AppTopBar<Trailing: View>: View {
             Button(action: onMenuTap) {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 36, height: 36)
+                    .frame(width: 34, height: 34)
                     .foregroundStyle(.primary)
             }
             .buttonStyle(.plain)
@@ -253,8 +271,8 @@ struct AppTopBar<Trailing: View>: View {
                 .foregroundStyle(.primary)
         }
         .padding(.horizontal, 14)
-        .frame(height: 44)
-        .background(.bar)
+        .frame(height: 42)
+        .background(.background)
         .overlay(alignment: .bottom) {
             Divider()
         }
@@ -275,11 +293,11 @@ struct ChromeSearchField: View {
         }
         .font(.subheadline)
         .padding(.horizontal, 12)
-        .frame(height: 36)
+        .frame(height: 34)
         .background(.quaternary, in: Capsule())
         .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(.bar)
+        .padding(.vertical, 5)
+        .background(.background)
     }
 }
 
@@ -301,15 +319,15 @@ private struct FloatingAddButton: View {
                 Spacer()
                 Button(action: action) {
                     Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .bold))
+                        .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(.white)
-                        .frame(width: 56, height: 56)
+                        .frame(width: 52, height: 52)
                         .background(.primary, in: Circle())
                         .shadow(color: .black.opacity(0.22), radius: 12, x: 0, y: 6)
                 }
                 .buttonStyle(.plain)
                 .padding(.trailing, 18)
-                .padding(.bottom, 68)
+                .padding(.bottom, 62)
             }
         }
     }
@@ -327,30 +345,6 @@ private struct AddReferencePlaceholderView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium])
-    }
-}
-
-struct TicketsPlaceholderView: View {
-    let onMenuTap: () -> Void
-    let onChromeVisibilityChange: (Bool) -> Void
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView {
-                Label("Tickets bientôt disponibles", systemImage: "ticket")
-            } description: {
-                Text("Le backend et les modèles sont prêts. La prochaine étape sera de brancher la liste et le détail des tickets pickup.")
-            }
-        }
-        .safeAreaInset(edge: .top) {
-            AppTopBar(title: "Tickets", onMenuTap: onMenuTap) {
-                EmptyView()
-            }
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            onChromeVisibilityChange(false)
-        }
     }
 }
 

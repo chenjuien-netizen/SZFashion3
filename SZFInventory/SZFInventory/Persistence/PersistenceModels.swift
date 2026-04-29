@@ -189,6 +189,171 @@ final class ReferenceDetailCacheRecord {
 }
 
 @Model
+final class PickupTicketRecord {
+    @Attribute(.unique) var ticketId: String
+    var ticketNumber: String
+    var statusRaw: String
+    var createdAt: String
+    var createdBy: String
+    var updatedAt: String?
+    var validatedAt: String?
+    var validatedBy: String?
+    var title: String
+    var requestTextRaw: String
+    var globalNote: String
+    var lineCount: Int
+    var resolvedLineCount: Int
+    var blockedLineCount: Int
+    var clientTicketId: String?
+    var version: Int
+
+    init(ticket: PickupTicket) {
+        ticketId = ticket.ticketId
+        ticketNumber = ticket.ticketNumber
+        statusRaw = ticket.status.rawValueForStorage
+        createdAt = ticket.createdAt
+        createdBy = ticket.createdBy
+        updatedAt = ticket.updatedAt
+        validatedAt = ticket.validatedAt
+        validatedBy = ticket.validatedBy
+        title = ticket.title
+        requestTextRaw = ticket.requestTextRaw
+        globalNote = ticket.globalNote
+        lineCount = ticket.lineCount
+        resolvedLineCount = ticket.resolvedLineCount
+        blockedLineCount = ticket.blockedLineCount
+        clientTicketId = ticket.clientTicketId
+        version = ticket.version
+    }
+
+    var domainModel: PickupTicket {
+        PickupTicket(
+            ticketId: ticketId,
+            ticketNumber: ticketNumber,
+            status: PickupTicketStatus(apiValue: statusRaw),
+            createdAt: createdAt,
+            createdBy: createdBy,
+            updatedAt: updatedAt,
+            validatedAt: validatedAt,
+            validatedBy: validatedBy,
+            title: title,
+            requestTextRaw: requestTextRaw,
+            globalNote: globalNote,
+            lineCount: lineCount,
+            resolvedLineCount: resolvedLineCount,
+            blockedLineCount: blockedLineCount,
+            clientTicketId: clientTicketId,
+            version: version
+        )
+    }
+}
+
+@Model
+final class PickupTicketLineRecord {
+    @Attribute(.unique) var lineId: String
+    var ticketId: String
+    var lineNumber: Int
+    var reference: String
+    var statusRaw: String
+    var requestUnit: String
+    var requestQuantity: Double?
+    var requestedDisplay: String
+    var pickedUnit: String?
+    var pickedQuantity: Double?
+    var pickedDisplay: String?
+    var stockAvailablePiecesSnapshot: Double?
+    var stockAvailableDisplaySnapshot: String?
+    var warehouseHelpDisplay: String
+    var arrivalNoteSnapshot: String
+    var lineNote: String
+    var stockMutationId: String?
+    var createdAt: String
+    var updatedAt: String?
+
+    init(line: PickupTicketLine) {
+        lineId = line.lineId
+        ticketId = line.ticketId
+        lineNumber = line.lineNumber
+        reference = line.reference
+        statusRaw = line.status.rawValueForStorage
+        requestUnit = line.requestUnit
+        requestQuantity = line.requestQuantity
+        requestedDisplay = line.requestedDisplay
+        pickedUnit = line.pickedUnit
+        pickedQuantity = line.pickedQuantity
+        pickedDisplay = line.pickedDisplay
+        stockAvailablePiecesSnapshot = line.stockAvailablePiecesSnapshot
+        stockAvailableDisplaySnapshot = line.stockAvailableDisplaySnapshot
+        warehouseHelpDisplay = line.warehouseHelpDisplay
+        arrivalNoteSnapshot = line.arrivalNoteSnapshot
+        lineNote = line.lineNote
+        stockMutationId = line.stockMutationId
+        createdAt = line.createdAt
+        updatedAt = line.updatedAt
+    }
+
+    var domainModel: PickupTicketLine {
+        PickupTicketLine(
+            lineId: lineId,
+            ticketId: ticketId,
+            lineNumber: lineNumber,
+            reference: reference,
+            status: PickupTicketLineStatus(apiValue: statusRaw),
+            requestUnit: requestUnit,
+            requestQuantity: requestQuantity,
+            requestedDisplay: requestedDisplay,
+            pickedUnit: pickedUnit,
+            pickedQuantity: pickedQuantity,
+            pickedDisplay: pickedDisplay,
+            stockAvailablePiecesSnapshot: stockAvailablePiecesSnapshot,
+            stockAvailableDisplaySnapshot: stockAvailableDisplaySnapshot,
+            warehouseHelpDisplay: warehouseHelpDisplay,
+            arrivalNoteSnapshot: arrivalNoteSnapshot,
+            lineNote: lineNote,
+            stockMutationId: stockMutationId,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+@Model
+final class PickupTicketEventRecord {
+    @Attribute(.unique) var eventId: String
+    var ticketId: String
+    var lineId: String?
+    var eventType: String
+    var actor: String
+    var createdAt: String
+    var message: String
+    var payload: Data?
+
+    init(event: PickupTicketEvent) {
+        eventId = event.eventId
+        ticketId = event.ticketId
+        lineId = event.lineId
+        eventType = event.eventType
+        actor = event.actor
+        createdAt = event.createdAt
+        message = event.message
+        payload = event.payload
+    }
+
+    var domainModel: PickupTicketEvent {
+        PickupTicketEvent(
+            eventId: eventId,
+            ticketId: ticketId,
+            lineId: lineId,
+            eventType: eventType,
+            actor: actor,
+            createdAt: createdAt,
+            message: message,
+            payload: payload
+        )
+    }
+}
+
+@Model
 final class SyncMetadataRecord {
     @Attribute(.unique) var resourceKey: String
     var syncedAt: Date?
@@ -204,6 +369,9 @@ func makeModelContainer(inMemory: Bool) -> ModelContainer {
         InventoryItemRecord.self,
         HistoryEntryRecord.self,
         ReferenceDetailCacheRecord.self,
+        PickupTicketRecord.self,
+        PickupTicketLineRecord.self,
+        PickupTicketEventRecord.self,
         SyncMetadataRecord.self
     ])
     let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)

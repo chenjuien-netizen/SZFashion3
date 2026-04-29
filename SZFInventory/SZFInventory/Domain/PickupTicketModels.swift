@@ -16,6 +16,26 @@ enum PickupTicketStatus: Hashable, Codable, Sendable {
         default: self = .other(apiValue)
         }
     }
+
+    var label: String {
+        switch self {
+        case .draft: return "Brouillon"
+        case .inProgress: return "En cours"
+        case .validated: return "Validé"
+        case .cancelled: return "Annulé"
+        case let .other(value): return value.isEmpty ? "Autre" : value
+        }
+    }
+
+    var rawValueForStorage: String {
+        switch self {
+        case .draft: return "draft"
+        case .inProgress: return "in_progress"
+        case .validated: return "validated"
+        case .cancelled: return "cancelled"
+        case let .other(value): return value
+        }
+    }
 }
 
 enum PickupTicketLineStatus: Hashable, Codable, Sendable {
@@ -30,6 +50,24 @@ enum PickupTicketLineStatus: Hashable, Codable, Sendable {
         case "resolved": self = .resolved
         case "blocked": self = .blocked
         default: self = .other(apiValue)
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .pending: return "À traiter"
+        case .resolved: return "Résolu"
+        case .blocked: return "Bloqué"
+        case let .other(value): return value.isEmpty ? "Autre" : value
+        }
+    }
+
+    var rawValueForStorage: String {
+        switch self {
+        case .pending: return "pending"
+        case .resolved: return "resolved"
+        case .blocked: return "blocked"
+        case let .other(value): return value
         }
     }
 }
@@ -142,4 +180,10 @@ struct PickupTicketEvent: Identifiable, Codable, Hashable, Sendable {
         message = dto.message ?? ""
         payload = try? JSONSerialization.data(withJSONObject: dto.payload ?? [:], options: [.sortedKeys])
     }
+}
+
+struct PickupTicketDetail: Codable, Hashable, Sendable {
+    let ticket: PickupTicket
+    let lines: [PickupTicketLine]
+    let events: [PickupTicketEvent]
 }
