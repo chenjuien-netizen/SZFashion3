@@ -1,5 +1,9 @@
 import Foundation
 
+protocol AppSyncRepository: AnyObject {
+    func refreshAll() async throws
+}
+
 protocol InventoryRepository: AnyObject {
     func loadInventory() async throws -> [InventoryItem]
     func refreshInventory() async throws -> [InventoryItem]

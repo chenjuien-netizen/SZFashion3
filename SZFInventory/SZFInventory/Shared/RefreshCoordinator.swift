@@ -1,9 +1,13 @@
+import Foundation
 import Observation
 
 @MainActor
 @Observable
 final class RefreshCoordinator {
+    static let globalSyncResource = "sync"
+
     private(set) var activeResource: String?
+    private(set) var lastCompletedAt: Date?
 
     var isRefreshing: Bool {
         activeResource != nil
@@ -12,16 +16,8 @@ final class RefreshCoordinator {
     var activeSyncLabel: String? {
         guard let activeResource else { return nil }
 
-        if activeResource == SyncMetadataStore.ResourceKey.inventory.rawValue {
-            return "Sync inventaire en cours…"
-        }
-
-        if activeResource == SyncMetadataStore.ResourceKey.history.rawValue {
-            return "Sync historique en cours…"
-        }
-
-        if activeResource.hasPrefix("detail:") {
-            return "Sync fiche en cours…"
+        if activeResource == Self.globalSyncResource {
+            return "Sync globale en cours…"
         }
 
         return "Sync en cours…"
@@ -36,5 +32,6 @@ final class RefreshCoordinator {
     func end(_ resource: String) {
         guard activeResource == resource else { return }
         activeResource = nil
+        lastCompletedAt = Date()
     }
 }

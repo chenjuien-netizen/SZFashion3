@@ -1,5 +1,12 @@
 import Foundation
 
+struct SyncResponseDTO: Codable {
+    let inventory: InventoryResponseDTO
+    let history: HistoryResponseDTO
+    let generatedAt: String?
+    let source: String?
+}
+
 struct InventoryResponseDTO: Codable {
     let items: [InventoryItemDTO]
     let summary: InventorySummaryDTO?

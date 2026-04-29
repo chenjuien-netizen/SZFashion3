@@ -7,6 +7,7 @@ struct AppView: View {
     @State private var isSideMenuPresented = false
     @State private var isChromeHidden = false
     @State private var isAddReferencePresented = false
+    @State private var didTriggerLaunchSync = false
 
     var body: some View {
         ZStack {
@@ -31,6 +32,9 @@ struct AppView: View {
         .sheet(isPresented: $isAddReferencePresented) {
             AddReferencePlaceholderView()
         }
+        .task {
+            triggerLaunchSyncIfNeeded()
+        }
         .tint(.primary)
     }
 
@@ -53,6 +57,23 @@ struct AppView: View {
     private func showSideMenu() {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
             isSideMenuPresented = true
+        }
+    }
+
+    private func triggerLaunchSyncIfNeeded() {
+        guard !didTriggerLaunchSync, !dependencies.refreshCoordinator.isRefreshing else { return }
+        didTriggerLaunchSync = true
+        Task {
+            let resource = RefreshCoordinator.globalSyncResource
+            guard dependencies.refreshCoordinator.begin(resource) else { return }
+            defer {
+                dependencies.refreshCoordinator.end(resource)
+            }
+            do {
+                try await dependencies.appSyncRepository.refreshAll()
+            } catch {
+                // Screens keep showing their cached data; explicit errors stay screen-local.
+            }
         }
     }
 

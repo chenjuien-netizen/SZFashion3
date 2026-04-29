@@ -3,6 +3,9 @@ function doGet(e) {
   const route = String(params.route || "").trim().toLowerCase();
 
   try {
+    if (route === "sync" || route === "bootstrap") {
+      return apiJson_(getSyncPayload_());
+    }
     if (route === "inventory") {
       return apiJson_(getInventoryPayload_());
     }
@@ -27,10 +30,21 @@ function doGet(e) {
     if (route === "pickup_ticket") {
       return apiJson_(getPickupTicketPayload_(params.ticket_id || ""));
     }
-    return apiError_("Route introuvable. Utilise route=inventory, route=history, route=detail, route=reference_import_batches, route=reference_import_batch, route=pickup_tickets, route=pickup_tickets_bootstrap ou route=pickup_ticket.", 404);
+    return apiError_("Route introuvable. Utilise route=sync, route=inventory, route=history, route=detail, route=reference_import_batches, route=reference_import_batch, route=pickup_tickets, route=pickup_tickets_bootstrap ou route=pickup_ticket.", 404);
   } catch (error) {
     return apiError_(error && error.message ? error.message : "Erreur serveur inconnue.", 500);
   }
+}
+
+function getSyncPayload_() {
+  const inventory = getInventoryPayload_();
+  const history = getHistoryPayload_({ loadAll: true });
+  return {
+    inventory: inventory,
+    history: history,
+    generatedAt: inventory.generatedAt || history.generatedAt || new Date().toISOString(),
+    source: "apps_script_sync"
+  };
 }
 
 function doPost(e) {

@@ -1,6 +1,7 @@
 import Foundation
 
 enum APIEndpoint {
+    case sync
     case inventory
     case history
     case detail(reference: String)
@@ -28,6 +29,8 @@ enum APIEndpoint {
 
     private var queryItems: [URLQueryItem] {
         switch self {
+        case .sync:
+            return [URLQueryItem(name: "route", value: "sync")]
         case .inventory:
             return [URLQueryItem(name: "route", value: "inventory")]
         case .history:

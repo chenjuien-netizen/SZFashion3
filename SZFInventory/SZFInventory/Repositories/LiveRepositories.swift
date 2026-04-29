@@ -14,8 +14,7 @@ final class LiveInventoryRepository: InventoryRepository {
     }
 
     func loadInventory() async throws -> [InventoryItem] {
-        let cached = try fetchCachedInventory()
-        return cached.isEmpty ? try await refreshInventory() : cached
+        try fetchCachedInventory()
     }
 
     func refreshInventory() async throws -> [InventoryItem] {
@@ -56,8 +55,7 @@ final class LiveHistoryRepository: HistoryRepository {
     }
 
     func loadHistory() async throws -> [HistoryEntry] {
-        let cached = try fetchCachedHistory()
-        return cached.isEmpty ? try await refreshHistory() : cached
+        try fetchCachedHistory()
     }
 
     func refreshHistory() async throws -> [HistoryEntry] {
@@ -103,17 +101,9 @@ final class LiveReferenceRepository: ReferenceRepository {
 
     func loadDetail(reference: String) async throws -> ReferenceDetail {
         let normalized = reference.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if let cached = try fetchCachedDetail(reference: normalized) {
-            return cached
-        }
-
         let item = try fetchCachedInventoryItem(reference: normalized)
         let history = try fetchCachedHistory(reference: normalized)
-        if item != nil || !history.isEmpty {
-            return ReferenceDetail(item: item, history: history, notFoundInStock: item == nil, lastMovementAt: history.first?.timestampRaw)
-        }
-
-        return try await refreshDetail(reference: normalized)
+        return ReferenceDetail(item: item, history: history, notFoundInStock: item == nil, lastMovementAt: history.first?.timestampRaw)
     }
 
     func refreshDetail(reference: String) async throws -> ReferenceDetail {

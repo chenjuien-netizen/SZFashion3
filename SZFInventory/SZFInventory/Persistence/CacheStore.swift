@@ -4,6 +4,7 @@ import SwiftData
 @MainActor
 final class SyncMetadataStore {
     enum ResourceKey: String {
+        case globalSync = "sync"
         case inventory
         case history
         case detailPrefix = "detail"

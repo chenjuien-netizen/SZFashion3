@@ -8,6 +8,7 @@ final class AppDependencies {
     let apiClient: APIClient
     let refreshCoordinator: RefreshCoordinator
     let syncMetadataStore: SyncMetadataStore
+    let appSyncRepository: AppSyncRepository
     let inventoryRepository: InventoryRepository
     let historyRepository: HistoryRepository
     let referenceRepository: ReferenceRepository
@@ -19,6 +20,7 @@ final class AppDependencies {
         self.apiClient = apiClient
         self.refreshCoordinator = refreshCoordinator
         self.syncMetadataStore = syncMetadataStore
+        self.appSyncRepository = LiveAppSyncRepository(modelContext: modelContext, apiClient: apiClient, syncMetadataStore: syncMetadataStore)
         self.inventoryRepository = LiveInventoryRepository(modelContext: modelContext, apiClient: apiClient, syncMetadataStore: syncMetadataStore)
         self.historyRepository = LiveHistoryRepository(modelContext: modelContext, apiClient: apiClient, syncMetadataStore: syncMetadataStore)
         self.referenceRepository = LiveReferenceRepository(modelContext: modelContext, apiClient: apiClient, syncMetadataStore: syncMetadataStore)

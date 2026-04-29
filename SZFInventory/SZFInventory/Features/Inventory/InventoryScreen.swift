@@ -14,7 +14,7 @@ struct InventoryRootView: View {
         onMenuTap: @escaping () -> Void = {},
         onChromeVisibilityChange: @escaping (Bool) -> Void = { _ in }
     ) {
-        _model = State(initialValue: InventoryScreenModel(repository: dependencies.inventoryRepository, syncMetadataStore: dependencies.syncMetadataStore, refreshCoordinator: dependencies.refreshCoordinator))
+        _model = State(initialValue: InventoryScreenModel(repository: dependencies.inventoryRepository, appSyncRepository: dependencies.appSyncRepository, syncMetadataStore: dependencies.syncMetadataStore, refreshCoordinator: dependencies.refreshCoordinator))
         self.onMenuTap = onMenuTap
         self.onChromeVisibilityChange = onChromeVisibilityChange
     }
@@ -30,6 +30,7 @@ struct InventoryRootView: View {
                             model: ReferenceDetailScreenModel(
                                 reference: reference,
                                 repository: dependencies.referenceRepository,
+                                appSyncRepository: dependencies.appSyncRepository,
                                 syncMetadataStore: dependencies.syncMetadataStore,
                                 refreshCoordinator: dependencies.refreshCoordinator
                             )
@@ -46,6 +47,7 @@ struct InventoryRootView: View {
                                 model: ReferenceDetailScreenModel(
                                     reference: item.reference,
                                     repository: dependencies.referenceRepository,
+                                    appSyncRepository: dependencies.appSyncRepository,
                                     syncMetadataStore: dependencies.syncMetadataStore,
                                     refreshCoordinator: dependencies.refreshCoordinator
                                 )
@@ -56,6 +58,10 @@ struct InventoryRootView: View {
         }
         .task {
             await model.load()
+        }
+        .task(id: dependencies.refreshCoordinator.lastCompletedAt) {
+            guard dependencies.refreshCoordinator.lastCompletedAt != nil else { return }
+            await model.reloadFromCache()
         }
         .sheet(item: $filterDraft) { draft in
             InventoryFilterSheet(draft: draft) { sortMode, stockFilter in
@@ -97,7 +103,7 @@ struct InventoryRootView: View {
         .coordinateSpace(name: "inventory-scroll")
         .onPreferenceChange(ScrollOffsetPreferenceKey.self, perform: updateChromeVisibility)
         .overlay {
-            if model.isLoading && model.visibleItems.isEmpty {
+            if (model.isLoading || model.isSyncInProgress) && model.visibleItems.isEmpty {
                 ProgressView("Chargement inventaire…")
             } else if let errorMessage = model.errorMessage, model.visibleItems.isEmpty {
                 ContentUnavailableView("Inventaire indisponible", systemImage: "wifi.exclamationmark", description: Text(errorMessage))

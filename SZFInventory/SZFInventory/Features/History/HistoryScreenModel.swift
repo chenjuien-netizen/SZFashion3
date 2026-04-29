@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class HistoryScreenModel {
     private let repository: HistoryRepository
+    private let appSyncRepository: AppSyncRepository
     private let syncMetadataStore: SyncMetadataStore
     private let refreshCoordinator: RefreshCoordinator
 
@@ -18,8 +19,9 @@ final class HistoryScreenModel {
     private var hasLoaded = false
     private var refreshTask: Task<Void, Never>?
 
-    init(repository: HistoryRepository, syncMetadataStore: SyncMetadataStore, refreshCoordinator: RefreshCoordinator) {
+    init(repository: HistoryRepository, appSyncRepository: AppSyncRepository, syncMetadataStore: SyncMetadataStore, refreshCoordinator: RefreshCoordinator) {
         self.repository = repository
+        self.appSyncRepository = appSyncRepository
         self.syncMetadataStore = syncMetadataStore
         self.refreshCoordinator = refreshCoordinator
     }
@@ -69,12 +71,17 @@ final class HistoryScreenModel {
             errorMessage = error.localizedDescription
         }
         isLoading = false
-        await refreshIfNeeded(force: false)
     }
 
-    func refreshIfNeeded(force: Bool) async {
-        guard force || shouldRefresh else { return }
-        await refresh()
+    func reloadFromCache() async {
+        do {
+            allEntries = try await repository.loadHistory()
+            lastSyncAt = syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.history.rawValue)
+        } catch {
+            if allEntries.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     func triggerBackgroundRefresh() {
@@ -89,7 +96,7 @@ final class HistoryScreenModel {
     }
 
     func refresh() async {
-        let resource = SyncMetadataStore.ResourceKey.history.rawValue
+        let resource = RefreshCoordinator.globalSyncResource
         guard refreshCoordinator.begin(resource) else { return }
         isRefreshing = true
         defer {
@@ -99,17 +106,12 @@ final class HistoryScreenModel {
 
         errorMessage = nil
         do {
-            allEntries = try await repository.refreshHistory()
-            lastSyncAt = syncMetadataStore.syncDate(for: resource)
+            try await appSyncRepository.refreshAll()
+            await reloadFromCache()
         } catch {
             if allEntries.isEmpty {
                 errorMessage = error.localizedDescription
             }
         }
-    }
-
-    private var shouldRefresh: Bool {
-        guard let lastSyncAt else { return true }
-        return Date().timeIntervalSince(lastSyncAt) > 180
     }
 }

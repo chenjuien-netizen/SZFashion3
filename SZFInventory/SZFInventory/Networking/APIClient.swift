@@ -21,6 +21,10 @@ struct APIClient {
         return decoder
     }()
 
+    func fetchSync() async throws -> SyncResponseDTO {
+        try await get(.sync, as: SyncResponseDTO.self)
+    }
+
     func fetchInventory() async throws -> InventoryResponseDTO {
         try await get(.inventory, as: InventoryResponseDTO.self)
     }

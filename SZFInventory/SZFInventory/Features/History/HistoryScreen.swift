@@ -12,7 +12,7 @@ struct HistoryRootView: View {
         onMenuTap: @escaping () -> Void = {},
         onChromeVisibilityChange: @escaping (Bool) -> Void = { _ in }
     ) {
-        _model = State(initialValue: HistoryScreenModel(repository: dependencies.historyRepository, syncMetadataStore: dependencies.syncMetadataStore, refreshCoordinator: dependencies.refreshCoordinator))
+        _model = State(initialValue: HistoryScreenModel(repository: dependencies.historyRepository, appSyncRepository: dependencies.appSyncRepository, syncMetadataStore: dependencies.syncMetadataStore, refreshCoordinator: dependencies.refreshCoordinator))
         self.onMenuTap = onMenuTap
         self.onChromeVisibilityChange = onChromeVisibilityChange
     }
@@ -54,7 +54,7 @@ struct HistoryRootView: View {
             .coordinateSpace(name: "history-scroll")
             .onPreferenceChange(ScrollOffsetPreferenceKey.self, perform: updateChromeVisibility)
             .overlay {
-                if model.isLoading && model.visibleEntries.isEmpty {
+                if (model.isLoading || model.isSyncInProgress) && model.visibleEntries.isEmpty {
                     ProgressView("Chargement historique…")
                 } else if let errorMessage = model.errorMessage, model.visibleEntries.isEmpty {
                     ContentUnavailableView("Historique indisponible", systemImage: "wifi.exclamationmark", description: Text(errorMessage))
@@ -69,6 +69,7 @@ struct HistoryRootView: View {
                     model: ReferenceDetailScreenModel(
                         reference: reference,
                         repository: dependencies.referenceRepository,
+                        appSyncRepository: dependencies.appSyncRepository,
                         syncMetadataStore: dependencies.syncMetadataStore,
                         refreshCoordinator: dependencies.refreshCoordinator
                     )
@@ -108,6 +109,10 @@ struct HistoryRootView: View {
         }
         .task {
             await model.load()
+        }
+        .task(id: dependencies.refreshCoordinator.lastCompletedAt) {
+            guard dependencies.refreshCoordinator.lastCompletedAt != nil else { return }
+            await model.reloadFromCache()
         }
     }
 

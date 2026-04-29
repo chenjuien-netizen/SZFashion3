@@ -7,6 +7,7 @@ final class ReferenceDetailScreenModel {
     let reference: String
 
     private let repository: ReferenceRepository
+    private let appSyncRepository: AppSyncRepository
     private let syncMetadataStore: SyncMetadataStore
     private let refreshCoordinator: RefreshCoordinator
 
@@ -18,9 +19,10 @@ final class ReferenceDetailScreenModel {
     private var hasLoaded = false
     private var refreshTask: Task<Void, Never>?
 
-    init(reference: String, repository: ReferenceRepository, syncMetadataStore: SyncMetadataStore, refreshCoordinator: RefreshCoordinator) {
+    init(reference: String, repository: ReferenceRepository, appSyncRepository: AppSyncRepository, syncMetadataStore: SyncMetadataStore, refreshCoordinator: RefreshCoordinator) {
         self.reference = reference
         self.repository = repository
+        self.appSyncRepository = appSyncRepository
         self.syncMetadataStore = syncMetadataStore
         self.refreshCoordinator = refreshCoordinator
     }
@@ -30,18 +32,25 @@ final class ReferenceDetailScreenModel {
         isLoading = true
         do {
             detail = try await repository.loadDetail(reference: reference)
-            lastSyncAt = syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.detail(reference: reference))
+            lastSyncAt = syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.globalSync.rawValue)
+                ?? syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.inventory.rawValue)
             hasLoaded = true
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
-        await refreshIfNeeded(force: false)
     }
 
-    func refreshIfNeeded(force: Bool) async {
-        guard force || shouldRefresh else { return }
-        await refresh()
+    func reloadFromCache() async {
+        do {
+            detail = try await repository.loadDetail(reference: reference)
+            lastSyncAt = syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.globalSync.rawValue)
+                ?? syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.inventory.rawValue)
+        } catch {
+            if detail == nil {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     var isSyncInProgress: Bool {
@@ -50,6 +59,10 @@ final class ReferenceDetailScreenModel {
 
     var syncInProgressLabel: String {
         refreshCoordinator.activeSyncLabel ?? "Sync en cours…"
+    }
+
+    var syncCompletedAt: Date? {
+        refreshCoordinator.lastCompletedAt
     }
 
     func triggerBackgroundRefresh() {
@@ -64,7 +77,7 @@ final class ReferenceDetailScreenModel {
     }
 
     func refresh() async {
-        let resource = SyncMetadataStore.ResourceKey.detail(reference: reference)
+        let resource = RefreshCoordinator.globalSyncResource
         guard refreshCoordinator.begin(resource) else { return }
         isRefreshing = true
         defer {
@@ -74,17 +87,12 @@ final class ReferenceDetailScreenModel {
 
         errorMessage = nil
         do {
-            detail = try await repository.refreshDetail(reference: reference)
-            lastSyncAt = syncMetadataStore.syncDate(for: resource)
+            try await appSyncRepository.refreshAll()
+            await reloadFromCache()
         } catch {
             if detail == nil {
                 errorMessage = error.localizedDescription
             }
         }
-    }
-
-    private var shouldRefresh: Bool {
-        guard let lastSyncAt else { return true }
-        return Date().timeIntervalSince(lastSyncAt) > 300
     }
 }

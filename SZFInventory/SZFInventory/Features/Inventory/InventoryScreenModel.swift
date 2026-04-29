@@ -39,6 +39,7 @@ final class InventoryScreenModel {
     }
 
     private let repository: InventoryRepository
+    private let appSyncRepository: AppSyncRepository
     private let syncMetadataStore: SyncMetadataStore
     private let refreshCoordinator: RefreshCoordinator
 
@@ -54,8 +55,9 @@ final class InventoryScreenModel {
     private var hasLoaded = false
     private var refreshTask: Task<Void, Never>?
 
-    init(repository: InventoryRepository, syncMetadataStore: SyncMetadataStore, refreshCoordinator: RefreshCoordinator) {
+    init(repository: InventoryRepository, appSyncRepository: AppSyncRepository, syncMetadataStore: SyncMetadataStore, refreshCoordinator: RefreshCoordinator) {
         self.repository = repository
+        self.appSyncRepository = appSyncRepository
         self.syncMetadataStore = syncMetadataStore
         self.refreshCoordinator = refreshCoordinator
     }
@@ -135,12 +137,17 @@ final class InventoryScreenModel {
             errorMessage = error.localizedDescription
         }
         isLoading = false
-        await refreshIfNeeded(force: false)
     }
 
-    func refreshIfNeeded(force: Bool) async {
-        guard force || shouldRefresh else { return }
-        await refresh()
+    func reloadFromCache() async {
+        do {
+            allItems = try await repository.loadInventory()
+            lastSyncAt = syncMetadataStore.syncDate(for: SyncMetadataStore.ResourceKey.inventory.rawValue)
+        } catch {
+            if allItems.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     func triggerBackgroundRefresh() {
@@ -155,7 +162,7 @@ final class InventoryScreenModel {
     }
 
     func refresh() async {
-        let resource = SyncMetadataStore.ResourceKey.inventory.rawValue
+        let resource = RefreshCoordinator.globalSyncResource
         guard refreshCoordinator.begin(resource) else { return }
         isRefreshing = true
         defer {
@@ -165,17 +172,12 @@ final class InventoryScreenModel {
 
         errorMessage = nil
         do {
-            allItems = try await repository.refreshInventory()
-            lastSyncAt = syncMetadataStore.syncDate(for: resource)
+            try await appSyncRepository.refreshAll()
+            await reloadFromCache()
         } catch {
             if allItems.isEmpty {
                 errorMessage = error.localizedDescription
             }
         }
-    }
-
-    private var shouldRefresh: Bool {
-        guard let lastSyncAt else { return true }
-        return Date().timeIntervalSince(lastSyncAt) > 300
     }
 }

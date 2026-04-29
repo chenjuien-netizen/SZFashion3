@@ -71,6 +71,10 @@ struct ReferenceDetailScreen: View {
         .task {
             await model.load()
         }
+        .task(id: model.syncCompletedAt) {
+            guard model.syncCompletedAt != nil else { return }
+            await model.reloadFromCache()
+        }
     }
 
     @ViewBuilder
